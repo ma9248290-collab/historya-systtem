@@ -202,9 +202,7 @@ document.getElementById('confirmYesBtn')?.addEventListener('click', function() {
 function openModal(modalId) { 
     document.getElementById(modalId).style.display = "block"; 
     if(modalId === 'addStudentModal') {
-        let prefixEl = document.getElementById('studentCenterPrefix');
-        if (prefixEl) prefixEl.value = '';
-        document.getElementById('studentCode').value = ''; 
+        document.getElementById('studentCode').value = generateStudentCode(); 
     }
     if(modalId === 'addSessionModal') { document.getElementById('sessionDate').valueAsDate = new Date(); toggleAutoInputs(); } 
     if(modalId === 'addExamModal') document.getElementById('examDate').valueAsDate = new Date(); 
@@ -1001,54 +999,20 @@ function filterGroupsByLevel(levelSelectId, groupSelectId) {
     if(level) { groups.filter(g => g.level === level).forEach(g => { groupSelect.innerHTML += `<option value="${g.name}">${g.name}</option>`; }); }
 }
 
-window.generateStudentCode = function(prefix = null) { 
-    if (prefix) {
-        let lastNum = 2000; // البداية الافتراضية لو السنتر ده لسه مفيش فيه ولا طالب
-        
-        // 💡 السحر هنا: بنلف في مصفوفة الطلاب بالعكس (من آخر طالب اتسجل لأول طالب)
-        for (let i = students.length - 1; i >= 0; i--) {
-            let s = students[i];
-            // لو لقينا طالب الكود بتاعه بيبدأ بحرف السنتر اللي اخترناه
-            if (s.code && String(s.code).startsWith(prefix + "-")) {
-                let num = parseInt(String(s.code).split("-")[1], 10);
-                if (!isNaN(num)) {
-                    lastNum = num; // بناخد رقمه
-                    break; // 🛑 ونوقف بحث فوراً لأننا خلاص لقينا "آخر" واحد اتسجل في السنتر ده
-                }
-            }
-        }
-        
-        // بنرجع الرقم مضاف ليه 1
-        return prefix + "-" + (lastNum + 1).toString();
-        
-    } else {
-        // دعم للنظام القديم أو الطلاب الأونلاين (أرقام فقط)
-        let maxId = 0; 
-        students.forEach(s => { 
-            let num = parseInt(s.code, 10); 
-            if (!isNaN(num) && num > maxId) maxId = num; 
-        }); 
-        return (maxId + 1).toString(); 
-    }
+
+
+// دالة توليد كود الطالب (أرقام فقط)
+window.generateStudentCode = function() {
+    let maxId = 0;
+    students.forEach(s => {
+        // السطر ده ذكي جداً: بيشيل أي حروف قديمة وياخد الرقم بس، عشان يكمل عد صح
+        let numStr = String(s.code).replace(/\D/g, ''); 
+        let num = parseInt(numStr, 10);
+        if (!isNaN(num) && num > maxId) maxId = num;
+    });
+    return (maxId + 1).toString();
 };
 
-// الدالة دي بتفضل زي ما هي مفيهاش تغيير
-window.updateGeneratedCode = function() {
-    let prefix = document.getElementById("studentCenterPrefix").value;
-    if (prefix) {
-        document.getElementById("studentCode").value = generateStudentCode(prefix);
-    } else {
-        document.getElementById("studentCode").value = "";
-    }
-};
-window.updateGeneratedCode = function() {
-    let prefix = document.getElementById("studentCenterPrefix").value;
-    if (prefix) {
-        document.getElementById("studentCode").value = generateStudentCode(prefix);
-    } else {
-        document.getElementById("studentCode").value = "";
-    }
-};
 // دالة مساعدة لحفظ الطالب تعمل مع الزرارين (حفظ وإنهاء / حفظ وإضافة)
 window.processStudentSaving = async function(keepOpen) {
     const code = document.getElementById("studentCode").value.trim(); 
@@ -1219,21 +1183,11 @@ window.openEditStudentModal = function() {
         document.getElementById('editStudentCodeOriginal').value = student.code;
         document.getElementById('editStudentCode').value = student.code; 
         document.getElementById('editStudentName').value = student.name; 
-        
-        // 💡 السطر الجديد: قراءة حرف السنتر من كود الطالب الحالي
-        const prefixSelect = document.getElementById('editStudentCenterPrefix');
-        if (prefixSelect) {
-            let match = student.code.match(/^[a-zA-Z]+/); // يمسك الحروف الانجليزية من الكود
-            if (match) {
-                prefixSelect.value = match[0].toUpperCase();
-            } else {
-                prefixSelect.value = ""; // لو الكود أرقام بس (أونلاين مثلا)
-            }
-        }
 
         document.getElementById('editStudentLevel').value = student.level; 
-        document.getElementById('editStudentTrack').value = student.track || "عام";
         toggleTrackDropdown('editStudentLevel', 'editTrackGroup');
+        
+        // ... (باقي الدالة زي ما هي بدون تغيير)
         
         filterGroupsByLevel('editStudentLevel', 'editStudentGroup');
         
@@ -2149,17 +2103,19 @@ window.exportData = function() {
     }
 };
 
-// دالة الاسترجاع (استيراد النسخة الاحتياطية)
+// دالة الاسترجاع (استيراد النسخة الاحتياطية مع الرفع السحابي)
 window.importData = function(event) { 
     const file = event.target.files[0]; 
     if(!file) return; 
     
     const reader = new FileReader(); 
-    reader.onload = function(e) { 
+    // خلينا الـ onload تبقى async عشان نقدر نستنى السحابة
+    reader.onload = async function(e) { 
         try { 
             const imp = JSON.parse(e.target.result); 
             // التحقق من وجود البيانات الأساسية لضمان سلامة الملف
             if(imp.students && imp.groups) { 
+                // 1. حفظ الداتا في المتصفح
                 localStorage.setItem("students", JSON.stringify(imp.students)); 
                 localStorage.setItem("groups", JSON.stringify(imp.groups)); 
                 localStorage.setItem("classSessions", JSON.stringify(imp.classSessions || [])); 
@@ -2168,13 +2124,31 @@ window.importData = function(event) {
                 localStorage.setItem("financeRecords", JSON.stringify(imp.financeRecords || {})); 
                 localStorage.setItem("expenses", JSON.stringify(imp.expenses || [])); 
                 localStorage.setItem("schedule", JSON.stringify(imp.schedule || [])); 
-                
-                // 👇 استرجاع البيانات الإضافية 👇
                 localStorage.setItem("books", JSON.stringify(imp.books || [])); 
                 localStorage.setItem("onlineExams", JSON.stringify(imp.onlineExams || [])); 
                 localStorage.setItem("monthlyPayments", JSON.stringify(imp.monthlyPayments || {})); 
+
+                // 2. تحديث المتغيرات في الذاكرة عشان السحابة تقرأها صح
+                students = imp.students;
+                groups = imp.groups;
+                classSessions = imp.classSessions || [];
+                exams = imp.exams || [];
+                homeworks = imp.homeworks || [];
+                financeRecords = imp.financeRecords || {};
+                expenses = imp.expenses || [];
+                schedule = imp.schedule || [];
+                books = imp.books || [];
+                window.onlineExams = imp.onlineExams || [];
+                window.monthlyPayments = imp.monthlyPayments || {};
+
+                // 3. رفع الداتا للسحابة إجبارياً قبل ما الصفحة تعمل ريفريش
+                if(typeof showToast === 'function') showToast("جاري دمج البيانات ورفعها للسحابة... ⏳", "info");
                 
-                alert("تم استرجاع جميع البيانات بنجاح! سيتم إعادة تحميل الصفحة لتطبيق التغييرات."); 
+                if (typeof syncDataToBot === "function") {
+                    await syncDataToBot(); // بنستنى لحد ما الرفع يخلص
+                }
+                
+                alert("تم استرجاع ورفع جميع البيانات بنجاح! سيتم إعادة تحميل الصفحة لتطبيق التغييرات."); 
                 location.reload(); 
             } else {
                 if(typeof showToast === 'function') showToast("ملف غير صالح أو لا يحتوي على بيانات النظام الأساسية!", "error");
@@ -2184,6 +2158,7 @@ window.importData = function(event) {
         } 
     }; 
     reader.readAsText(file); 
+    event.target.value = ""; // تصفير زرار الرفع عشان لو حب يرفع نفس الملف تاني
 };
 
 function downloadExcelTemplate() { const headers = [["الاسم", "الصف", "المجموعة", "هاتف الطالب", "هاتف ولي الأمر", "الجنس"]]; const worksheet = XLSX.utils.aoa_to_sheet(headers); worksheet['!cols'] = [{wch: 25}, {wch: 15}, {wch: 20}, {wch: 15}, {wch: 15}, {wch: 10}]; const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, "الطلاب"); XLSX.writeFile(workbook, "نموذج_إضافة_الطلاب.xlsx"); showToast("تم تحميل النموذج!"); }
@@ -6447,6 +6422,7 @@ window.toggleTrackDropdown = function(levelId, trackGroupId) {
 
 
 
+// امسح البلوك ده بالكامل
 window.updateEditGeneratedCode = function() {
     let prefix = document.getElementById("editStudentCenterPrefix").value;
     if (prefix) {

@@ -1793,30 +1793,17 @@
         <h2 style="color: var(--primary-color); margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">➕ تسجيل طالب جديد</h2>
         
         <form id="addStudentForm" class="form-grid">
-            <!-- الصف الأول: السنتر والكود -->
-            <div class="input-group">
-                <label>السنتر التابع له الطالب</label>
-                <select id="studentCenterPrefix" required class="custom-input" onchange="updateGeneratedCode()">
-                    <option value="">اختر السنتر لتوليد الكود...</option>
-                    <option value="M">المهندس (M)</option>
-                    <option value="F">الفضل (F)</option>
-                    <option value="Q">القمة (Q)</option>
-                    <option value="A">الأوائل (A)</option>
-                    <option value="S">سمارت (S)</option>
-                    <option value="Z">زون (Z)</option>
-                </select>
-            </div>
-            <div class="input-group">
-                <label>كود الطالب <span style="color:var(--text-muted); font-size:11px;">(قابل للتعديل يدوياً)</span></label>
-                <!-- تم إزالة readonly لجعله قابلاً للتعديل -->
-                <input type="text" id="studentCode" required class="custom-input" style="font-weight: bold; color: var(--primary-color); letter-spacing: 1px;">
-            </div>
+            <!-- الصف الأول: الكود والاسم -->
+<div class="input-group">
+    <label>كود الطالب (تلقائي)</label>
+    <input type="text" id="studentCode" readonly class="custom-input" style="font-weight: bold; color: var(--primary-color); background: #f8fafc;">
+</div>
+<div class="input-group">
+    <label>اسم الطالب رباعي</label>
+    <input type="text" id="studentName" required class="custom-input" placeholder="اكتب اسم الطالب...">
+</div>
 
-            <!-- الصف الثاني: الاسم والصف -->
-            <div class="input-group">
-                <label>اسم الطالب رباعي</label>
-                <input type="text" id="studentName" required class="custom-input" placeholder="اكتب اسم الطالب...">
-            </div>
+<!-- الصف الثاني: الصف والمسار -->
             <div class="input-group">
                 <label>الصف الدراسي</label>
                 <select id="studentLevel" required class="custom-input" onchange="filterGroupsByLevel('studentLevel', 'studentGroup'); toggleTrackDropdown('studentLevel', 'trackGroup');">
@@ -1827,15 +1814,7 @@
                 </select>
             </div>
 
-            <!-- الصف الثالث: المسار والمجموعة -->
-            <div class="input-group" id="trackGroup" style="display:none;">
-                <label>المسار</label>
-                <select id="studentTrack" class="custom-input" style="border-color: var(--primary-color);">
-                    <option value="عام">عام</option>
-                    <option value="أزهر">أزهر</option>
-                    <option value="بكالوريا">بكالوريا</option>
-                </select>
-            </div>
+            
             <div class="input-group">
                 <label>المجموعة</label>
                 <select id="studentGroup" required class="custom-input">
@@ -1889,29 +1868,17 @@
         <form id="editStudentForm" class="form-grid">
             <input type="hidden" id="editStudentCodeOriginal">
             
-            <!-- الصف الأول: السنتر والكود -->
-            <div class="input-group">
-                <label>نقل لسنتر آخر؟ (لتغيير الكود)</label>
-                <select id="editStudentCenterPrefix" class="custom-input" onchange="updateEditGeneratedCode()">
-                    <option value="">بدون تغيير...</option>
-                    <option value="M">المهندس (M)</option>
-                    <option value="F">الفضل (F)</option>
-                    <option value="Q">القمة (Q)</option>
-                    <option value="A">الأوائل (A)</option>
-                    <option value="S">سمارت (S)</option>
-                    <option value="Z">زون (Z)</option>
-                </select>
-            </div>
-            <div class="input-group">
-                <label>كود الطالب</label>
-                <input type="text" id="editStudentCode" required class="custom-input" style="font-weight:bold; color:var(--primary-color); letter-spacing: 1px;">
-            </div>
+            <!-- الصف الأول: الكود والاسم -->
+<div class="input-group">
+    <label>كود الطالب</label>
+    <input type="text" id="editStudentCode" readonly class="custom-input" style="font-weight:bold; color:var(--primary-color); background: #f8fafc;">
+</div>
+<div class="input-group">
+    <label>الاسم</label>
+    <input type="text" id="editStudentName" required class="custom-input">
+</div>
 
-            <!-- الصف المضاف للاسم عشان التنسيق يفضل مظبوط -->
-            <div class="input-group full-width" style="grid-column: span 2;">
-                <label>الاسم</label>
-                <input type="text" id="editStudentName" required class="custom-input">
-            </div>
+<!-- الصف الثاني: الصف والمسار -->
 
             <!-- الصف الثاني: الصف والمسار (سيبه زي ما هو عندك) -->
 
@@ -1925,12 +1892,7 @@
                 </select>
             </div>
             <div class="input-group" id="editTrackGroup" style="display:none;">
-                <label>المسار</label>
-                <select id="editStudentTrack" class="custom-input" style="border-color: var(--primary-color);">
-                    <option value="عام">عام</option>
-                    <option value="أزهر">أزهر</option>
-                    <option value="بكالوريا">بكالوريا</option>
-                </select>
+                
             </div>
 
             <!-- الصف الثالث: المجموعة والجنس -->
