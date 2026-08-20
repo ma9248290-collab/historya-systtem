@@ -667,206 +667,7 @@ async function activateSoftware() {
     } catch (e) { showToast("عطل في الاتصال بالخادم", "error"); }
 }
 
-// 3. المزامنة السحابية + التحقق من الإيقاف والتاريخ التلقائي والإنذار
-async function loadDataFromFirebase() {
-    // 🛑 منع التحميل من السحابة لو الحساب تجريبي
-    if (localStorage.getItem("is_demo_mode") === "true") {
-        isFirebaseLoaded = true; return; 
-    }
-    
-    // 🔥 تعريف كود السنتر (تثبيت إجباري لضمان العزل لنسخة السينيور)
-let currentLicenseKey = "Historia_System_Master";
-    
-    try {
-        let licRes = await fetch(`https://edutrack-system-1ded4-default-rtdb.firebaseio.com/licenses/${currentLicenseKey}.json`);
-        let licData = await licRes.json();
-        
-        if (licData) {
-            let isExpired = false;
-            
-            // حساب هل الباقة انتهت زمنياً أم لا
-            if (licData.activatedAt) {
-                let activationDate = new Date(licData.activatedAt);
-                let expirationDate = new Date(activationDate);
-                
-                if (licData.durationDays) {
-                    expirationDate.setDate(expirationDate.getDate() + parseInt(licData.durationDays));
-                } else if (licData.durationMonths) {
-                    expirationDate.setMonth(expirationDate.getMonth() + parseInt(licData.durationMonths));
-                }
-                
-                let today = new Date();
-                let timeDiff = expirationDate.getTime() - today.getTime();
-                let daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24)); // حساب الأيام المتبقية
-
-                if (licData.durationMonths != 99) {
-                    if (daysLeft <= 0) {
-                        isExpired = true;
-                    } else if (daysLeft <= 5 && daysLeft > 0) {
-                        // 🚨 إظهار شريط الإنذار
-                        let banner = document.getElementById("expiration-banner");
-                        if(banner) {
-                            banner.style.display = "block";
-                            document.getElementById("expire-days").innerText = daysLeft;
-                        }
-                    }
-                }
-            }
-
-            // 🚫 الطرد المباشر
-            if (licData.status === 'suspended' || isExpired) {
-                sessionStorage.removeItem("isLoggedIn"); // مسح الجلسة
-                localStorage.setItem("keepLoggedIn", "false"); // 🔥 مسح (تذكرني) إجبارياً
-                
-                document.getElementById("login-screen").style.display = "none";
-                document.getElementById("main-app").style.display = "none";
-                
-                const suspendedScreen = document.getElementById("suspended-screen");
-                if(suspendedScreen) {
-                    suspendedScreen.style.display = "flex";
-                    if (isExpired) {
-                        suspendedScreen.querySelector("h2").innerText = "انتهت فترة الاشتراك! ⏳";
-                        suspendedScreen.querySelector("p").innerText = "لقد انتهت صلاحية باقتك الحالية. يرجى التواصل مع الإدارة لتجديد الاشتراك واستعادة بياناتك.";
-                    } else {
-                        suspendedScreen.querySelector("h2").innerText = "تم إيقاف النسخة! 🚫";
-                        suspendedScreen.querySelector("p").innerText = "عفواً، تم إيقاف ترخيص استخدام هذا النظام من قبل الإدارة العليا.";
-                    }
-                }
-                return; // ⛔ قفل السيستم ومنع تحميل باقي الداتا
-            }
-        }
-        
-        // ... (باقي الكود بتاع جلب الداتا الخاصة بالطلاب زي ما هو تحت هنا) ...
-
-        // --- باقي دالة الـ loadDataFromFirebase لسحب الداتا ---
-        let res = await fetch(getFirebaseUrl());
-
-        // 💻 سحب بيانات المنصة (الكورسات والمشاهدات) لربطها بالحضور
-        try {
-            let lecRes = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${localStorage.getItem("licenseKey")}/lectures.json`);
-            window.platformLectures = Object.values(await lecRes.json() || {});
-            
-            let trackRes = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${localStorage.getItem("licenseKey")}/course_tracking.json`);
-            window.platformTracking = await trackRes.json() || {};
-        } catch(e) { console.log("لم يتم جلب بيانات المنصة للربط"); }
-        let data = await res.json();
-        // ... (تكملة الكود بتاع سحب الـ settings والـ students زي ما هو) ...
-        
-        if (data) {
-            if(data.settings) {
-                localStorage.setItem("teacherName", data.settings.teacherName);
-                localStorage.setItem("centerName", data.settings.centerName);
-                // السطرين الجداد دول 👇
-                localStorage.setItem("adminUser", data.settings.adminUser);
-                localStorage.setItem("adminPass", data.settings.adminPass);
-                localStorage.setItem("adminPin", data.settings.adminPin);
-                adminPin = data.settings.adminPin; // تحديث المتغير العالمي
-                if(data.settings.phoneNumbers) localStorage.setItem("teacherPhones", data.settings.phoneNumbers);
-                if(data.settings.parentMsgTemplate) localStorage.setItem("parentMsgTemplate", data.settings.parentMsgTemplate);
-                if(data.settings.studentMsgTemplate) localStorage.setItem("studentMsgTemplate", data.settings.studentMsgTemplate);
-            } else if (data.teacherName) {
-                localStorage.setItem("teacherName", data.teacherName);
-            }
-
-            students = (data.students || []).filter(i => i !== null);
-            groups = (data.groups || []).filter(i => i !== null);
-            schedule = (data.schedule || []).filter(i => i !== null);
-            expenses = (data.expenses || []).filter(i => i !== null);
-            financeRecords = data.financeRecords || {};
-            books = (data.books || []).filter(i => i !== null);
-             onlineExams = (data.onlineExams || []).filter(i => i !== null);
-            classSessions = (data.classSessions || []).filter(i => i !== null).map(s => ({...s, attendance: s.attendance || {}}));
-            exams = (data.exams || []).filter(i => i !== null).map(e => ({...e, grades: e.grades || {}}));
-            homeworks = (data.homeworks || []).filter(i => i !== null).map(h => ({...h, grades: h.grades || {}}));
-            
-            // 🛑 إيقاف المزامنة العكسية أثناء استقبال البيانات من جهاز آخر
-            window.isIncomingSync = true; 
-            
-            localStorage.setItem("students", JSON.stringify(students));
-            localStorage.setItem("classSessions", JSON.stringify(classSessions));
-            localStorage.setItem("exams", JSON.stringify(exams));
-            localStorage.setItem("homeworks", JSON.stringify(homeworks));
-            localStorage.setItem("schedule", JSON.stringify(schedule));
-            localStorage.setItem("groups", JSON.stringify(groups));
-            localStorage.setItem("financeRecords", JSON.stringify(financeRecords));
-            localStorage.setItem("expenses", JSON.stringify(expenses));
-            localStorage.setItem("books", JSON.stringify(books));
-            localStorage.setItem("onlineExams", JSON.stringify(onlineExams));
-            
-            // 🟢 إعادة تشغيل المزامنة للمستخدم
-            window.isIncomingSync = false;
-
-            renderTable();
-            if (document.getElementById("groups-list")) renderGroupCards();
-            if (typeof renderBooksTable === "function") renderBooksTable();
-            if(sessionStorage.getItem("isLoggedIn") === "true" && typeof renderDashboardCharts === "function") {
-                renderDashboardCharts();
-            }
-        }
-    } catch (e) {
-        console.log("⚠️ تعذر الاتصال بالسحابة أو قاعدة البيانات فارغة.");
-    }
-    isFirebaseLoaded = true; 
-
-    setTimeout(window.checkGlobalAnnouncements, 1500);
-}
-
-async function syncDataToBot() {
-    let isDemo = localStorage.getItem("is_demo_mode") === "true";
-    if (!isDemo && (!isFirebaseLoaded || !licenseKey)) return; 
-
-    // تجميع البيانات
-    const dataToSync = {
-        settings: {
-            teacherName: localStorage.getItem("teacherName") || "المدير",
-            centerName: localStorage.getItem("centerName") || "السنتر",
-            adminUser: localStorage.getItem("adminUser") || "shefo",
-            adminPass: localStorage.getItem("adminPass") || "12345",
-            adminPin: localStorage.getItem("adminPin") || "1234",
-            phoneNumbers: localStorage.getItem("teacherPhones") || "",
-            parentMsgTemplate: localStorage.getItem("parentMsgTemplate") || "",
-            studentMsgTemplate: localStorage.getItem("studentMsgTemplate") || "",
-            botEnabled: localStorage.getItem("botEnabled") === "true",
-            botName: localStorage.getItem("botName") || "المساعد",
-            botInstructions: localStorage.getItem("botInstructions") || ""
-        },
-        teacherName: localStorage.getItem("teacherName") || "المدير",
-        centerName: localStorage.getItem("centerName") || "السنتر",
-        adminUser: localStorage.getItem("adminUser"),
-        adminPass: localStorage.getItem("adminPass"),
-        adminPin: localStorage.getItem("adminPin"),
-        
-        students, classSessions, exams, homeworks, schedule, groups, financeRecords, expenses, books, monthlyPayments: monthlyPayments,
-        onlineExams: onlineExams
-    };
-
-    // 🌟 تحديد وقت التحديث المحلي عشان الجهاز ميعملش ريفريش لنفسه
-    window.lastLocalSyncTime = Date.now();
-
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:") {
-        try {
-            await fetch(`${WHATSAPP_SERVER_URL}/sync-database`, { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify(dataToSync) 
-            });
-        } catch (e) {}
-    }
-
-    if (isDemo) return;
-
-    try {
-        // رفع البيانات الأساسية
-        await fetch(getFirebaseUrl(), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dataToSync) });
-        
-        // 🚀 إرسال إشارة للسيرفر (جرس) إن فيه تعديل حصل في نفس اللحظة
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master/syncSignal.json`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(window.lastLocalSyncTime)
-        });
-    } catch (e) {}
-}   
+ 
 
 window.isIncomingSync = false; // فلاج عشان نمنع الـ Loop
 ["students", "classSessions", "exams", "homeworks", "schedule", "groups", "financeRecords", "expenses", "books", "monthlyPayments"].forEach(key => {
@@ -1001,16 +802,61 @@ function filterGroupsByLevel(levelSelectId, groupSelectId) {
 
 
 
-// دالة توليد كود الطالب (أرقام فقط)
+// دالة توليد كود الطالب (تعتمد على آخر طالب مضاف)
 window.generateStudentCode = function() {
-    let maxId = 0;
-    students.forEach(s => {
-        // السطر ده ذكي جداً: بيشيل أي حروف قديمة وياخد الرقم بس، عشان يكمل عد صح
-        let numStr = String(s.code).replace(/\D/g, ''); 
-        let num = parseInt(numStr, 10);
-        if (!isNaN(num) && num > maxId) maxId = num;
-    });
-    return (maxId + 1).toString();
+    if (students.length === 0) return "1"; // لو السيستم فاضي
+
+    // هنجيب آخر طالب تم حفظه
+    let lastStudent = students[students.length - 1];
+    let numStr = String(lastStudent.code).replace(/\D/g, ''); 
+    let lastNum = parseInt(numStr, 10);
+
+    // لو الكود الأخير رقم سليم، زود 1
+    if (!isNaN(lastNum)) {
+        return (lastNum + 1).toString();
+    } else {
+        // خطة بديلة لو آخر كود مكنش رقم
+        let maxId = 0;
+        students.forEach(s => {
+            let nStr = String(s.code).replace(/\D/g, ''); 
+            let n = parseInt(nStr, 10);
+            if (!isNaN(n) && n > maxId) maxId = n;
+        });
+        return (maxId + 1).toString();
+    }
+};
+
+// دالة مساعدة لتحديث الخانة
+window.updateGeneratedCode = function() {
+    let codeInput = document.getElementById("studentCode");
+    if(codeInput) codeInput.value = window.generateStudentCode();
+};
+
+// دالة الفحص اللحظي لتكرار رقم ولي الأمر
+window.checkDuplicateParentPhone = function() {
+    let phone = document.getElementById("parentPhone").value.trim();
+    let warningEl = document.getElementById("parentPhoneWarning");
+    
+    if (!warningEl) return;
+
+    // لو الرقم لسه صغير أو صفر، نخفي التنبيه
+    if (phone.length < 10 || phone === "0") {
+        warningEl.style.display = "none";
+        return;
+    }
+
+    // البحث عن طلاب مسجلين بنفس رقم ولي الأمر
+    let duplicates = students.filter(s => s.parentPhone === phone);
+
+    if (duplicates.length > 0) {
+        // لو لقينا، نجيب أساميهم ونعرضها
+        let names = duplicates.map(s => s.name).join("، ");
+        warningEl.innerHTML = `⚠️ تنبيه: هذا الرقم مسجل بالفعل للطالب: <strong style="text-decoration: underline;">${names}</strong>`;
+        warningEl.style.display = "block";
+    } else {
+        // لو مفيش تكرار، نخفي التنبيه
+        warningEl.style.display = "none";
+    }
 };
 
 // دالة مساعدة لحفظ الطالب تعمل مع الزرارين (حفظ وإنهاء / حفظ وإضافة)
@@ -1019,8 +865,7 @@ window.processStudentSaving = async function(keepOpen) {
     const name = document.getElementById("studentName").value.trim(); 
     const level = document.getElementById("studentLevel").value; 
     const gender = document.getElementById("studentGender").value; 
-    const trackGroup = document.getElementById("trackGroup").style.display;
-    const track = trackGroup !== 'none' ? document.getElementById("studentTrack").value : "عام";
+    const track = "عام";
     
     const phoneEl = document.getElementById("studentPhone");
     const phone = phoneEl && phoneEl.value.trim() !== "" ? phoneEl.value.trim() : "0"; 
@@ -1040,12 +885,12 @@ window.processStudentSaving = async function(keepOpen) {
 
     const duplicate = students.find(s => 
         s.code === code || 
-        (phone !== "0" && s.phone === phone) || 
-        (parentPhone !== "0" && s.parentPhone === parentPhone) || 
-        normalizeArabicName(s.name) === normalizeArabicName(name)
+        (phone !== "0" && s.phone === phone)
     );
     
-    if(duplicate) return showToast(`مسجل مسبقاً: ${duplicate.name}`, "error");
+    if(duplicate) return showToast(`تنبيه! كود الطالب أو هاتفه مسجل مسبقاً: ${duplicate.name}`, "error");
+    
+    
 
     // حفظ الطالب في النظام
     let isSpecialCase = document.getElementById("studentIsSpecial") ? document.getElementById("studentIsSpecial").checked : false;
@@ -1091,7 +936,11 @@ window.processStudentSaving = async function(keepOpen) {
         document.getElementById("studentName").value = "";
         document.getElementById("studentPhone").value = "";
         document.getElementById("parentPhone").value = "";
-        
+        // 🔥 إخفاء التنبيه لو كان ظاهر
+        let warningEl = document.getElementById("parentPhoneWarning");
+        if (warningEl) warningEl.style.display = "none";
+
+
         if(document.getElementById("studentIsSpecial")) {
             document.getElementById("studentIsSpecial").checked = false;
             document.getElementById("studentSpecialAmountDiv").style.display = 'none';
@@ -1231,9 +1080,7 @@ document.getElementById('editStudentForm')?.addEventListener('submit', function(
     const duplicate = students.find(s => 
         s.code !== originalCode && (
             s.code === newCode || 
-            (phone !== "0" && s.phone === phone) || 
-            (parentPhone !== "0" && s.parentPhone === parentPhone) || 
-            normalizeArabicName(s.name) === normalizeArabicName(name)
+            (phone !== "0" && s.phone === phone)
         )
     );
     if(duplicate) return showToast(`تنبيه! مسجل مسبقاً`, "error");
@@ -1244,7 +1091,7 @@ document.getElementById('editStudentForm')?.addEventListener('submit', function(
         students[studentIndex].code = newCode; 
         students[studentIndex].name = name; 
         students[studentIndex].level = document.getElementById('editStudentLevel').value; 
-        students[studentIndex].track = document.getElementById('editTrackGroup').style.display !== 'none' ? document.getElementById('editStudentTrack').value : "عام";
+        students[studentIndex].track = "عام";
         students[studentIndex].gender = document.getElementById('editStudentGender').value; 
         students[studentIndex].phone = phone; 
         students[studentIndex].parentPhone = parentPhone; 
@@ -2176,11 +2023,10 @@ function importStudentsFromExcel(event) {
                 const name = row['الاسم'], level = row['الصف'], group = row['المجموعة'], phone = row['هاتف الطالب'] || '', parentPhone = row['هاتف ولي الأمر'] || '', gender = row['الجنس'] || 'ذكر';
                 
                 if(name && level && group) {
-                    const duplicate = students.find(s => 
-    (phone && phone.toString() !== "0" && s.phone === phone.toString()) || 
-    (parentPhone && parentPhone.toString() !== "0" && s.parentPhone === parentPhone.toString()) || 
-    normalizeArabicName(s.name) === normalizeArabicName(name.toString())
-);
+                   const duplicate = students.find(s => 
+        s.code === code || 
+        (phone !== "0" && s.phone === phone)
+    );
                     if(!duplicate) { 
                         // --- 🚀 الذكاء هنا: تنظيف اسم المجموعة ومطابقته بالسيستم ---
                         let excelGroup = group.toString().trim();
@@ -2384,12 +2230,36 @@ window.randomSleep = function(min = 2000, max = 5000) {
 
 
 // ==========================================
-// 🧠 معالج قوالب الرسائل الذكي (المطور)
+// 🧠 معالج قوالب الرسائل الذكي (المطور بالترحيب العشوائي)
 // ==========================================
 window.processMessageTemplate = function(template, student, session, reportData) {
     let tName = localStorage.getItem("teacherName") || "المدير";
     let cName = localStorage.getItem("centerName") || "السنتر";
     let nowTime = new Date().toLocaleTimeString('ar-EG');
+    
+    // 🎲 1. قاموس الترحيبات العشوائية
+    const parentGreetings = [
+        "أهلاً بحضرتك",
+        "مرحباً بك",
+        "السلام عليكم ورحمة الله،",
+        "تحياتنا لحضرتك",
+        "أهلاً وسهلاً بك",
+        "طاب يومك"
+    ];
+
+    const studentGreetings = [
+        "أهلاً بيك يا بطل",
+        "عاش يا وحش",
+        "أخبار المذاكرة إيه يا",
+        "شد حيلك يا نجم",
+        "يا هلا بالبطل",
+        "مستعد للقمة يا",
+        "إيه الأخبار يا"
+    ];
+
+    // اختيار ترحيب عشوائي لكل رسالة
+    let randomParentGreeting = parentGreetings[Math.floor(Math.random() * parentGreetings.length)];
+    let randomStudentGreeting = studentGreetings[Math.floor(Math.random() * studentGreetings.length)];
     
     let finalTemplate = template;
     
@@ -2398,26 +2268,86 @@ window.processMessageTemplate = function(template, student, session, reportData)
         finalTemplate += "\n\n{تفاصيل_التقرير}";
     }
 
-    // 1. استبدال المتغيرات الثابتة
+    // 2. استبدال المتغيرات الثابتة ومتغيرات الترحيب العشوائي
     let msg = finalTemplate
-        .replace(/{اسم_الطالب}/g, student.name)
-        .replace(/{المجموعة}/g, student.group)
+        .replace(/{ترحيب_ولي_الأمر}/g, randomParentGreeting) // يعطي ترحيب عشوائي لولي الأمر
+        .replace(/{ترحيب_الطالب}/g, randomStudentGreeting)    // يعطي ترحيب عشوائي للطالب
+        .replace(/{اسم_الطالب}/g, student.name || "")
+        .replace(/{كود_الطالب}/g, student.code || "")
+        .replace(/{رقم_الطالب}/g, (student.phone && student.phone !== "0") ? student.phone : "غير مسجل")
+        .replace(/{رقم_ولي_الأمر}/g, (student.parentPhone && student.parentPhone !== "0") ? student.parentPhone : "غير مسجل")
+        .replace(/{المجموعة}/g, student.group || "")
         .replace(/{الموضوع}/g, session.topic || 'حصة عادية')
         .replace(/{تفاصيل_التقرير}/g, reportData)
         .replace(/{اسم_السنتر}/g, cName)
         .replace(/{اسم_المدير}/g, tName)
         .replace(/{وقت_الرسالة}/g, nowTime);
 
-    // 2. معالجة الـ Spintax وحذف الأقواس لو المدرس نسي يكتب فاصل |
+    // 3. معالجة الـ Spintax اليدوي لو المدرس استخدمه {كلمة1|كلمة2}
     msg = msg.replace(/\{([^{}]*)\}/g, function(match, contents) {
         if (contents.includes('|')) {
             let options = contents.split('|');
             return options[Math.floor(Math.random() * options.length)];
         }
-        return contents; // 🌟 هنا التعديل: بيرجع الكلمة نظيفة من غير الأقواس
+        return contents; 
     });
     
     return msg;
+};
+
+
+// ==========================================
+// 🖱️ نظام إدراج المتغيرات التفاعلي في مكان المؤشر (Cursor Tracking)
+// ==========================================
+let lastFocusedMsgBox = null;
+
+// تتبع المربع الذي يقف فيه المستخدم حالياً
+document.addEventListener('DOMContentLoaded', () => {
+    const parentBox = document.getElementById('settingParentMsg');
+    const studentBox = document.getElementById('settingStudentMsg');
+    
+    if(parentBox) {
+        parentBox.addEventListener('focus', () => lastFocusedMsgBox = parentBox);
+        parentBox.addEventListener('blur', () => { /* لا نفرغ المتغير لنحتفظ بآخر مربع */ });
+    }
+    if(studentBox) {
+        studentBox.addEventListener('focus', () => lastFocusedMsgBox = studentBox);
+        studentBox.addEventListener('blur', () => { /* لا نفرغ المتغير لنحتفظ بآخر مربع */ });
+    }
+});
+
+// دالة زرع المتغير في النص
+window.insertVariable = function(variableText) {
+    let targetBox = lastFocusedMsgBox;
+    
+    // لو المدرس مضغطش على أي مربع، نختار مربع ولي الأمر كافتراضي
+    if (!targetBox) {
+        targetBox = document.getElementById('settingParentMsg');
+        if(!targetBox) return;
+        showToast("💡 تم الإدراج في رسالة ولي الأمر (اضغط على مربع الطالب إذا أردت الإدراج هناك).", "info");
+    }
+
+    // تحديد مكان المؤشر الحالي
+    const startPos = targetBox.selectionStart;
+    const endPos = targetBox.selectionEnd;
+    const text = targetBox.value;
+
+    // دمج المتغير في النص
+    targetBox.value = text.substring(0, startPos) + variableText + text.substring(endPos);
+    
+    // إعادة المؤشر بعد المتغير مباشرة عشان يقدر يكمل كتابة
+    const newCursorPos = startPos + variableText.length;
+    targetBox.setSelectionRange(newCursorPos, newCursorPos);
+    targetBox.focus();
+
+    // تشغيل أنيميشن خفيف للمربع عشان يلفت انتباهه إن الإضافة تمت
+    targetBox.style.transition = "all 0.2s";
+    targetBox.style.backgroundColor = "#f0fdf4"; // أخضر فاتح
+    targetBox.style.borderColor = "#10b981";
+    setTimeout(() => {
+        targetBox.style.backgroundColor = "";
+        targetBox.style.borderColor = "";
+    }, 300);
 };
 
 // دالة مساعدة للتأخير الزمني العشوائي (لحماية الرقم من الحظر)
@@ -4077,14 +4007,31 @@ window.loadSentNotifications = async function() {
     }
 };
 
-// 1. إضافة فيديو (جديد)
-window.addCourseVideoRow = function(title = "", url = "", linkedSession = "", requiredExam = "", type = "free", price = "") {
+window.addCourseVideoRow = function(title = "", url = "", linkedSessions = [], requiredExam = "", type = "free", price = "") {
     let container = document.getElementById("courseVideosContainer");
     let level = document.getElementById("lecLevel").value;
     let validGroups = groups.filter(g => level === 'all' || g.level === level).map(g => g.name);
     let validSessions = classSessions.filter(s => validGroups.includes(s.group)).reverse();
-    let sessionOpts = '<option value="">بدون ربط بالحضور</option>';
-    validSessions.forEach(s => { sessionOpts += `<option value="${s.id}" ${linkedSession === s.id ? 'selected' : ''}>${s.date} - ${s.topic || 'حصة'} (${s.group})</option>`; });
+    
+    // التأكد أن linkedSessions مصفوفة دائماً
+    if (!Array.isArray(linkedSessions)) {
+        linkedSessions = linkedSessions ? [linkedSessions] : [];
+    }
+
+    let sessionsCheckboxes = '';
+    if (validSessions.length === 0) {
+        sessionsCheckboxes = `<span style="color: var(--danger-color); font-size: 12px; font-weight: bold;">لا توجد حصص مسجلة لهذا الصف!</span>`;
+    } else {
+        validSessions.forEach(s => {
+            let isChecked = linkedSessions.includes(s.id) ? "checked" : "";
+            sessionsCheckboxes += `
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; background: white; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 12px; font-weight: bold; margin-bottom: 4px;">
+                <input type="checkbox" value="${s.id}" ${isChecked} class="vid-session-cb" style="accent-color: var(--success-color); width: 16px; height: 16px;">
+                ${s.date} - ${s.topic || 'حصة'} (${s.group})
+            </label>`;
+        });
+    }
+
     let examsToSelect = JSON.parse(localStorage.getItem("onlineExams")) || [];
     let examOpts = '<option value="">بدون شرط امتحان</option>';
     examsToSelect.forEach(e => { examOpts += `<option value="${e.id}" ${requiredExam === e.id ? 'selected' : ''}>${e.title}</option>`; });
@@ -4106,24 +4053,41 @@ window.addCourseVideoRow = function(title = "", url = "", linkedSession = "", re
                 </select>
                 <input type="number" class="custom-input vid-price" placeholder="السعر (ج.م)" value="${price}" style="margin-top: 5px; display: ${type === 'paid' ? 'block' : 'none'};">
             </div>
-            <div style="flex: 1; min-width: 150px;"><label style="font-size: 12px; color: #10b981; font-weight: bold;">تُفتح مجاناً لمن حضر حصة:</label><select class="custom-input vid-session" style="margin: 0;">${sessionOpts}</select></div>
+            <div style="flex: 2; min-width: 250px;">
+                <label style="font-size: 12px; color: #10b981; font-weight: 900; margin-bottom: 5px; display: block;">🔓 يُفتح مجاناً لمن حضر حصص (اختر حصة أو أكثر):</label>
+                <div style="max-height: 120px; overflow-y: auto; background: var(--bg-color); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+                    ${sessionsCheckboxes}
+                </div>
+            </div>
             <div style="flex: 1; min-width: 150px;"><label style="font-size: 12px; color: #f59e0b; font-weight: bold;">شرط الفتح (اجتياز امتحان):</label><select class="custom-input vid-exam" style="margin: 0;">${examOpts}</select></div>
         </div>
     `;
     document.getElementById("courseVideosContainer").appendChild(div);
 };
 
-window.addEditCourseVideoRow = function(title = "", url = "", linkedSession = "", requiredExam = "", type = "free", price = "") {
+window.addEditCourseVideoRow = function(title = "", url = "", linkedSessions = [], requiredExam = "", type = "free", price = "") {
     let container = document.getElementById("editCourseVideosContainer");
-    
     let level = document.getElementById("editLecLevel").value;
     let validGroups = groups.filter(g => level === 'all' || g.level === level).map(g => g.name);
     let validSessions = classSessions.filter(s => validGroups.includes(s.group)).reverse();
     
-    let sessionOpts = '<option value="">بدون ربط (متاح للكل بناءً على شراء الكورس)</option>';
-    validSessions.forEach(s => {
-        sessionOpts += `<option value="${s.id}" ${linkedSession === s.id ? 'selected' : ''}>${s.date} - ${s.topic || 'حصة'} (${s.group})</option>`;
-    });
+    if (!Array.isArray(linkedSessions)) {
+        linkedSessions = linkedSessions ? [linkedSessions] : [];
+    }
+
+    let sessionsCheckboxes = '';
+    if (validSessions.length === 0) {
+        sessionsCheckboxes = `<span style="color: var(--danger-color); font-size: 12px; font-weight: bold;">لا توجد حصص مسجلة لهذا الصف!</span>`;
+    } else {
+        validSessions.forEach(s => {
+            let isChecked = linkedSessions.includes(s.id) ? "checked" : "";
+            sessionsCheckboxes += `
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; background: white; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 12px; font-weight: bold; margin-bottom: 4px;">
+                <input type="checkbox" value="${s.id}" ${isChecked} class="vid-session-cb" style="accent-color: var(--success-color); width: 16px; height: 16px;">
+                ${s.date} - ${s.topic || 'حصة'} (${s.group})
+            </label>`;
+        });
+    }
 
     let examsToSelect = JSON.parse(localStorage.getItem("onlineExams")) || [];
     let examOpts = '<option value="">بدون شرط امتحان</option>';
@@ -4133,14 +4097,10 @@ window.addEditCourseVideoRow = function(title = "", url = "", linkedSession = ""
 
     let div = document.createElement("div");
     div.className = "video-row-edit";
-    // الستايل الجديد للمربع
     div.style.cssText = "background: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02); margin-bottom: 15px; position: relative; transition: 0.3s;";
     
     div.innerHTML = `
-        <!-- زرار الحذف الشيك في الركن الأيسر -->
-        <button type="button" onclick="this.parentElement.remove()" style="position: absolute; top: 15px; left: 15px; background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; width: 35px; height: 35px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s;" onmouseover="this.style.background='#f87171'; this.style.color='white';" onmouseout="this.style.background='#fee2e2'; this.style.color='#ef4444';" title="حذف هذا الفيديو">🗑️</button>
-
-        <!-- صف العناوين والروابط -->
+        <button type="button" onclick="this.parentElement.remove()" style="position: absolute; top: 15px; left: 15px; background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; width: 35px; height: 35px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px;">🗑️</button>
         <div style="display: flex; gap: 15px; margin-bottom: 15px; padding-left: 45px;">
             <div style="flex: 1;">
                 <label style="font-size: 13px; font-weight: bold; color: var(--text-main); margin-bottom: 5px; display: block;">عنوان الفيديو</label>
@@ -4151,8 +4111,6 @@ window.addEditCourseVideoRow = function(title = "", url = "", linkedSession = ""
                 <input type="url" class="custom-input vid-url" placeholder="https://..." value="${url}" style="margin: 0; background: #f8fafc; text-align: left; direction: ltr; border-color: #cbd5e1;">
             </div>
         </div>
-
-        <!-- صف الشروط (مفصول بخط داش) -->
         <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #cbd5e1; align-items: center; flex-wrap: wrap;">
             <div style="flex: 1; min-width: 150px;">
                 <label style="font-size: 12px; color: #3b82f6; font-weight: bold;">نوع المحاضرة:</label>
@@ -4162,12 +4120,14 @@ window.addEditCourseVideoRow = function(title = "", url = "", linkedSession = ""
                 </select>
                 <input type="number" class="custom-input vid-price" placeholder="السعر (ج.م)" value="${price}" style="margin-top: 5px; display: ${type === 'paid' ? 'block' : 'none'};">
             </div>
-            <div style="flex: 1; min-width: 250px;">
-                <label style="font-size: 13px; color: #10b981; font-weight: 900; margin-bottom: 8px; display: flex; align-items: center; gap: 5px;"><span>🔓</span> يُفتح مجاناً لمن حضر حصة:</label>
-                <select class="custom-input vid-session" style="margin: 0; border-color: #10b981; font-weight: bold;">${sessionOpts}</select>
+            <div style="flex: 2; min-width: 250px;">
+                <label style="font-size: 13px; color: #10b981; font-weight: 900; margin-bottom: 5px; display: block;"><span>🔓</span> يُفتح مجاناً لمن حضر حصص:</label>
+                <div style="max-height: 120px; overflow-y: auto; background: white; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+                    ${sessionsCheckboxes}
+                </div>
             </div>
-            <div style="flex: 1; min-width: 250px;">
-                <label style="font-size: 13px; color: #f59e0b; font-weight: 900; margin-bottom: 8px; display: flex; align-items: center; gap: 5px;"><span>🔐</span> شرط الفتح (اجتياز امتحان):</label>
+            <div style="flex: 1; min-width: 200px;">
+                <label style="font-size: 13px; color: #f59e0b; font-weight: 900; margin-bottom: 8px; display: block;"><span>🔐</span> شرط الفتح (اجتياز امتحان):</label>
                 <select class="custom-input vid-exam" style="margin: 0; border-color: #f59e0b; font-weight: bold;">${examOpts}</select>
             </div>
         </div>
@@ -4186,12 +4146,12 @@ window.saveLecture = async function() {
     document.querySelectorAll(".video-row").forEach(row => {
         let vTitle = row.querySelector(".vid-title").value.trim();
         let vUrl = row.querySelector(".vid-url").value.trim();
-        let vSession = row.querySelector(".vid-session").value;
+        let vSessions = Array.from(row.querySelectorAll(".vid-session-cb:checked")).map(cb => cb.value);
         let vExam = row.querySelector(".vid-exam").value;
         let vType = row.querySelector(".vid-type").value;
         let vPrice = row.querySelector(".vid-price") ? parseFloat(row.querySelector(".vid-price").value) || 0 : 0;
         
-        if(vUrl) videos.push({ title: vTitle || "فيديو", url: vUrl, linkedSession: vSession, requiredExam: vExam, type: vType, price: vPrice });
+        if(vUrl)videos.push({ title: vTitle || "فيديو", url: vUrl, linkedSessions: vSessions, requiredExam: vExam, type: vType, price: vPrice });
     });
 
     if(!title || videos.length === 0) return showToast("يرجى إدخال اسم الكورس وفيديو واحد على الأقل!", "error");
@@ -4231,12 +4191,12 @@ window.saveEditedCourse = async function() {
     document.querySelectorAll(".video-row-edit").forEach(row => {
         let vTitle = row.querySelector(".vid-title").value.trim();
         let vUrl = row.querySelector(".vid-url").value.trim();
-        let vSession = row.querySelector(".vid-session").value;
+        let vSessions = Array.from(row.querySelectorAll(".vid-session-cb:checked")).map(cb => cb.value);
         let vExam = row.querySelector(".vid-exam").value;
         let vType = row.querySelector(".vid-type").value;
         let vPrice = row.querySelector(".vid-price") ? parseFloat(row.querySelector(".vid-price").value) || 0 : 0;
         
-        if(vUrl) videos.push({ title: vTitle || "فيديو", url: vUrl, linkedSession: vSession, requiredExam: vExam, type: vType, price: vPrice });
+        if(vUrl) videos.push({ title: vTitle || "فيديو", url: vUrl, linkedSessions: vSessions, requiredExam: vExam, type: vType, price: vPrice });
     });
 
     if(!title || videos.length === 0) return alert("يرجى إدخال اسم الكورس وفيديو واحد على الأقل!");
@@ -4441,7 +4401,9 @@ window.renderLectures = async function() {
     } catch(e) {}
 };
 
-// --- 📜 فتح محتوى الكورس (يعرض الفيديوهات وبجوارها التراكر) ---
+// ==========================================
+// 📜 فتح محتوى الكورس (تصميم Premium زي Edutrack)
+// ==========================================
 window.openCourseContent = function(courseId) {
     let lec = window.fetchedLectures.find(l => l.id === courseId);
     if(!lec) return;
@@ -4451,24 +4413,148 @@ window.openCourseContent = function(courseId) {
     list.innerHTML = "";
 
     let vids = lec.videos || [];
-    if(vids.length === 0 && lec.url) vids.push({title: "المحاضرة كاملة", url: lec.url}); // دعم للكورسات القديمة
+    if(vids.length === 0 && lec.url) vids.push({title: "المحاضرة كاملة", url: lec.url, type: 'free'});
 
     if(vids.length === 0) {
-        list.innerHTML = `<div style="text-align:center; padding: 20px; color:var(--text-muted);">لا توجد فيديوهات في هذا الكورس.</div>`;
+        list.innerHTML = `<div style="text-align:center; padding: 30px; color:var(--text-muted); font-weight:bold; background: var(--hover-bg); border-radius: 12px; border: 2px dashed var(--border-color);">لا توجد فيديوهات في هذا الكورس.</div>`;
     } else {
         vids.forEach((v, idx) => {
+            // شياكة البادجات: توضح نوع الفيديو وسعره والامتحانات
+            let typeBadge = (v.type === 'paid') ? `<span style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: bold;">مدفوع (${v.price || 0} ج) 💰</span>` : `<span style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: bold;">مجاني 🎁</span>`;
+            let examBadge = v.requiredExam ? `<span style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: bold;">مربوط بامتحان 📝</span>` : '';
+            
             list.innerHTML += `
-            <div style="background: var(--card-bg); border: 1px solid var(--border-color); padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <span style="font-size:20px;">▶️</span>
-                    <span style="font-weight: bold; color: var(--secondary-color); font-size: 16px;">${v.title}</span>
+            <div style="background: var(--card-bg); border: 1px solid var(--border-color); padding: 20px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: 0.3s; margin-bottom: 12px;" onmouseover="this.style.transform='translateY(-3px)'; this.style.borderColor='#8b5cf6'; this.style.boxShadow='0 10px 20px rgba(139, 92, 246, 0.1)';" onmouseout="this.style.transform='translateY(0)'; this.style.borderColor='var(--border-color)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.02)';">
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <div style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6; width: 50px; height: 50px; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-size: 22px;">
+                        ▶️
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <span style="font-weight: 900; color: var(--secondary-color); font-size: 17px;">${v.title}</span>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            ${typeBadge}
+                            ${examBadge}
+                        </div>
+                    </div>
                 </div>
-                <button onclick="openVideoAnalytics('${courseId}', ${idx}, '${v.title}')" style="background:#8b5cf6; color:white; border:none; border-radius:8px; padding:8px 15px; cursor:pointer; font-weight: bold; transition:0.3s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">إحصائيات 📊</button>
+                <button onclick="openVideoAnalytics('${courseId}', ${idx}, '${v.title}')" style="background: linear-gradient(45deg, #8b5cf6, #6d28d9); color: white; border: none; border-radius: 10px; padding: 10px 20px; cursor: pointer; font-weight: 900; font-size: 14px; box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3); transition: 0.3s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                    الإحصائيات 📊
+                </button>
             </div>
             `;
         });
     }
     openModal("courseContentModal");
+};
+
+// ==========================================
+// 📊 إحصائيات الفيديو (مع بحث وإحصائيات علوية)
+// ==========================================
+window.openVideoAnalytics = async function(courseId, videoIndex, videoTitle) {
+    let tbody = document.getElementById("course-analytics-list");
+    
+    // حقن هيدر الإحصائيات والبحث ديناميكياً جوه المودال لو مش موجود
+    let searchBoxId = "analyticsSearchBox";
+    if (!document.getElementById(searchBoxId)) {
+        let statsHtml = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--hover-bg); padding: 15px 20px; border-radius: 16px; border: 1px dashed var(--border-color);">
+                <div style="display: flex; gap: 30px;">
+                    <div style="text-align: center;">
+                        <span style="display: block; font-size: 12px; color: var(--text-muted); font-weight: bold; margin-bottom: 5px;">إجمالي المشاهدين</span>
+                        <strong id="analyticsTotalViewers" style="font-size: 24px; color: #8b5cf6;">0</strong>
+                    </div>
+                    <div style="width: 2px; background: var(--border-color); border-radius: 2px;"></div>
+                    <div style="text-align: center;">
+                        <span style="display: block; font-size: 12px; color: var(--text-muted); font-weight: bold; margin-bottom: 5px;">إجمالي المشاهدات</span>
+                        <strong id="analyticsTotalViews" style="font-size: 24px; color: #10b981;">0</strong>
+                    </div>
+                </div>
+                <input type="text" id="${searchBoxId}" class="custom-input" placeholder="🔍 بحث بالاسم أو الكود..." style="width: 300px; margin: 0; border-radius: 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.02);" onkeyup="filterAnalyticsTable()">
+            </div>
+        `;
+        tbody.closest('.table-container').insertAdjacentHTML('beforebegin', statsHtml);
+    }
+
+    document.getElementById("analyticsVideoTitle").innerText = `📊 إحصائيات: ${videoTitle}`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 30px;">جاري جلب البيانات... ⏳</td></tr>`;
+    
+    // تصفير الخانات القديمة
+    if (document.getElementById("analyticsTotalViewers")) document.getElementById("analyticsTotalViewers").innerText = "0";
+    if (document.getElementById("analyticsTotalViews")) document.getElementById("analyticsTotalViews").innerText = "0";
+    if (document.getElementById(searchBoxId)) document.getElementById(searchBoxId).value = "";
+
+    openModal("courseAnalyticsModal");
+
+    let course = window.fetchedLectures ? window.fetchedLectures.find(c => c.id === courseId) : null;
+    let defaultMaxViews = course ? (parseInt(course.maxViews) || 0) : 0;
+
+    try {
+        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/course_tracking/${courseId}.json`);
+        let trackingData = await res.json() || {};
+        
+        tbody.innerHTML = ""; 
+        let hasData = false;
+        let totalViewersCount = 0;
+        let totalViewsCount = 0;
+
+        Object.keys(trackingData).forEach(key => {
+            if (key === "0" || key === "") return;
+
+            let studentVids = trackingData[key];
+            if(studentVids[videoIndex]) { 
+                hasData = true;
+                totalViewersCount++;
+                let vData = studentVids[videoIndex];
+                totalViewsCount += (vData.views || 0);
+
+                let st = typeof students !== 'undefined' ? students.find(s => s.code === key || (s.phone && String(s.phone).trim() !== "0" && s.phone === key)) : null;
+                let name = st ? st.name : "طالب غير معروف";
+                let code = st ? st.code : key;
+                
+                let extraViews = parseInt(vData.extraViews) || 0;
+                let totalAllowed = defaultMaxViews > 0 ? defaultMaxViews + extraViews : "∞";
+                let isBlocked = defaultMaxViews > 0 && vData.views >= totalAllowed;
+
+                let viewsDisplay = defaultMaxViews > 0 ? `${vData.views} / ${totalAllowed}` : vData.views;
+                let badgeBg = isBlocked ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)";
+                let badgeColor = isBlocked ? "#ef4444" : "#10b981";
+
+                tbody.innerHTML += `<tr class="analytics-row">
+                    <td class="st-code"><strong style="color: var(--primary-color);">${code}</strong></td>
+                    <td class="st-name" style="font-weight: bold; font-size: 15px;">${name}</td>
+                    <td style="direction: ltr;"><span style="background:${badgeBg}; color:${badgeColor}; border: 1px solid ${badgeColor}; padding:4px 12px; border-radius:12px; font-weight:900; font-size:14px;">👁️ ${viewsDisplay}</span></td>
+                    <td style="font-size: 13px; color: var(--text-muted); font-weight:bold;">${vData.lastSeen}</td>
+                    <td>
+                        ${defaultMaxViews > 0 ? `<button class="save-btn" style="width: auto; padding: 6px 15px; margin: 0; font-size: 12px; background: #3b82f6; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 5px rgba(59,130,246,0.2);" onclick="addExtraViews('${courseId}', ${videoIndex}, '${key}', ${extraViews}, '${name}', '${videoTitle}')">➕ زيادة</button>` : `<span style="color:var(--text-muted); font-size:12px; font-weight:bold; background: var(--hover-bg); padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border-color);">غير محدود</span>`}
+                    </td>
+                </tr>`;
+            }
+        });
+
+        if(!hasData) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 30px; font-weight:bold; color:var(--text-muted);">لم يقم أي طالب بمشاهدة هذا الفيديو حتى الآن. 📭</td></tr>`;
+        
+        // تحديث الأرقام العلوية
+        if (document.getElementById("analyticsTotalViewers")) document.getElementById("analyticsTotalViewers").innerText = totalViewersCount;
+        if (document.getElementById("analyticsTotalViews")) document.getElementById("analyticsTotalViews").innerText = totalViewsCount;
+
+    } catch(e) { 
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red; padding: 20px; font-weight: bold;">خطأ في الاتصال بالإنترنت! ❌</td></tr>`; 
+    }
+};
+
+// دالة فلترة جدول الإحصائيات أثناء الكتابة
+window.filterAnalyticsTable = function() {
+    let input = document.getElementById("analyticsSearchBox").value.toLowerCase();
+    let rows = document.querySelectorAll(".analytics-row");
+    rows.forEach(row => {
+        let code = row.querySelector(".st-code").innerText.toLowerCase();
+        let name = row.querySelector(".st-name").innerText.toLowerCase();
+        if (code.includes(input) || name.includes(input)) {
+            row.style.display = "";
+        } else {
+            row.style.display = "none";
+        }
+    });
 };
 
 
@@ -4536,57 +4622,7 @@ window.readFileAsBase64 = function(fileInputId) {
 
 
 
-window.openVideoAnalytics = async function(courseId, videoIndex, videoTitle) {
-    let tbody = document.getElementById("course-analytics-list");
-    document.getElementById("analyticsVideoTitle").innerText = `📊 إحصائيات: ${videoTitle}`;
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">جاري جلب البيانات... ⏳</td></tr>`;
-    openModal("courseAnalyticsModal");
 
-    // جلب الحد الأقصى للمشاهدات المحدد للكورس
-    let course = window.fetchedLectures ? window.fetchedLectures.find(c => c.id === courseId) : null;
-    let defaultMaxViews = course ? (parseInt(course.maxViews) || 0) : 0;
-
-    try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/course_tracking/${courseId}.json`);
-        let trackingData = await res.json() || {};
-        
-        tbody.innerHTML = ""; let hasData = false;
-
-        Object.keys(trackingData).forEach(key => {
-            if (key === "0" || key === "") return;
-
-            let studentVids = trackingData[key];
-            if(studentVids[videoIndex]) { 
-                hasData = true;
-                let vData = studentVids[videoIndex];
-                let st = typeof students !== 'undefined' ? students.find(s => s.code === key || (s.phone && String(s.phone).trim() !== "0" && s.phone === key)) : null;
-                let name = st ? st.name : "طالب غير معروف";
-                let code = st ? st.code : key;
-                
-                // 💡 التعديل هنا: حساب المشاهدات الإضافية اللي الإدارة منحتها للطالب
-                let extraViews = parseInt(vData.extraViews) || 0;
-                let totalAllowed = defaultMaxViews > 0 ? defaultMaxViews + extraViews : "∞";
-                let isBlocked = defaultMaxViews > 0 && vData.views >= totalAllowed;
-
-                let viewsDisplay = defaultMaxViews > 0 ? `${vData.views} / ${totalAllowed}` : vData.views;
-                let badgeBg = isBlocked ? "#ef4444" : "var(--primary-color)";
-
-                tbody.innerHTML += `<tr>
-                    <td><strong>${code}</strong></td>
-                    <td>${name}</td>
-                    <td style="direction: ltr;"><span style="background:${badgeBg}; color:#fff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:14px;">${viewsDisplay}</span></td>
-                    <td style="font-size: 14px; color: var(--text-muted); font-weight:bold;">${vData.lastSeen}</td>
-                    <td>
-                        ${defaultMaxViews > 0 ? `<button class="save-btn" style="width: auto; padding: 6px 12px; margin: 0; font-size: 12px; background: #10b981; border: none; border-radius: 6px; cursor: pointer;" onclick="addExtraViews('${courseId}', ${videoIndex}, '${key}', ${extraViews}, '${name}', '${videoTitle}')">➕ زيادة المرات</button>` : `<span style="color:var(--text-muted); font-size:12px; font-weight:bold;">غير محدود</span>`}
-                    </td>
-                </tr>`;
-            }
-        });
-
-        if(!hasData) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px; font-weight:bold; color:var(--text-muted);">لم يقم أي طالب بمشاهدة هذا الفيديو حتى الآن.</td></tr>`;
-
-    } catch(e) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">خطأ في الاتصال بالإنترنت!</td></tr>`; }
-};
 
 // الدالة الجديدة لمنح مشاهدات إضافية للطالب
 window.addExtraViews = async function(courseId, videoIndex, studentKey, currentExtra, studentName, videoTitle) {
@@ -6357,45 +6393,371 @@ window.saveBotSettings = function() {
 };
 
 
+// 3. المزامنة السحابية + التحقق من الإيقاف والتاريخ التلقائي والإنذار
+async function loadDataFromFirebase() {
+    // 🛑 منع التحميل من السحابة لو الحساب تجريبي
+    if (localStorage.getItem("is_demo_mode") === "true") {
+        isFirebaseLoaded = true; return; 
+    }
+    
+    // 🔥 تعريف كود السنتر اللي كان بيعمل إيرور في الخفاء
+    let currentLicenseKey = localStorage.getItem("licenseKey"); 
+    if(!currentLicenseKey) return; 
+    
+    try {
+        let licRes = await fetch(`https://edutrack-system-1ded4-default-rtdb.firebaseio.com/licenses/${currentLicenseKey}.json`);
+        let licData = await licRes.json();
+        
+        if (licData) {
+            let isExpired = false;
+            
+            // حساب هل الباقة انتهت زمنياً أم لا
+            if (licData.activatedAt) {
+                let activationDate = new Date(licData.activatedAt);
+                let expirationDate = new Date(activationDate);
+                
+                if (licData.durationDays) {
+                    expirationDate.setDate(expirationDate.getDate() + parseInt(licData.durationDays));
+                } else if (licData.durationMonths) {
+                    expirationDate.setMonth(expirationDate.getMonth() + parseInt(licData.durationMonths));
+                }
+                
+                let today = new Date();
+                let timeDiff = expirationDate.getTime() - today.getTime();
+                let daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24)); // حساب الأيام المتبقية
+
+                if (licData.durationMonths != 99) {
+                    if (daysLeft <= 0) {
+                        isExpired = true;
+                    } else if (daysLeft <= 5 && daysLeft > 0) {
+                        // 🚨 إظهار شريط الإنذار
+                        let banner = document.getElementById("expiration-banner");
+                        if(banner) {
+                            banner.style.display = "block";
+                            document.getElementById("expire-days").innerText = daysLeft;
+                        }
+                    }
+                }
+            }
+
+            // 🚫 الطرد المباشر
+            if (licData.status === 'suspended' || isExpired) {
+                sessionStorage.removeItem("isLoggedIn"); // مسح الجلسة
+                localStorage.setItem("keepLoggedIn", "false"); // 🔥 مسح (تذكرني) إجبارياً
+                
+                document.getElementById("login-screen").style.display = "none";
+                document.getElementById("main-app").style.display = "none";
+                
+                const suspendedScreen = document.getElementById("suspended-screen");
+                if(suspendedScreen) {
+                    suspendedScreen.style.display = "flex";
+                    if (isExpired) {
+                        suspendedScreen.querySelector("h2").innerText = "انتهت فترة الاشتراك! ⏳";
+                        suspendedScreen.querySelector("p").innerText = "لقد انتهت صلاحية باقتك الحالية. يرجى التواصل مع الإدارة لتجديد الاشتراك واستعادة بياناتك.";
+                    } else {
+                        suspendedScreen.querySelector("h2").innerText = "تم إيقاف النسخة! 🚫";
+                        suspendedScreen.querySelector("p").innerText = "عفواً، تم إيقاف ترخيص استخدام هذا النظام من قبل الإدارة العليا.";
+                    }
+                }
+                return; // ⛔ قفل السيستم ومنع تحميل باقي الداتا
+            }
+        }
+        
+        // ... (باقي الكود بتاع جلب الداتا الخاصة بالطلاب زي ما هو تحت هنا) ...
+
+        // --- باقي دالة الـ loadDataFromFirebase لسحب الداتا ---
+        let res = await fetch(getFirebaseUrl());
+        let data = await res.json();
+        // ... (تكملة الكود بتاع سحب الـ settings والـ students زي ما هو) ...
+        
+        if (data) {
+            if(data.settings) {
+                localStorage.setItem("teacherName", data.settings.teacherName);
+                localStorage.setItem("centerName", data.settings.centerName);
+                // السطرين الجداد دول 👇
+                localStorage.setItem("adminUser", data.settings.adminUser);
+                localStorage.setItem("adminPass", data.settings.adminPass);
+                localStorage.setItem("adminPin", data.settings.adminPin);
+                adminPin = data.settings.adminPin; // تحديث المتغير العالمي
+                if(data.settings.phoneNumbers) localStorage.setItem("teacherPhones", data.settings.phoneNumbers);
+                if(data.settings.parentMsgTemplate) localStorage.setItem("parentMsgTemplate", data.settings.parentMsgTemplate);
+                if(data.settings.studentMsgTemplate) localStorage.setItem("studentMsgTemplate", data.settings.studentMsgTemplate);
+            } else if (data.teacherName) {
+                localStorage.setItem("teacherName", data.teacherName);
+            }
+
+            students = (data.students || []).filter(i => i !== null);
+            groups = (data.groups || []).filter(i => i !== null);
+            schedule = (data.schedule || []).filter(i => i !== null);
+            expenses = (data.expenses || []).filter(i => i !== null);
+            financeRecords = data.financeRecords || {};
+            books = (data.books || []).filter(i => i !== null);
+             onlineExams = (data.onlineExams || []).filter(i => i !== null);
+            classSessions = (data.classSessions || []).filter(i => i !== null).map(s => ({...s, attendance: s.attendance || {}}));
+            exams = (data.exams || []).filter(i => i !== null).map(e => ({...e, grades: e.grades || {}}));
+            homeworks = (data.homeworks || []).filter(i => i !== null).map(h => ({...h, grades: h.grades || {}}));
+            
+            localStorage.setItem("students", JSON.stringify(students));
+            localStorage.setItem("classSessions", JSON.stringify(classSessions));
+            localStorage.setItem("exams", JSON.stringify(exams));
+            localStorage.setItem("homeworks", JSON.stringify(homeworks));
+            localStorage.setItem("schedule", JSON.stringify(schedule));
+            localStorage.setItem("groups", JSON.stringify(groups));
+            localStorage.setItem("financeRecords", JSON.stringify(financeRecords));
+            localStorage.setItem("expenses", JSON.stringify(expenses));
+            localStorage.setItem("books", JSON.stringify(books));
+           
+            localStorage.setItem("onlineExams", JSON.stringify(onlineExams));
+
+            renderTable();
+            if (document.getElementById("groups-list")) renderGroupCards();
+            if (typeof renderBooksTable === "function") renderBooksTable();
+            if(sessionStorage.getItem("isLoggedIn") === "true" && typeof renderDashboardCharts === "function") {
+                renderDashboardCharts();
+            }
+        }
+    } catch (e) {
+        console.log("⚠️ تعذر الاتصال بالسحابة أو قاعدة البيانات فارغة.");
+    }
+    isFirebaseLoaded = true; 
+
+    // بعد ما السيستم يحمل الداتا ويفرشها، شيك لو محتاجين باك أب النهاردة
+    setTimeout(autoCloudBackup, 5000); // بنأخره 5 ثواني عشان ميعطلش فتح الشاشة
+
+    setTimeout(window.checkGlobalAnnouncements, 1500);
+}
+
 // ==========================================
-// 🌐 مراقبة حالة الاتصال بالإنترنت والمزامنة الذكية
+// 🧬 المُدمج الذكي للبيانات (Two-Way Sync Merge)
+// ==========================================
+window.mergeOfflineDataAndSync = async function() {
+    showToast("جاري دمج بياناتك الأوفلاين مع بيانات الأجهزة الأخرى... ⏳", "info");
+    
+    try {
+        // 1. سحب داتا السيرفر الحالية
+        let res = await fetch(getFirebaseUrl());
+        let serverData = await res.json() || {};
+
+        // 2. دمج الطلاب (الجداد من هنا ومن هناك)
+        let mergedStudentsMap = {};
+        (serverData.students || []).forEach(s => { if(s) mergedStudentsMap[s.code] = s; });
+        students.forEach(s => { mergedStudentsMap[s.code] = { ...mergedStudentsMap[s.code], ...s }; });
+        students = Object.values(mergedStudentsMap);
+
+        // 3. دمج الحصص والحضور (أهم نقطة عشان الغياب ميتلغيش)
+        let mergedSessionsMap = {};
+        (serverData.classSessions || []).forEach(s => { if(s) mergedSessionsMap[s.id] = s; });
+        classSessions.forEach(s => {
+            if(mergedSessionsMap[s.id]) {
+                // لو الحصة موجودة في الجهازين، ادمج غياب الطلاب اللي هنا مع اللي هناك
+                mergedSessionsMap[s.id].attendance = { ...mergedSessionsMap[s.id].attendance, ...s.attendance };
+                mergedSessionsMap[s.id] = { ...mergedSessionsMap[s.id], ...s, attendance: mergedSessionsMap[s.id].attendance };
+            } else {
+                mergedSessionsMap[s.id] = s; // لو حصة جديدة أوفلاين
+            }
+        });
+        classSessions = Object.values(mergedSessionsMap).sort((a,b) => new Date(a.date) - new Date(b.date));
+
+        // 4. دمج الامتحانات والدرجات
+        let mergedExamsMap = {};
+        (serverData.exams || []).forEach(e => { if(e) mergedExamsMap[e.id] = e; });
+        exams.forEach(e => {
+            if(mergedExamsMap[e.id]) {
+                mergedExamsMap[e.id].grades = { ...mergedExamsMap[e.id].grades, ...e.grades };
+                mergedExamsMap[e.id] = { ...mergedExamsMap[e.id], ...e, grades: mergedExamsMap[e.id].grades };
+            } else {
+                mergedExamsMap[e.id] = e;
+            }
+        });
+        exams = Object.values(mergedExamsMap);
+
+        // 5. دمج الخزنة والماليات (عشان الفلوس متضيعش)
+        let serverFinance = serverData.financeRecords || {};
+        Object.keys(financeRecords).forEach(sessionKey => {
+            if(!serverFinance[sessionKey]) serverFinance[sessionKey] = {};
+            serverFinance[sessionKey] = { ...serverFinance[sessionKey], ...financeRecords[sessionKey] };
+        });
+        financeRecords = serverFinance;
+
+        // 6. حفظ النسخة المدمجة في الجهاز
+        localStorage.setItem("students", JSON.stringify(students));
+        localStorage.setItem("classSessions", JSON.stringify(classSessions));
+        localStorage.setItem("exams", JSON.stringify(exams));
+        localStorage.setItem("financeRecords", JSON.stringify(financeRecords));
+
+        // 7. رفع النسخة المدمجة للسيرفر
+        localStorage.removeItem('has_offline_changes');
+        await syncDataToBot();
+        
+        showToast("✅ تمت المزامنة! تم دمج شغلك مع السيرفر بنجاح.", "success");
+        if(typeof refreshCurrentVisibleScreens === 'function') refreshCurrentVisibleScreens();
+
+    } catch(err) {
+        showToast("حدث خطأ أثناء دمج البيانات!", "error");
+        console.error(err);
+    }
+};
+
+
+// ==========================================
+// 🛡️ نظام النسخ الاحتياطي التلقائي السحابي (Auto Cloud Backup)
+// ==========================================
+async function autoCloudBackup() {
+    const licenseKey = localStorage.getItem("licenseKey");
+    let isDemo = localStorage.getItem("is_demo_mode") === "true";
+    
+    // لو مفيش نت، أو الحساب تجريبي، أو مفيش كود سنتر، متعملش باك أب
+    if (!licenseKey || !navigator.onLine || isDemo) return;
+
+    // تحديد اسم النسخة بتاريخ اليوم (مثال: 2026-08-19)
+    const today = new Date().toISOString().split('T')[0];
+    const lastBackup = localStorage.getItem('last_auto_backup');
+
+    // لو السيستم عمل نسخة النهاردة بالفعل، هيوقف عشان ميزحمش الداتابيز
+    if (lastBackup === today) return;
+
+    // تجميع كل قطرة داتا في السيستم
+    const backupData = {
+        timestamp: new Date().toISOString(),
+        students: typeof students !== 'undefined' ? students : [], 
+        classSessions: typeof classSessions !== 'undefined' ? classSessions : [], 
+        exams: typeof exams !== 'undefined' ? exams : [], 
+        homeworks: typeof homeworks !== 'undefined' ? homeworks : [], 
+        schedule: typeof schedule !== 'undefined' ? schedule : [], 
+        groups: typeof groups !== 'undefined' ? groups : [], 
+        financeRecords: typeof financeRecords !== 'undefined' ? financeRecords : {}, 
+        expenses: typeof expenses !== 'undefined' ? expenses : [], 
+        books: typeof books !== 'undefined' ? books : [], 
+        monthlyPayments: typeof monthlyPayments !== 'undefined' ? monthlyPayments : {},
+        onlineExams: typeof onlineExams !== 'undefined' ? onlineExams : []
+    };
+
+    try {
+        // رفع النسخة في مسار معزول تماماً اسمه (backups) جوه ملف السنتر
+        await fetch(`https://edutrack-system-1ded4-default-rtdb.firebaseio.com/teachers/${licenseKey}/backups/${today}.json`, { 
+            method: 'PUT', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify(backupData) 
+        });
+        
+        // تسجيل إننا عملنا باك أب النهاردة عشان ميكرروش تاني إلا بكرة
+        localStorage.setItem('last_auto_backup', today);
+        console.log(`✅ تم أخذ لقطة احتياطية سحابية بنجاح ليوم: ${today}`);
+        
+    } catch (e) {
+        console.error("⚠️ فشل النسخ الاحتياطي التلقائي:", e);
+    }
+}
+
+
+// ==========================================
+// 🌐 مراقب حالة الإنترنت (محدث بالدمج الذكي)
 // ==========================================
 function updateNetworkStatus(isOnline, isInitialLoad = false) {
     const badge = document.getElementById('network-status-badge');
     const dot = document.getElementById('network-status-dot');
     const text = document.getElementById('network-status-text');
-    
     if (!badge || !dot || !text) return;
 
     if (isOnline) {
-        // 🟢 حالة الاتصال (Online)
-        badge.style.background = 'rgba(16, 185, 129, 0.1)';
-        badge.style.color = '#10b981';
-        dot.style.background = '#10b981';
-        dot.style.boxShadow = '0 0 5px #10b981';
+        badge.style.background = 'rgba(16, 185, 129, 0.1)'; badge.style.color = '#10b981';
+        dot.style.background = '#10b981'; dot.style.boxShadow = '0 0 5px #10b981';
         text.innerText = 'متصل بالإنترنت';
         
-        // لو النت لسه راجع حالا (مش أول تحميل للصفحة)، نرفع الداتا للسيرفر وننبه المدرس
         if (!isInitialLoad) {
-            if (typeof syncDataToBot === 'function') {
-                syncDataToBot(); // مزامنة البيانات المتراكمة
+            // 🛑 فحص هل في شغل اتعمل وإحنا أوفلاين ولا لأ؟
+            let hasOfflineChanges = localStorage.getItem('has_offline_changes') === 'true';
+            
+            if (hasOfflineChanges) {
+                // تشغيل الدمج الذكي اللي بيجمع شغل الجهازين مع بعض
+                mergeOfflineDataAndSync();
+            } else {
+                // لو معملش حاجة أوفلاين، يسحب بأمان
+                showToast("تم عودة الإنترنت، جاري سحب أحدث البيانات... 📥", "info");
+                if (typeof loadDataFromFirebase === 'function') {
+                    loadDataFromFirebase().then(() => {
+                        if (typeof refreshCurrentVisibleScreens === 'function') refreshCurrentVisibleScreens();
+                        showToast("تم تحديث شاشتك بأحدث البيانات بنجاح ✅", "success");
+                    });
+                }
             }
-            showToast("تم عودة الإنترنت، وجاري مزامنة بياناتك مع السيرفر 🔄✅", "success");
         }
     } else {
-        // 🔴 حالة الانقطاع (Offline)
-        badge.style.background = 'rgba(239, 68, 68, 0.1)';
-        badge.style.color = '#ef4444';
-        dot.style.background = '#ef4444';
-        dot.style.boxShadow = '0 0 5px #ef4444';
+        badge.style.background = 'rgba(239, 68, 68, 0.1)'; badge.style.color = '#ef4444';
+        dot.style.background = '#ef4444'; dot.style.boxShadow = '0 0 5px #ef4444';
         text.innerText = 'الإنترنت فاصل';
-        
-        // تنبيه المدرس إن السيستم شغال أوفلاين
-        if (!isInitialLoad) {
-            showToast("انقطع الاتصال بالإنترنت! النظام يعمل الآن في وضع الأوفلاين ⚠️", "error");
-        }
+        if (!isInitialLoad) showToast("انقطع الاتصال بالإنترنت! سيتم دمج أي تعديل لاحقاً ⚠️", "error");
     }
 }
+
+// ==========================================
+// ☁️ دالة الرفع للسحابة (محمية ضد تداخل الأجهزة)
+// ==========================================
+async function syncDataToBot() {
+    // 🔥 الحماية الأولى: لو مفيش نت، متعملش أي حاجة وسجل إن في شغل أوفلاين
+    if (!navigator.onLine) {
+        console.warn("الإنترنت مفصول.. تم إيقاف الرفع مؤقتاً وتسجيل التعديلات كمحلية.");
+        // وضع علامة سرية في الجهاز إن في داتا مستنية تترفع
+        const originalSetItem = localStorage.constructor.prototype.setItem;
+        originalSetItem.call(localStorage, 'has_offline_changes', 'true');
+        return; 
+    }
+
+    let isDemo = localStorage.getItem("is_demo_mode") === "true";
+    if (!isDemo && (!isFirebaseLoaded || !licenseKey)) return; 
+
+   const dataToSync = {
+        settings: {
+            teacherName: localStorage.getItem("teacherName") || "المدير",
+            centerName: localStorage.getItem("centerName") || "السنتر",
+            adminUser: localStorage.getItem("adminUser") || "shefo",
+            adminPass: localStorage.getItem("adminPass") || "12345",
+            adminPin: localStorage.getItem("adminPin") || "1234",
+            phoneNumbers: localStorage.getItem("teacherPhones") || "",
+            parentMsgTemplate: localStorage.getItem("parentMsgTemplate") || "",
+            studentMsgTemplate: localStorage.getItem("studentMsgTemplate") || "",
+            botEnabled: localStorage.getItem("botEnabled") === "true",
+            botName: localStorage.getItem("botName") || "المساعد",
+            botInstructions: localStorage.getItem("botInstructions") || ""
+        },
+        teacherName: localStorage.getItem("teacherName") || "المدير",
+        centerName: localStorage.getItem("centerName") || "السنتر",
+        adminUser: localStorage.getItem("adminUser"),
+        adminPass: localStorage.getItem("adminPass"),
+        adminPin: localStorage.getItem("adminPin"),
+        
+        students, classSessions, exams, homeworks, schedule, groups, financeRecords, expenses, books, monthlyPayments: monthlyPayments,
+        onlineExams: onlineExams 
+    };
+
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:") {
+        try {
+            await fetch(`${WHATSAPP_SERVER_URL}/sync-database`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(dataToSync) 
+            });
+        } catch (e) {}
+    }
+
+    if (isDemo) return;
+
+    try {
+        await fetch(getFirebaseUrl(), { 
+            method: 'PUT', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify(dataToSync) 
+        });
+        
+        // 🔥 مسح العلامة بعد الرفع بنجاح عشان منسألوش تاني
+        localStorage.removeItem('has_offline_changes');
+
+        if (typeof triggerGlobalSyncSignal === 'function') {
+            await triggerGlobalSyncSignal();
+        }
+    } catch (e) {}
+}
+
 
 // الاستماع لتغيرات الشبكة لحظياً
 window.addEventListener('online', () => updateNetworkStatus(true, false));
@@ -6483,3 +6845,65 @@ document.addEventListener('DOMContentLoaded', () => {
         startRealTimeSync();
     }, 3000); // بنستنى 3 ثواني لحد ما السيستم يحمل عشان منعملش تعارض
 });
+
+
+// ==========================================
+// 📥 تصدير جميع الطلاب إلى إكسيل (شيت شامل)
+// ==========================================
+window.exportAllStudentsToExcel = function() {
+    if (students.length === 0) return showToast("لا يوجد طلاب لتصديرهم!", "error");
+
+    let excelData = students.map(st => ({
+        "الكود": st.code,
+        "الاسم": st.name,
+        "الصف الدراسي": st.level,
+        "المسار": st.track || 'عام',
+        "المجموعة": st.group,
+        "هاتف الطالب": st.phone,
+        "هاتف ولي الأمر": st.parentPhone,
+        "الجنس": st.gender,
+        "نقاط التميز": st.behaviorPoints || 0
+    }));
+
+    let ws = XLSX.utils.json_to_sheet(excelData);
+    // تظبيط عرض العواميد عشان الكلام ميبقاش مقطوش
+    ws['!cols'] = [{wch: 10}, {wch: 30}, {wch: 20}, {wch: 10}, {wch: 20}, {wch: 15}, {wch: 15}, {wch: 10}, {wch: 12}];
+    
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "سجل الطلاب");
+    
+    let dateStr = new Date().toLocaleDateString('ar-EG').replace(/\//g, '-');
+    XLSX.writeFile(wb, `سجل_جميع_الطلاب_${dateStr}.xlsx`);
+    showToast("تم تصدير سجل الطلاب بنجاح! 📥");
+};
+
+// ==========================================
+// 📥 تصدير طلاب مجموعة معينة إلى إكسيل (شيت حضور/غياب)
+// ==========================================
+window.exportGroupStudentsToExcel = function() {
+    if (!currentActiveGroup) return;
+    
+    let groupStudents = students.filter(s => s.group === currentActiveGroup);
+    if (groupStudents.length === 0) return showToast("لا يوجد طلاب في هذه المجموعة لتصديرهم!", "error");
+
+    let excelData = groupStudents.map(st => ({
+        "الكود": st.code,
+        "الاسم": st.name,
+        "المسار": st.track || 'عام',
+        "هاتف الطالب": st.phone,
+        "هاتف ولي الأمر": st.parentPhone,
+        "نقاط التميز": st.behaviorPoints || 0
+    }));
+
+    let ws = XLSX.utils.json_to_sheet(excelData);
+    // تظبيط عرض العواميد
+    ws['!cols'] = [{wch: 10}, {wch: 30}, {wch: 10}, {wch: 15}, {wch: 15}, {wch: 12}];
+    
+    let wb = XLSX.utils.book_new();
+    // اسم الشيت من تحت هيكون اسم المجموعة
+    XLSX.utils.book_append_sheet(wb, ws, currentActiveGroup.substring(0, 30)); 
+    
+    let dateStr = new Date().toLocaleDateString('ar-EG').replace(/\//g, '-');
+    XLSX.writeFile(wb, `طلاب_مجموعة_${currentActiveGroup}_${dateStr}.xlsx`);
+    showToast(`تم تصدير شيت مجموعة (${currentActiveGroup}) بنجاح! 📥`);
+};

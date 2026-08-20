@@ -258,7 +258,8 @@
                 <section id="group-details-view" class="students-section" style="display: none;">
                     <div class="section-header">
                         <div><button class="theme-btn" onclick="backToGroups()" style="margin-bottom: 15px;">🔙 عودة</button><h2 id="current-group-title" style="color: var(--primary-color);">إدارة مجموعة: </h2></div>
-                        <div class="header-actions"><button class="add-btn exam-btn" onclick="quickExamForGroup()">⚡ امتحان مفاجئ</button><button class="add-btn" onclick="openAddStudentToGroupModal()">+ إضافة طالب هنا</button></div>
+                        <div class="header-actions"><button class="theme-btn" onclick="exportGroupStudentsToExcel()" style="border-color: #3b82f6; color: #3b82f6; background: white; padding: 10px 15px; font-weight: bold; border-radius: 8px;">📤 تحميل شيت المجموعة</button>
+                            <button class="add-btn exam-btn" onclick="quickExamForGroup()">⚡ امتحان مفاجئ</button><button class="add-btn" onclick="openAddStudentToGroupModal()">+ إضافة طالب هنا</button></div>
                     </div>
                     <div class="table-container">
                         <table class="students-table">
@@ -324,6 +325,8 @@
                         <h2>سجل الطلاب الشامل</h2>
                         <div class="header-actions">
                             <input type="text" id="searchInput" placeholder="بحث بالاسم أو الكود..." class="custom-input" onkeyup="searchStudent()" style="width: 250px;">
+                            <!-- زرار التصدير الجديد 👇 -->
+    <button class="theme-btn" onclick="exportAllStudentsToExcel()" style="border-color: #3b82f6; color: #3b82f6;">📤 تصدير إكسيل</button>
                             <button class="theme-btn" onclick="downloadExcelTemplate()" style="border-color: #10b981; color: #10b981;">📄 تحميل نموذج الإكسيل</button>
                             <div style="position: relative; display: inline-block;">
                                 <input type="file" id="importExcelInput" accept=".xlsx, .xls" style="position: absolute; width: 100%; height: 100%; opacity: 0; cursor: pointer;" onchange="importStudentsFromExcel(event)">
@@ -664,30 +667,50 @@
             <span style="font-size: 24px;">💬</span> تخصيص رسائل الواتساب التلقائية
         </h2>
         
-        <div style="background: var(--hover-bg); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px dashed #0ea5e9;">
-            <p style="font-weight: bold; margin-bottom: 10px; color: var(--text-main);">💡 المتغيرات المتاحة (انسخ الكلمة بأقواسها وضعها في النص):</p>
-            <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px; margin-bottom: 15px;">
-                <span class="badge" style="background: #e0f2fe; color: #1e3a8a; border: 1px solid #bae6fd;">{اسم_الطالب}</span>
-                <span class="badge" style="background: #e0f2fe; color: #1e3a8a; border: 1px solid #bae6fd;">{المجموعة}</span>
-                <span class="badge" style="background: #e0f2fe; color: #1e3a8a; border: 1px solid #bae6fd;">{الموضوع}</span>
-                <span class="badge" style="background: #e0f2fe; color: #1e3a8a; border: 1px solid #bae6fd;">{تفاصيل_التقرير}</span>
-                <span class="badge" style="background: #e0f2fe; color: #1e3a8a; border: 1px solid #bae6fd;">{اسم_السنتر}</span>
-                <span class="badge" style="background: #e0f2fe; color: #1e3a8a; border: 1px solid #bae6fd;">{اسم_المدير}</span>
-                <span class="badge" style="background: #e0f2fe; color: #1e3a8a; border: 1px solid #bae6fd;">{وقت_الرسالة}</span>
+        <div style="background: var(--hover-bg); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px dashed #0ea5e9; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+            <p style="font-weight: bold; margin-bottom: 15px; color: var(--text-main); font-size: 15px;">
+                💡 المتغيرات الذكية (اضغط على أي متغير لإضافته في مكان المؤشر داخل الرسالة):
+            </p>
+            <!-- أزرار الترحيب العشوائي الجديدة -->
+                <button type="button" class="var-btn" onclick="insertVariable('{ترحيب_ولي_الأمر}')" style="background: #fdf4ff; border-color: #d946ef; color: #a21caf;">👋 ترحيب ولي الأمر (عشوائي)</button>
+                <button type="button" class="var-btn" onclick="insertVariable('{ترحيب_الطالب}')" style="background: #fdf4ff; border-color: #d946ef; color: #a21caf;">👋 ترحيب الطالب (عشوائي)</button>
+            <!-- أزرار المتغيرات التفاعلية -->
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;" id="smart-variables-container">
+                <button type="button" class="var-btn" onclick="insertVariable('{اسم_الطالب}')">👤 اسم الطالب</button>
+                <button type="button" class="var-btn" onclick="insertVariable('{كود_الطالب}')">🔢 كود الطالب</button>
+                <button type="button" class="var-btn" onclick="insertVariable('{رقم_الطالب}')">📱 هاتف الطالب</button>
+                <button type="button" class="var-btn" onclick="insertVariable('{رقم_ولي_الأمر}')">👨‍👦 هاتف ولي الأمر</button>
+                <button type="button" class="var-btn" onclick="insertVariable('{المجموعة}')">📚 المجموعة</button>
+                <button type="button" class="var-btn" onclick="insertVariable('{الموضوع}')">🎯 موضوع الحصة</button>
+                <button type="button" class="var-btn" onclick="insertVariable('{تفاصيل_التقرير}')" style="background: #e0e7ff; border-color: #3b82f6; color: #1d4ed8;">📊 تفاصيل التقرير (الغياب والدرجات)</button>
+                <button type="button" class="var-btn" onclick="insertVariable('{اسم_السنتر}')">🏫 اسم السنتر</button>
+                <button type="button" class="var-btn" onclick="insertVariable('{اسم_المدير}')">👑 اسم المدرس</button>
+                <button type="button" class="var-btn" onclick="insertVariable('{وقت_الرسالة}')">⏰ وقت الإرسال</button>
             </div>
-            <p style="margin-top: 10px; font-size: 13px; color: var(--danger-color); line-height: 1.6;">
-                🛡️ <strong>حماية من الحظر (Spintax):</strong> لتجنب حظر الواتساب، استخدم الصيغة <code>{كلمة1|كلمة2|كلمة3}</code> ليقوم النظام باختيار كلمة عشوائية في كل رسالة، مما يجعل الرسائل تبدو وكأن بشراً يكتبها.
+
+            <p style="margin-top: 15px; font-size: 13px; color: var(--danger-color); line-height: 1.6; background: rgba(239, 68, 68, 0.05); padding: 10px; border-radius: 8px;">
+                🛡️ <strong>حماية من الحظر (Spintax):</strong> لتجنب حظر الواتساب، استخدم الصيغة <code>{كلمة1|كلمة2|كلمة3}</code> ليقوم النظام باختيار كلمة عشوائية في كل رسالة.
             </p>
         </div>
 
+        <style>
+            .var-btn {
+                background: white; border: 1px solid #bae6fd; color: #0369a1; padding: 6px 12px;
+                border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer;
+                transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-family: 'Cairo', sans-serif;
+            }
+            .var-btn:hover { background: #0ea5e9; color: white; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(14, 165, 233, 0.3); }
+            .var-btn:active { transform: translateY(0); }
+        </style>
+
         <div class="input-group">
-            <label style="font-weight: bold;">قالب رسالة ولي الأمر</label>
-            <textarea id="settingParentMsg" class="custom-input" rows="5" placeholder="مثال: {أهلاً|مرحباً} ولي أمر الطالب {اسم_الطالب}..."></textarea>
+            <label style="font-weight: bold; font-size: 15px; color: var(--primary-color);">👨‍👦 قالب رسالة ولي الأمر</label>
+            <textarea id="settingParentMsg" class="custom-input" rows="6" placeholder="قف هنا ثم اضغط على المتغيرات بالأعلى لإضافتها..."></textarea>
         </div>
         
         <div class="input-group">
-            <label style="font-weight: bold;">قالب رسالة الطالب</label>
-            <textarea id="settingStudentMsg" class="custom-input" rows="5" placeholder="مثال: {عاش يا بطل|أخبار المذاكرة إيه} يا {اسم_الطالب}..."></textarea>
+            <label style="font-weight: bold; font-size: 15px; color: var(--success-color);">🎓 قالب رسالة الطالب</label>
+            <textarea id="settingStudentMsg" class="custom-input" rows="6" placeholder="قف هنا ثم اضغط على المتغيرات بالأعلى لإضافتها..."></textarea>
         </div>
         
         <button class="save-btn" style="width: 100%; font-size: 16px; background-color: #0ea5e9;" onclick="saveAccountSettings()">💾 حفظ قوالب الرسائل والإعدادات</button>
@@ -1795,8 +1818,9 @@
         <form id="addStudentForm" class="form-grid">
             <!-- الصف الأول: الكود والاسم -->
 <div class="input-group">
-    <label>كود الطالب (تلقائي)</label>
-    <input type="text" id="studentCode" readonly class="custom-input" style="font-weight: bold; color: var(--primary-color); background: #f8fafc;">
+    <label>كود الطالب (قابل للتعديل)</label>
+    <!-- شيلنا readonly واللون الرصاصي عشان تقدر تكتب براحتك -->
+    <input type="text" id="studentCode" class="custom-input" style="font-weight: bold; color: var(--primary-color);">
 </div>
 <div class="input-group">
     <label>اسم الطالب رباعي</label>
@@ -1806,8 +1830,7 @@
 <!-- الصف الثاني: الصف والمسار -->
             <div class="input-group">
                 <label>الصف الدراسي</label>
-                <select id="studentLevel" required class="custom-input" onchange="filterGroupsByLevel('studentLevel', 'studentGroup'); toggleTrackDropdown('studentLevel', 'trackGroup');">
-                    <option value="">اختر الصف...</option>
+                <select id="studentLevel" required class="custom-input" onchange="filterGroupsByLevel('studentLevel', 'studentGroup');">
                     <option value="الأول الثانوي">الأول الثانوي</option>
                     <option value="الثاني الثانوي">الثاني الثانوي</option>
                     <option value="الثالث الثانوي">الثالث الثانوي</option>
@@ -1828,9 +1851,12 @@
                 <input type="text" id="studentPhone" required class="custom-input" placeholder="01XXXXXXXXX">
             </div>
             <div class="input-group">
-                <label>هاتف ولي الأمر</label>
-                <input type="text" id="parentPhone" required class="custom-input" placeholder="01XXXXXXXXX">
-            </div>
+    <label>هاتف ولي الأمر</label>
+    <!-- ضفنا onkeyup عشان يفحص الرقم وإنت بتكتب -->
+    <input type="text" id="parentPhone" required class="custom-input" placeholder="01XXXXXXXXX" onkeyup="checkDuplicateParentPhone()">
+    <!-- رسالة التنبيه المخفية -->
+    <p id="parentPhoneWarning" style="color: var(--danger-color); font-size: 12px; font-weight: bold; margin-top: 5px; display: none;"></p>
+</div>
 
             <!-- الصف الخامس: الجنس -->
             <div class="input-group full-width">
@@ -1871,7 +1897,7 @@
             <!-- الصف الأول: الكود والاسم -->
 <div class="input-group">
     <label>كود الطالب</label>
-    <input type="text" id="editStudentCode" readonly class="custom-input" style="font-weight:bold; color:var(--primary-color); background: #f8fafc;">
+    <input type="text" id="editStudentCode" class="custom-input" style="font-weight:bold; color:var(--primary-color); background: #f8fafc;">
 </div>
 <div class="input-group">
     <label>الاسم</label>
@@ -1885,8 +1911,7 @@
             <!-- الصف الثاني: الصف والمسار -->
             <div class="input-group">
                 <label>الصف</label>
-                <select id="editStudentLevel" required class="custom-input" onchange="filterGroupsByLevel('editStudentLevel', 'editStudentGroup'); toggleTrackDropdown('editStudentLevel', 'editTrackGroup');">
-                    <option value="الأول الثانوي">الأول الثانوي</option>
+                <select id="editStudentLevel" required class="custom-input" onchange="filterGroupsByLevel('editStudentLevel', 'editStudentGroup');">
                     <option value="الثاني الثانوي">الثاني الثانوي</option>
                     <option value="الثالث الثانوي">الثالث الثانوي</option>
                 </select>
@@ -1914,9 +1939,12 @@
                 <input type="text" id="editStudentPhone" required class="custom-input">
             </div>
             <div class="input-group">
-                <label>هاتف ولي الأمر</label>
-                <input type="text" id="editParentPhone" required class="custom-input">
-            </div>
+    <label>هاتف ولي الأمر</label>
+    <!-- ضفنا onkeyup عشان يفحص الرقم وإنت بتكتب -->
+    <input type="text" id="parentPhone" required class="custom-input" placeholder="01XXXXXXXXX" onkeyup="checkDuplicateParentPhone()">
+    <!-- رسالة التنبيه المخفية -->
+    <p id="parentPhoneWarning" style="color: var(--danger-color); font-size: 12px; font-weight: bold; margin-top: 5px; display: none;"></p>
+</div>
 
             <!-- حقل الحالة الخاصة (الإعفاء) -->
             <div class="input-group full-width" style="background: rgba(245, 158, 11, 0.05); padding: 12px; border-radius: 8px; border: 1px dashed #f59e0b; margin-top: 10px;">
