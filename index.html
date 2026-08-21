@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة تحكم المدرس | هيستوريا</title>
+    <title>لوحة تحكم المدرس | El-Senior</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -23,10 +23,10 @@
         <div class="login-card">
         <div style="text-align: center; margin-top: 10px; margin-bottom: 0;">
     <!-- الأخطبوط اللي بيشاور (متوسط الحجم وجوه الكارت) -->
-    <img src="logo.png" style="width: 80px; height: auto;">
+    <img src="logo.PNG" style="width: 80px; height: auto;">
 </div>
-           <h2 class="logo" style="margin-bottom: 5px;">هيستوريا <span class="dot">.</span></h2>
-<span style="display: block; font-size: 16px; color: var(--primary-color); font-weight: 900; margin-bottom: 15px;">أسامة رفعت</span>
+           <h2 class="logo" style="margin-bottom: 5px;">El-Senior <span class="dot">.</span></h2>
+<span style="display: block; font-size: 16px; color: var(--primary-color); font-weight: 900; margin-bottom: 15px;">Sami Samir</span>
             <h3 style="margin-bottom: 20px; color: var(--text-main);">تسجيل الدخول</h3>
             <form id="loginForm">
                 
@@ -57,10 +57,10 @@
         
         <aside class="sidebar no-print">
     <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 30px;">
-        <img src="logo.png" style="width: 70px; height: auto;">
+        <img src="logo.PNG" style="width: 70px; height: auto;">
         <div style="text-align: right;">
-            <h2 class="logo" style="margin: 0; line-height: 1.1;">هيستوريا</h2>
-            <span style="display: block; font-size: 20px; color: var(--primary-color); font-weight: 800; letter-spacing: 1px;">أسامة رفعت</span>
+            <h2 class="logo" style="margin: 0; line-height: 1.1;">El-Senior</h2>
+            <span style="display: block; font-size: 20px; color: var(--primary-color); font-weight: 800; letter-spacing: 1px;">Sami Samir</span>
             
             <!-- 🌐 الكود الجديد: مؤشر حالة الإنترنت -->
             <div id="network-status-badge" style="display: flex; align-items: center; gap: 5px; margin-top: 5px; font-size: 11px; font-weight: bold; background: rgba(16, 185, 129, 0.1); padding: 3px 8px; border-radius: 20px; color: #10b981; width: max-content; transition: 0.3s;">
@@ -152,7 +152,7 @@
                 </li>
                 
                 <li id="nav-platform"><a href="#" onclick="switchPage('platform')">إدارة المنصة💻</a></li>
-
+                <li id="nav-walletRequests"><a href="#" onclick="switchPage('walletRequests')">طلبات الشحن 💳 <span id="walletReqBadge" style="background: red; color: white; padding: 2px 6px; border-radius: 50%; font-size: 12px; display: none;">0</span></a></li>
                 <li class="nav-dropdown admin-only">
                     <div class="dropdown-toggle" onclick="toggleSidebarDropdown(this)">
                         <span>📈 الإدارة والماليات</span>
@@ -167,7 +167,7 @@
                         <li id="nav-broadcast"><a href="#" onclick="switchPage('broadcast')">الإرسال الجماعي 📢</a></li>
                     </ul>
                 </li>
-
+                
                 <li id="nav-logs" class="admin-only"><a href="#" onclick="switchPage('logs')">سجل الحركات 🕵️‍♂️</a></li>
 
                 <li class="nav-dropdown admin-only">
@@ -251,32 +251,56 @@
             </div>
 
             <div id="groups-view" class="view-section" style="display: none;">
-                <section id="groups-overview" class="students-section">
-                    <div class="section-header"><h2>مجموعات الدروس</h2><button class="add-btn" onclick="openModal('addGroupModal')">+ إضافة مجموعة جديدة</button></div>
-                    <div class="stats-grid" id="groups-list"></div>
-                </section>
-                <section id="group-details-view" class="students-section" style="display: none;">
-                    <div class="section-header">
-                        <div><button class="theme-btn" onclick="backToGroups()" style="margin-bottom: 15px;">🔙 عودة</button><h2 id="current-group-title" style="color: var(--primary-color);">إدارة مجموعة: </h2></div>
-                        <div class="header-actions"><button class="theme-btn" onclick="exportGroupStudentsToExcel()" style="border-color: #3b82f6; color: #3b82f6; background: white; padding: 10px 15px; font-weight: bold; border-radius: 8px;">📤 تحميل شيت المجموعة</button>
-                            <button class="add-btn exam-btn" onclick="quickExamForGroup()">⚡ امتحان مفاجئ</button><button class="add-btn" onclick="openAddStudentToGroupModal()">+ إضافة طالب هنا</button></div>
-                    </div>
-                    <div class="table-container">
-                        <table class="students-table">
+    
+    <!-- 1. الشاشة الجديدة: عرض السناتر -->
+    <section id="centers-overview" class="students-section">
+        <div class="section-header">
+            <h2>مراكز التعليم (السناتر) 🏫</h2>
+            <button class="add-btn" style="background-color: #8b5cf6;" onclick="openModal('addCenterModal')">+ إضافة سنتر جديد</button>
+        </div>
+        <div class="stats-grid" id="centers-list"></div>
+    </section>
+
+    <!-- 2. شاشة عرض المجموعات (داخل السنتر المحدد) -->
+    <section id="groups-overview" class="students-section" style="display: none;">
+        <div class="section-header">
+            <div>
+                <button class="theme-btn" onclick="backToCenters()" style="margin-bottom: 15px;">🔙 عودة للسناتر</button>
+                <h2 id="current-center-title" style="color: var(--primary-color);">مجموعات سنتر: </h2>
+            </div>
+            <button class="add-btn" onclick="openModal('addGroupModal')">+ إضافة مجموعة للسنتر</button>
+        </div>
+        <div class="stats-grid" id="groups-list"></div>
+    </section>
+
+    <!-- 3. شاشة إدارة المجموعة (طلاب المجموعة) -->
+    <section id="group-details-view" class="students-section" style="display: none;">
+        <div class="section-header">
+            <div>
+                <button class="theme-btn" onclick="backToGroups()" style="margin-bottom: 15px;">🔙 عودة للمجموعات</button>
+                <h2 id="current-group-title" style="color: var(--primary-color);">إدارة مجموعة: </h2>
+            </div>
+            <div class="header-actions">
+                <button class="add-btn exam-btn" onclick="quickExamForGroup()">⚡ امتحان مفاجئ</button>
+                <button class="add-btn" onclick="openAddStudentToGroupModal()">+ إضافة طالب هنا</button>
+            </div>
+        </div>
+        <div class="table-container">
+           <table class="students-table">
     <thead>
         <tr>
-            <th>الكود</th>
-            <th>اسم الطالب والمسار</th>
+            <th onclick="sortGroupStudentsTable('code')" style="cursor: pointer; user-select: none;" title="ترتيب حسب الكود">الكود <span id="sort-gs-code" style="color: var(--primary-color); font-size: 13px;">⇅</span></th>
+            <th onclick="sortGroupStudentsTable('name')" style="cursor: pointer; user-select: none;" title="ترتيب حسب الاسم">اسم الطالب والمسار <span id="sort-gs-name" style="color: var(--text-muted); font-size: 13px;">⇅</span></th>
             <th style="text-align: center;">آخر 4 حصص</th>
-            <th>رقم ولي الأمر</th>
+            <th onclick="sortGroupStudentsTable('parentPhone')" style="cursor: pointer; user-select: none;" title="ترتيب حسب رقم ولي الأمر">رقم ولي الأمر <span id="sort-gs-parentPhone" style="color: var(--text-muted); font-size: 13px;">⇅</span></th>
             <th>إجراء</th>
         </tr>
     </thead>
     <tbody id="group-students-list"></tbody>
 </table>
+        </div>
+    </section>
 </div>
-                </section>
-            </div>
 
             <div id="joinreq-view" class="view-section" style="display: none;">
     <section class="students-section">
@@ -318,6 +342,92 @@
         <button class="save-btn" style="width: 100%; background: var(--success-color);" onclick="confirmApproveRequest()">توليد الكود وإرسال واتساب 🚀</button>
     </div>
 </div>
+
+
+<!-- صفحة طلبات شحن المحفظة للمدرس -->
+<div id="walletRequests-view" class="view-section admin-only" style="display: none;">
+    <section class="students-section">
+        <div class="section-header">
+            <div>
+                <h2>طلبات شحن المحفظة 💳</h2>
+                <p style="color: var(--text-muted); font-size: 14px;">مراجعة إيصالات تحويل الطلاب ومتابعة سجل الطلبات السابقة</p>
+            </div>
+            <button class="theme-btn" onclick="loadWalletRequests()">🔄 تحديث الطلبات</button>
+        </div>
+        
+        <!-- الطلبات المعلقة -->
+        <div class="table-container" style="margin-bottom: 30px;">
+            <h3 style="color: var(--secondary); margin-bottom: 10px; font-size: 18px;">⏳ الطلبات المعلقة (تحتاج مراجعة)</h3>
+            <table class="students-table">
+                <thead>
+                    <tr>
+                        <th>التاريخ</th>
+                        <th>الطالب</th>
+                        <th>المبلغ المُرسل</th>
+                        <th>رقم التحويل / الإيصال</th>
+                        <th>صورة الإيصال</th>
+                        <th>إجراء</th>
+                    </tr>
+                </thead>
+                <tbody id="wallet-requests-tbody">
+                    <tr><td colspan="6" style="text-align: center; padding: 30px;">جاري التحميل...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- سجل الطلبات السابقة -->
+        <div class="table-container">
+            <h3 style="color: var(--secondary); margin-bottom: 10px; font-size: 18px;">📜 سجل الطلبات السابقة (المقبولة والمرفوضة)</h3>
+            <table class="students-table">
+                <thead>
+                    <tr>
+                        <th>التاريخ</th>
+                        <th>الطالب</th>
+                        <th>المبلغ</th>
+                        <th>رقم التحويل</th>
+                        <th>صورة الإيصال</th>
+                        <th>الحالة</th>
+                    </tr>
+                </thead>
+                <tbody id="wallet-history-tbody">
+                    <tr><td colspan="6" style="text-align: center; padding: 20px;">لا توجد طلبات سابقة.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<!-- نافذة تأكيد أو تعديل مبلغ شحن المحفظة -->
+<div id="approveWalletModal" class="modal" style="z-index: 1000000;">
+    <div class="modal-content" style="width: 450px; border-top: 5px solid var(--success-color);">
+        <span class="close-btn" onclick="closeModal('approveWalletModal')">&times;</span>
+        <h2 style="color: var(--success-color); margin-bottom: 15px;">مراجعة وقبول طلب الشحن ✅</h2>
+        
+        <input type="hidden" id="approveWalletReqId">
+        <input type="hidden" id="approveWalletStudentCode">
+
+        <div style="background: var(--hover-bg); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: right;">
+            <p style="margin: 0 0 5px 0;">اسم الطالب: <strong id="aprWalletStName" style="color: var(--primary-color);"></strong></p>
+            <p style="margin: 0 0 10px 0;">المبلغ الذي كتبه الطالب: <strong id="aprWalletStAmount" style="color: #f59e0b;"></strong> ج.م</p>
+            <div style="text-align: center; margin-top: 10px;">
+                <a id="aprWalletImgLink" href="#" target="_blank" title="اضغط لتكبير الصورة">
+                    <img id="aprWalletImgPreview" src="" style="max-width: 100%; height: 150px; object-fit: contain; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer;">
+                </a>
+                <small style="display: block; color: var(--text-muted); margin-top: 5px;">(اضغط على الصورة لرؤيتها بحجمها الطبيعي)</small>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>المبلغ المراد اعتماده وشحنه في رصيد الطالب (ج.م):</label>
+            <input type="number" id="aprWalletFinalAmount" class="custom-input" style="font-size: 20px; font-weight: bold; text-align: center; color: var(--success-color);" min="1">
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="save-btn" style="flex: 2; margin: 0; background: var(--success-color);" onclick="confirmApproveWalletRequest()">تأكيد الشحن وإضافة الرصيد 🚀</button>
+            <button class="theme-btn" style="flex: 1; margin: 0; border-color: var(--danger-color); color: var(--danger-color);" onclick="rejectWalletRequest()">رفض الطلب ❌</button>
+        </div>
+    </div>
+</div>
             
             <div id="students-view" class="view-section" style="display: none;">
                 <section id="students-overview" class="students-section">
@@ -325,8 +435,6 @@
                         <h2>سجل الطلاب الشامل</h2>
                         <div class="header-actions">
                             <input type="text" id="searchInput" placeholder="بحث بالاسم أو الكود..." class="custom-input" onkeyup="searchStudent()" style="width: 250px;">
-                            <!-- زرار التصدير الجديد 👇 -->
-    <button class="theme-btn" onclick="exportAllStudentsToExcel()" style="border-color: #3b82f6; color: #3b82f6;">📤 تصدير إكسيل</button>
                             <button class="theme-btn" onclick="downloadExcelTemplate()" style="border-color: #10b981; color: #10b981;">📄 تحميل نموذج الإكسيل</button>
                             <div style="position: relative; display: inline-block;">
                                 <input type="file" id="importExcelInput" accept=".xlsx, .xls" style="position: absolute; width: 100%; height: 100%; opacity: 0; cursor: pointer;" onchange="importStudentsFromExcel(event)">
@@ -336,7 +444,18 @@
                         </div>
                     </div>
                     <div class="table-container">
-                        <table class="students-table"><thead><tr><th>الكود</th><th>اسم الطالب</th><th>الصف</th><th>المجموعة</th><th>إجراءات</th></tr></thead><tbody id="students-list"></tbody></table>
+                        <table class="students-table">
+    <thead>
+        <tr>
+            <th onclick="sortStudentsTable('code')" style="cursor: pointer; user-select: none;" title="ترتيب حسب الكود">الكود <span id="sort-st-code" style="color: var(--primary-color); font-size: 13px;">⇅</span></th>
+            <th onclick="sortStudentsTable('name')" style="cursor: pointer; user-select: none;" title="ترتيب حسب الاسم">اسم الطالب <span id="sort-st-name" style="color: var(--text-muted); font-size: 13px;">⇅</span></th>
+            <th onclick="sortStudentsTable('level')" style="cursor: pointer; user-select: none;" title="ترتيب حسب الصف">الصف <span id="sort-st-level" style="color: var(--text-muted); font-size: 13px;">⇅</span></th>
+            <th onclick="sortStudentsTable('group')" style="cursor: pointer; user-select: none;" title="ترتيب حسب المجموعة">المجموعة <span id="sort-st-group" style="color: var(--text-muted); font-size: 13px;">⇅</span></th>
+            <th>إجراءات</th>
+        </tr>
+    </thead>
+    <tbody id="students-list"></tbody>
+</table>
                     </div>
                 </section>
                 
@@ -475,7 +594,7 @@
                     <h2 style="color: var(--primary-color); margin-bottom: 5px;">الماليات وإدارة الخزنة 💰</h2>
                     <p style="color: var(--text-muted); font-size: 14px;">إدارة إيرادات ومصروفات الحصة (دعم الدفع بالحصة والشهر)</p>
                 </div>
-                <img src="logo.png" style="width: 80px; height: auto;">
+                <img src="logo.PNG" style="width: 80px; height: auto;">
             </div>
 
             <!-- 1. فلاتر اختيار الحصة -->
@@ -557,7 +676,7 @@
 
             <div id="leaderboard-view" class="view-section" style="display: none;">
                 <section class="students-section"><div class="section-header"><div style="display: flex; align-items: center; gap: 15px;">
-    <img src="logo.png" style="width: 70px; height: 70px;">
+    <img src="logo.PNG" style="width: 70px; height: 70px;">
     <h2 style="margin: 0;">لوحة الشرف 🏆</h2>
 </div><div style="display: flex; gap: 10px;"><select id="leaderboardLevel" class="custom-input" style="width: 150px;" onchange="filterGroupsByLevel('leaderboardLevel', 'leaderboardGroup')"><option value="">الصف...</option><option value="الأول الثانوي">الأول الثانوي</option><option value="الثاني الثانوي">الثاني الثانوي</option><option value="الثالث الثانوي">الثالث الثانوي</option></select><select id="leaderboardGroup" class="custom-input" style="width: 200px;" onchange="generateLeaderboard()"><option value="">المجموعة...</option></select></div></div><div id="leaderboard-results" class="stats-grid" style="grid-template-columns: 1fr;"></div></section>
             </div>
@@ -661,7 +780,7 @@
     </div>
 
 
-    <!-- كارت تخصيص رسائل الواتساب التلقائية -->
+   <!-- كارت تخصيص رسائل الواتساب التلقائية -->
     <div class="admin-panel-card" style="border-top: 5px solid #0ea5e9;">
         <h2 style="color: #0ea5e9; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
             <span style="font-size: 24px;">💬</span> تخصيص رسائل الواتساب التلقائية
@@ -869,47 +988,93 @@
             </div>
         </div>
     </div>
-
+<!-- ========================================== -->
+    <!-- 🎬 قسم المحاضرات (نظام المجلدات الشجري الذكي) -->
+    <!-- ========================================== -->
     <div id="platform-lectures" class="platform-section" style="display: none;">
-        <div class="card" style="margin-bottom: 20px;">
-            <h3 style="color: var(--primary-color); margin-top: 0; border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">إضافة كورس جديد 🎬</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
-                
+        
+        <style>
+            /* ستايل المجلدات الفخم */
+            .explorer-card { background: white; border-radius: 16px; overflow: hidden; border: 2px solid var(--border-color); cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; }
+            .explorer-card:hover { transform: translateY(-5px); border-color: var(--primary-color); box-shadow: 0 10px 20px rgba(14, 165, 233, 0.15); }
+            .explorer-img { width: 100%; height: 140px; object-fit: cover; background: var(--hover-bg); display: flex; justify-content: center; align-items: center; font-size: 50px; }
+            .explorer-content { padding: 15px; text-align: center; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+            .explorer-title { margin: 0 0 5px 0; font-size: 20px; font-weight: 900; color: var(--secondary-color); }
+            .explorer-desc { margin: 0; font-size: 13px; color: var(--text-muted); font-weight: bold; }
+        </style>
+
+        <!-- شريط التصفح وأزرار التحكم -->
+        <div class="card" style="margin-bottom: 20px; padding: 20px; border-top: 4px solid var(--primary-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+            <div id="lectures-breadcrumbs" style="font-size: 18px; font-weight: 900; color: var(--secondary-color); display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <!-- المسار هيترسم هنا أوتوماتيك -->
+            </div>
+            <div id="lectures-actions" style="display: flex; gap: 10px;">
+                <!-- أزرار الإضافة (ترم/شهر/كورس) هتظهر هنا ديناميكياً -->
+            </div>
+        </div>
+
+        <!-- شبكة العرض (الصفوف أو الأترام أو الشهور أو الكورسات) -->
+        <div id="lectures-explorer-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px;">
+            <!-- الكروت هتترسم هنا -->
+        </div>
+    </div>
+
+    <!-- 📁 نافذة إضافة مجلد (ترم أو شهر) -->
+    <div id="addFolderModal" class="modal" style="z-index: 1000000;">
+        <div class="modal-content" style="width: 500px; border-top: 5px solid #3b82f6;">
+            <span class="close-btn" onclick="closeModal('addFolderModal')">&times;</span>
+            <h2 id="folderModalTitle" style="color: #3b82f6; margin-bottom: 20px;">إضافة مجلد جديد 📁</h2>
+            
+            <div class="input-group">
+                <label>اسم المجلد (مثال: الترم الأول، أو شهر أكتوبر)</label>
+                <input type="text" id="folderName" class="custom-input" placeholder="اكتب الاسم هنا...">
+            </div>
+            <div class="input-group">
+                <label>صورة الغلاف (اختياري - سيتم ضغطها تلقائياً)</label>
+                <input type="file" id="folderImage" class="custom-input" accept="image/png, image/jpeg, image/jpg">
+            </div>
+
+            <div class="input-group">
+                <label>سعر الباقة بالكامل (ج.م) - اختياري</label>
+                <input type="number" id="folderPrice" class="custom-input" placeholder="0 = تسعير منفصل لكل محاضرة" min="0">
+            </div>
+
+            <div class="input-group">
+                <label>وصف أو تفاصيل قصيرة (اختياري)</label>
+                <textarea id="folderDesc" class="custom-input" rows="2" placeholder="اكتب تفاصيل المجلد..."></textarea>
+            </div>
+
+            
+            
+            <button class="save-btn" id="saveFolderBtn" style="width: 100%; background: #3b82f6; font-size: 18px;" onclick="saveFolder()">حفظ وإنشاء المجلد 🚀</button>
+        </div>
+    </div>
+
+    <!-- 🎬 نافذة إضافة كورس/محاضرة (مخفية وتفتح فقط داخل الشهر) -->
+    <div id="addLectureModal" class="modal" style="z-index: 1000000;">
+        <div class="modal-content" style="width: 800px; max-width: 95%; max-height: 90vh; overflow-y: auto; border-top: 5px solid var(--primary-color);">
+            <span class="close-btn" onclick="closeModal('addLectureModal')">&times;</span>
+            <h2 style="color: var(--primary-color); margin-bottom: 20px;">إضافة كورس جديد 🎬</h2>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                 <div class="input-group full-width" style="grid-column: span 2;">
                     <label>اسم الكورس</label>
-                    <input type="text" id="lecTitle" class="custom-input" placeholder="مثال: كورس المراجعة النهائية - الباب الأول">
+                    <input type="text" id="lecTitle" class="custom-input" placeholder="مثال: الحصة الأولى - الباب الأول">
                 </div>
                 
                 <div class="input-group">
-                    <label>الصف الدراسي المستهدف</label>
-                    <select id="lecLevel" class="custom-input" onchange="filterCourseSessions('lecLevel', 'lecSessionsContainer')">
-                        <option value="all">كل الصفوف (عام)</option>
+                    <label>المسار المستهدف (للمنصة)</label>
+                    <select id="lecTrack" class="custom-input">
+                        <option value="all">عام وأزهر معاً (الكل)</option>
+                        <option value="عام">طلاب العام فقط</option>
+                        <option value="أزهر">طلاب الأزهر فقط</option>
                     </select>
                 </div>
-
                 <div class="input-group">
-    <label>المسار المستهدف (للمنصة)</label>
-    <select id="lecTrack" class="custom-input">
-        <option value="all">عام وأزهر معاً (الكل)</option>
-        <option value="عام">طلاب العام فقط</option>
-        <option value="أزهر">طلاب الأزهر فقط</option>
-    </select>
-</div>
-
-                
-
-                <div class="input-group">
-    <label>عدد المشاهدات المسموح بها (اتركها 0 لعدد غير محدود)</label>
-    <input type="number" id="lecMaxViews" class="custom-input" placeholder="0 = لا نهائي" min="0">
-</div>
-
-                
-
-                <div class="input-group" id="priceContainer" style="display: none;">
-                    <label>سعر الكورس (يُخصم من المحفظة لمن كان غائباً)</label>
-                    <input type="number" id="lecPrice" class="custom-input" placeholder="مثال: 150" min="0">
+                    <label>عدد المشاهدات المسموح بها (0 لعدد غير محدود)</label>
+                    <input type="number" id="lecMaxViews" class="custom-input" placeholder="0 = لا نهائي" min="0">
                 </div>
-
+                
                 <div class="input-group" style="grid-column: span 2;">
                     <label>صورة غلاف الكورس (رفع من الجهاز PNG/JPG)</label>
                     <input type="file" id="lecImageFile" class="custom-input" accept="image/png, image/jpeg, image/jpg">
@@ -926,16 +1091,10 @@
                     <textarea id="lecDesc" class="custom-input" rows="3" placeholder="اكتب تفاصيل الكورس..."></textarea>
                 </div>
 
-                <button class="save-btn" style="grid-column: span 2; font-size: 18px; padding: 15px;" onclick="saveLecture()">نشر الكورس للطلاب 🚀</button>
+                <button class="save-btn" id="saveLectureBtn" style="grid-column: span 2; font-size: 18px; padding: 15px;" onclick="saveLecture()">نشر الكورس للطلاب 🚀</button>
             </div>
         </div>
-
-        <div class="card">
-            <h3 style="margin-top: 0; color: var(--secondary-color); margin-bottom: 15px;">الكورسات المنشورة</h3>
-            <div id="lectures-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;"></div>
-        </div>
     </div>
-
     <div id="platform-exams" class="platform-section" style="display: none;">
         
         <div id="platform-exams-list-container">
@@ -1576,9 +1735,25 @@
     </div> 
 
     <!-- النوافذ المنبثقة (Modals) مكانها الصح بره الـ main -->
+
+
+    <!-- نافذة إضافة سنتر جديد -->
+<div id="addCenterModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeModal('addCenterModal')">&times;</span>
+        <h2 style="color: #8b5cf6; margin-bottom: 20px;">إضافة سنتر جديد 🏫</h2>
+        <form id="addCenterForm">
+            <div class="input-group">
+                <label>اسم السنتر</label>
+                <input type="text" id="newCenterName" required class="custom-input" placeholder="مثال: سنتر الأوائل">
+            </div>
+            <button type="submit" class="save-btn" style="background-color: #8b5cf6;">حفظ السنتر</button>
+        </form>
+    </div>
+</div>
 <div id="globalAnnouncementModal" class="modal" style="z-index: 1000000;">
         <div class="modal-content" style="width: 450px; text-align: center; border-top: 5px solid var(--primary-color);">
-            <img src="logo.png" style="width: 80px; height: 80px; margin: 0 auto 15px auto; display: block;">
+            <img src="logo.PNG" style="width: 80px; height: 80px; margin: 0 auto 15px auto; display: block;">
             
             <h2 id="globalAnnTitle" style="color: var(--primary-color); margin-bottom: 15px; font-size: 22px;">تحديث جديد!</h2>
             
@@ -1591,7 +1766,7 @@
     <div id="customConfirmModal" class="modal">
         <div class="modal-content" style="width: 350px; text-align: center; margin: 20% auto;">
             <!-- 🐙 أخطبوط التحذير -->
-            <img src="logo.png" style="width: 80px; height: 80px; margin: 0 auto 15px auto; display: block;">
+            <img src="logo.PNG" style="width: 80px; height: 80px; margin: 0 auto 15px auto; display: block;">
             
             <h3 id="confirmMessage" style="margin-bottom: 25px; color: var(--text-main);">هل أنت متأكد؟</h3>
             <div style="display: flex; gap: 10px;">
@@ -1816,28 +1991,49 @@
         <h2 style="color: var(--primary-color); margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">➕ تسجيل طالب جديد</h2>
         
         <form id="addStudentForm" class="form-grid">
-            <!-- الصف الأول: الكود والاسم -->
-<div class="input-group">
-    <label>كود الطالب (قابل للتعديل)</label>
-    <!-- شيلنا readonly واللون الرصاصي عشان تقدر تكتب براحتك -->
-    <input type="text" id="studentCode" class="custom-input" style="font-weight: bold; color: var(--primary-color);">
-</div>
-<div class="input-group">
-    <label>اسم الطالب رباعي</label>
-    <input type="text" id="studentName" required class="custom-input" placeholder="اكتب اسم الطالب...">
-</div>
+            <!-- الصف الأول: السنتر والكود -->
+            <div class="input-group">
+                <label>السنتر التابع له الطالب</label>
+                <select id="studentCenterPrefix" required class="custom-input" onchange="updateGeneratedCode()">
+                    <option value="">اختر السنتر لتوليد الكود...</option>
+                    <option value="M">المهندس (M)</option>
+                    <option value="F">الفضل (F)</option>
+                    <option value="Q">القمة (Q)</option>
+                    <option value="A">الأوائل (A)</option>
+                    <option value="S">سمارت (S)</option>
+                    <option value="Z">زون (Z)</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>كود الطالب <span style="color:var(--text-muted); font-size:11px;">(قابل للتعديل يدوياً)</span></label>
+                <!-- تم إزالة readonly لجعله قابلاً للتعديل -->
+                <input type="text" id="studentCode" required class="custom-input" style="font-weight: bold; color: var(--primary-color); letter-spacing: 1px;">
+            </div>
 
-<!-- الصف الثاني: الصف والمسار -->
+            <!-- الصف الثاني: الاسم والصف -->
+            <div class="input-group">
+                <label>اسم الطالب رباعي</label>
+                <input type="text" id="studentName" required class="custom-input" placeholder="اكتب اسم الطالب...">
+            </div>
             <div class="input-group">
                 <label>الصف الدراسي</label>
-                <select id="studentLevel" required class="custom-input" onchange="filterGroupsByLevel('studentLevel', 'studentGroup');">
+                <select id="studentLevel" required class="custom-input" onchange="filterGroupsByLevel('studentLevel', 'studentGroup'); toggleTrackDropdown('studentLevel', 'trackGroup');">
+                    <option value="">اختر الصف...</option>
                     <option value="الأول الثانوي">الأول الثانوي</option>
                     <option value="الثاني الثانوي">الثاني الثانوي</option>
                     <option value="الثالث الثانوي">الثالث الثانوي</option>
                 </select>
             </div>
 
-            
+            <!-- الصف الثالث: المسار والمجموعة -->
+            <div class="input-group" id="trackGroup" style="display:none;">
+                <label>المسار</label>
+                <select id="studentTrack" class="custom-input" style="border-color: var(--primary-color);">
+                    <option value="عام">عام</option>
+                    <option value="أزهر">أزهر</option>
+                    <option value="بكالوريا">بكالوريا</option>
+                </select>
+            </div>
             <div class="input-group">
                 <label>المجموعة</label>
                 <select id="studentGroup" required class="custom-input">
@@ -1851,12 +2047,11 @@
                 <input type="text" id="studentPhone" required class="custom-input" placeholder="01XXXXXXXXX">
             </div>
             <div class="input-group">
-    <label>هاتف ولي الأمر</label>
-    <!-- ضفنا onkeyup عشان يفحص الرقم وإنت بتكتب -->
-    <input type="text" id="parentPhone" required class="custom-input" placeholder="01XXXXXXXXX" onkeyup="checkDuplicateParentPhone()">
-    <!-- رسالة التنبيه المخفية -->
-    <p id="parentPhoneWarning" style="color: var(--danger-color); font-size: 12px; font-weight: bold; margin-top: 5px; display: none;"></p>
-</div>
+                <label>هاتف ولي الأمر</label>
+                <input type="text" id="parentPhone" required class="custom-input" placeholder="01XXXXXXXXX" oninput="checkParentPhoneWarning('add')">
+                <!-- 💡 صندوق الإنذار اللحظي للأخوات -->
+                <div id="parentPhoneWarning_add" style="display: none; margin-top: 5px; font-size: 12px; color: #f59e0b; font-weight: bold; background: rgba(245, 158, 11, 0.1); padding: 5px 8px; border-radius: 6px; border: 1px dashed #f59e0b;"></div>
+            </div>
 
             <!-- الصف الخامس: الجنس -->
             <div class="input-group full-width">
@@ -1894,30 +2089,50 @@
         <form id="editStudentForm" class="form-grid">
             <input type="hidden" id="editStudentCodeOriginal">
             
-            <!-- الصف الأول: الكود والاسم -->
-<div class="input-group">
-    <label>كود الطالب</label>
-    <input type="text" id="editStudentCode" class="custom-input" style="font-weight:bold; color:var(--primary-color); background: #f8fafc;">
-</div>
-<div class="input-group">
-    <label>الاسم</label>
-    <input type="text" id="editStudentName" required class="custom-input">
-</div>
+            <!-- الصف الأول: السنتر والكود -->
+            <div class="input-group">
+                <label>نقل لسنتر آخر؟ (لتغيير الكود)</label>
+                <select id="editStudentCenterPrefix" class="custom-input" onchange="updateEditGeneratedCode()">
+                    <option value="">بدون تغيير...</option>
+                    <option value="M">المهندس (M)</option>
+                    <option value="F">الفضل (F)</option>
+                    <option value="Q">القمة (Q)</option>
+                    <option value="A">الأوائل (A)</option>
+                    <option value="S">سمارت (S)</option>
+                    <option value="Z">زون (Z)</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>كود الطالب</label>
+                <input type="text" id="editStudentCode" required class="custom-input" style="font-weight:bold; color:var(--primary-color); letter-spacing: 1px;">
+            </div>
 
-<!-- الصف الثاني: الصف والمسار -->
+            <!-- الصف المضاف للاسم عشان التنسيق يفضل مظبوط -->
+            <div class="input-group full-width" style="grid-column: span 2;">
+                <label>الاسم</label>
+                <input type="text" id="editStudentName" required class="custom-input">
+            </div>
+
+            <!-- الصف الثاني: الصف والمسار (سيبه زي ما هو عندك) -->
 
             <!-- الصف الثاني: الصف والمسار (سيبه زي ما هو عندك) -->
 
             <!-- الصف الثاني: الصف والمسار -->
             <div class="input-group">
                 <label>الصف</label>
-                <select id="editStudentLevel" required class="custom-input" onchange="filterGroupsByLevel('editStudentLevel', 'editStudentGroup');">
+                <select id="editStudentLevel" required class="custom-input" onchange="filterGroupsByLevel('editStudentLevel', 'editStudentGroup'); toggleTrackDropdown('editStudentLevel', 'editTrackGroup');">
+                    <option value="الأول الثانوي">الأول الثانوي</option>
                     <option value="الثاني الثانوي">الثاني الثانوي</option>
                     <option value="الثالث الثانوي">الثالث الثانوي</option>
                 </select>
             </div>
             <div class="input-group" id="editTrackGroup" style="display:none;">
-                
+                <label>المسار</label>
+                <select id="editStudentTrack" class="custom-input" style="border-color: var(--primary-color);">
+                    <option value="عام">عام</option>
+                    <option value="أزهر">أزهر</option>
+                    <option value="بكالوريا">بكالوريا</option>
+                </select>
             </div>
 
             <!-- الصف الثالث: المجموعة والجنس -->
@@ -1939,12 +2154,9 @@
                 <input type="text" id="editStudentPhone" required class="custom-input">
             </div>
             <div class="input-group">
-    <label>هاتف ولي الأمر</label>
-    <!-- ضفنا onkeyup عشان يفحص الرقم وإنت بتكتب -->
-    <input type="text" id="parentPhone" required class="custom-input" placeholder="01XXXXXXXXX" onkeyup="checkDuplicateParentPhone()">
-    <!-- رسالة التنبيه المخفية -->
-    <p id="parentPhoneWarning" style="color: var(--danger-color); font-size: 12px; font-weight: bold; margin-top: 5px; display: none;"></p>
-</div>
+                <label>هاتف ولي الأمر</label>
+                <input type="text" id="editParentPhone" required class="custom-input" placeholder="01XXXXXXXXX">
+            </div>
 
             <!-- حقل الحالة الخاصة (الإعفاء) -->
             <div class="input-group full-width" style="background: rgba(245, 158, 11, 0.05); padding: 12px; border-radius: 8px; border: 1px dashed #f59e0b; margin-top: 10px;">
@@ -2000,7 +2212,7 @@
 <!-- زرار فتح الشات -->
 <button id="shefo-assistant-btn" onclick="openShefoChat()" style="width: 75px; height: 75px; padding: 0; border-radius: 50%; display: flex; justify-content: center; align-items: center; opacity: 0.9; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(0,0,0,0.15); border: 2px solid #e2e8f0; background: white;" onmouseover="this.style.opacity='1'; this.style.transform='scale(1.1)';" onmouseout="this.style.opacity='0.9'; this.style.transform='scale(1)';">
     <!-- اللوجو -->
-    <img src="logo.png" style="width: 55px; height: 55px; min-width: 55px; margin: 0;">
+    <img src="logo.PNG" style="width: 55px; height: 55px; min-width: 55px; margin: 0;">
 </button>
 
 <!-- نافذة شات ميرا (WhatsApp Style) -->
@@ -2012,7 +2224,7 @@
                <div class="shefo-avatar-chat" style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; display: flex; justify-content: center; align-items: center; border-radius: 50%; width: 45px; height: 45px; box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);">
     <div class="shefo-avatar-chat" style="background: transparent; box-shadow: none; padding: 0;">
     <!-- أخطبوط الدعم الفني مصغر -->
-    <img src="logo.png" style="width: 50px; height: 50px;">
+    <img src="logo.PNG" style="width: 50px; height: 50px;">
 </div>
         <path d="M12 8V4H8"></path>
         <rect width="16" height="12" x="4" y="8" rx="2"></rect>
@@ -2090,7 +2302,7 @@
     <div id="demoRegistrationModal" class="login-overlay" style="display: none; z-index: 10000000;">
         <div class="login-card" style="width: 400px;">
             <h2 style="color: var(--primary); margin-bottom: 10px;">أهلاً بك في النسخة التجريبية 🚀</h2>
-            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 14px;">يرجى إدخال بياناتك لبدء تجربة هيستوريا لمدة 7 أيام مجاناً</p>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 14px;">يرجى إدخال بياناتك لبدء تجربة El-Senior لمدة 7 أيام مجاناً</p>
             <form id="demoRegistrationForm">
                 <div class="input-group" style="text-align: right;">
                     <label>الاسم</label>
@@ -2186,6 +2398,15 @@
                         <label>الصف الدراسي المستهدف</label>
                         <select id="editLecLevel" class="custom-input" onchange="filterCourseSessions('editLecLevel', 'editLecSessionsContainer')"></select>
                     </div>
+
+                    <div class="input-group">
+                        <label>الترم الدراسي</label>
+                        <input type="text" id="editLecTerm" list="termOptionsList" class="custom-input">
+                    </div>
+                    <div class="input-group">
+                        <label>الشهر</label>
+                        <input type="text" id="editLecMonth" list="monthOptionsList" class="custom-input">
+                    </div>
                     
                     <div class="input-group">
     <label>المسار المستهدف</label>
@@ -2244,6 +2465,10 @@
 
     <div id="courseAnalyticsModal" class="modal" style="z-index: 1000005;">
         <div class="modal-content" style="width: 800px; max-width: 95%; max-height: 90vh; overflow-y: auto; border-top: 5px solid #8b5cf6;">
+            <div style="margin-bottom: 15px;">
+                <input type="text" id="analyticsSearchInput" class="custom-input" placeholder="🔍 ابحث باسم الطالب أو الكود لإضافة مشاهدات..." onkeyup="filterAnalyticsTable()" style="border-color: #8b5cf6;">
+            </div>
+            
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px;">
                 <h2 id="analyticsVideoTitle" style="margin: 0; color: #8b5cf6;">📊 إحصائيات المشاهدة</h2>
                 <span class="close" onclick="closeModal('courseAnalyticsModal')" style="font-size: 28px; cursor: pointer; color: var(--danger-color);">&times;</span>
@@ -2293,6 +2518,8 @@
                 <label style="cursor: pointer; font-weight: bold;"><input type="checkbox" class="perm-cb" value="atrisk" style="accent-color: #f59e0b; width:18px; height:18px;"> تحت الملاحظة 🚨</label>
                 <label style="cursor: pointer; font-weight: bold;"><input type="checkbox" class="perm-cb" value="broadcast" style="accent-color: #f59e0b; width:18px; height:18px;"> الإرسال الجماعي 📢</label>
                 <label style="cursor: pointer; font-weight: bold; color: var(--danger-color);"><input type="checkbox" class="perm-cb" value="finance" style="accent-color: var(--danger-color); width:18px; height:18px;"> الخزنة والماليات 💰</label>
+                <label style="cursor: pointer; font-weight: bold;"><input type="checkbox" class="perm-cb" value="walletRequests" style="accent-color: #f59e0b; width:18px; height:18px;"> طلبات الشحن 💳</label>
+<label style="cursor: pointer; font-weight: bold;"><input type="checkbox" class="perm-cb" value="backup" style="accent-color: #f59e0b; width:18px; height:18px;"> النسخ الاحتياطي والرفع 💾</label>
             </div>
             <button class="save-btn" style="margin-top: 20px; width: 100%; background: #f59e0b;" onclick="closeModal('assistantPermissionsModal')">حفظ الصلاحيات مؤقتاً 🔒</button>
         </div>
@@ -2322,6 +2549,8 @@
                 <label style="cursor: pointer; font-weight: bold;"><input type="checkbox" class="edit-perm-cb" value="atrisk" style="accent-color: #f59e0b; width:18px; height:18px;"> تحت الملاحظة 🚨</label>
                 <label style="cursor: pointer; font-weight: bold;"><input type="checkbox" class="edit-perm-cb" value="broadcast" style="accent-color: #f59e0b; width:18px; height:18px;"> الإرسال الجماعي 📢</label>
                 <label style="cursor: pointer; font-weight: bold; color: var(--danger-color);"><input type="checkbox" class="edit-perm-cb" value="finance" style="accent-color: var(--danger-color); width:18px; height:18px;"> الخزنة والماليات 💰</label>
+                <label style="cursor: pointer; font-weight: bold;"><input type="checkbox" class="perm-cb" value="walletRequests" style="accent-color: #f59e0b; width:18px; height:18px;"> طلبات الشحن 💳</label>
+<label style="cursor: pointer; font-weight: bold;"><input type="checkbox" class="perm-cb" value="backup" style="accent-color: #f59e0b; width:18px; height:18px;"> النسخ الاحتياطي والرفع 💾</label>
             </div>
             <button id="saveEditPermBtn" class="save-btn" style="margin-top: 20px; width: 100%; background: #f59e0b;" onclick="saveEditedPermissions()">حفظ التعديلات ✅</button>
         </div>
@@ -2335,7 +2564,7 @@
     <div id="newCodesModal" class="modal" style="z-index: 1000000;">
         <div class="modal-content" style="width: 500px; max-width: 95%; text-align: center; border-top: 5px solid var(--success-color);">
             <span class="close-btn" onclick="closeModal('newCodesModal')">&times;</span>
-            <img src="logo.png" style="width: 80px; height: 80px; margin: 0 auto 15px auto; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));">
+            <img src="logo.PNG" style="width: 80px; height: 80px; margin: 0 auto 15px auto; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));">
 
             <h2 style="color: var(--success-color); margin-bottom: 10px;">تم التوليد بنجاح! 🎉</h2>
             <p style="color: var(--text-muted); margin-bottom: 20px;">تم إنشاء <span id="newCodesCountDisplay" style="font-weight: 900; color: var(--primary-color); font-size: 18px;">0</span> أكواد بقيمة <span id="newCodesAmountDisplay" style="font-weight: 900; color: var(--primary-color); font-size: 18px;">0</span> ج.م للكود الواحد.</p>
@@ -2356,7 +2585,7 @@
     <div id="reportResultsModal" class="modal" style="z-index: 1000005;">
         <div class="modal-content" style="width: 500px; text-align: center; border-top: 5px solid #10b981;">
             <span class="close-btn" onclick="closeModal('reportResultsModal')">&times;</span>
-            <img src="logo.png" style="width: 80px; height: 80px; margin: 0 auto 15px auto;">
+            <img src="logo.PNG" style="width: 80px; height: 80px; margin: 0 auto 15px auto;">
             
             <h2 style="color: #10b981; margin-bottom: 10px;">إحصائيات إرسال الواتساب 🚀</h2>
             <p style="color: var(--text-muted); margin-bottom: 25px; font-weight: bold;">إليك نتيجة تسليم التقارير لأولياء الأمور والطلاب:</p>
@@ -2415,6 +2644,27 @@
     </div>
 </div>
 
+<!-- نافذة نقل المجموعة لسنتر آخر -->
+<div id="moveGroupModal" class="modal">
+    <div class="modal-content" style="width: 400px; border-top: 5px solid #3b82f6;">
+        <span class="close-btn" onclick="closeModal('moveGroupModal')">&times;</span>
+        <h2 style="color: #3b82f6; margin-bottom: 15px;">نقل المجموعة لسنتر آخر 🔄</h2>
+        
+        <input type="hidden" id="moveGroupOriginalName">
+        
+        <div style="background: var(--hover-bg); padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+            <p style="margin: 0; font-weight: bold;">المجموعة: <span id="moveGroupNameDisplay" style="color: var(--primary-color);"></span></p>
+        </div>
+
+        <div class="input-group">
+            <label>اختر السنتر المنقول إليه:</label>
+            <select id="moveTargetCenterSelect" class="custom-input"></select>
+        </div>
+
+        <button class="save-btn" style="width: 100%; background: #3b82f6;" onclick="confirmMoveGroupToCenter()">تأكيد النقل 🚀</button>
+    </div>
+</div>
+
     <!-- نافذة الطالب في مجموعة مختلفة (تعويض أو نقل) -->
     <div id="wrongGroupModal" class="modal" style="z-index: 100000;">
         <div class="modal-content" style="width: 450px; border-top: 5px solid #f59e0b;">
@@ -2429,7 +2679,7 @@
                 <p style="margin: 0; font-size: 14px; font-weight: bold;">المجموعة الحالية: <span id="wgCurrentGroup" style="color: var(--success-color);">---</span></p>
             </div>
 
-            <!-- خيار 1: يحضر كتعويض في مجموعته الأصلية -->
+            <!-- 🟢 خيار 1: يحضر كتعويض في مجموعته الأصلية (الذي كان يظهر فارغاً) -->
             <div id="wgAttendanceDiv" style="background: rgba(16, 185, 129, 0.05); padding: 15px; border-radius: 8px; border: 1px solid #10b981; margin-bottom: 15px;">
                 <label style="font-weight: bold; color: #10b981; margin-bottom: 10px; display: block;">1. حضور كتعويض (تسجيل في حصة مجموعته)</label>
                 <div style="display: flex; gap: 10px;">
@@ -2449,7 +2699,33 @@
         </div>
     </div>
 
-    
+    <!-- ✏️ نافذة تعديل المجلد (ترم أو شهر) -->
+    <div id="editFolderModal" class="modal" style="z-index: 1000000;">
+        <div class="modal-content" style="width: 500px; border-top: 5px solid #f59e0b;">
+            <span class="close-btn" onclick="closeModal('editFolderModal')">&times;</span>
+            <h2 id="editFolderModalTitle" style="color: #f59e0b; margin-bottom: 20px;">تعديل المجلد ✏️</h2>
+            <input type="hidden" id="editFolderId">
+            
+            <div class="input-group">
+                <label>اسم المجلد</label>
+                <input type="text" id="editFolderName" class="custom-input" placeholder="اسم المجلد...">
+            </div>
+            <div class="input-group">
+                <label>تغيير صورة الغلاف (اختياري)</label>
+                <input type="file" id="editFolderImage" class="custom-input" accept="image/png, image/jpeg, image/jpg">
+                <input type="hidden" id="editFolderImageBase64">
+            </div>
+            <div class="input-group">
+                <label>سعر الباقة بالكامل (ج.م) - اختياري</label>
+                <input type="number" id="editFolderPrice" class="custom-input" min="0" placeholder="0 = بدون باقة">
+            </div>
+            <div class="input-group">
+                <label>وصف أو تفاصيل قصيرة (اختياري)</label>
+                <textarea id="editFolderDesc" class="custom-input" rows="2" placeholder="اكتب تفاصيل المجلد..."></textarea>
+            </div>
+            <button class="save-btn" id="saveEditFolderBtn" style="width: 100%; background: #f59e0b; font-size: 18px;" onclick="saveEditedFolder()">حفظ التعديلات 💾</button>
+        </div>
+    </div>
 
 
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
