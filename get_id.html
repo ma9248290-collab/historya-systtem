@@ -496,34 +496,70 @@
                 let foundStudent = cachedStudentsData.find(s => s && (s.parentPhone === engPhone || s.phone === engPhone));
 
                 if (foundStudent) {
-                    // إخفاء صندوق البحث وأنيميشن ظهوره
+                    // إخفاء صندوق البحث
                     searchContainer.style.display = "none";
                     
-                    // إظهار الكارت
+                    // تحديد صور الكارت حسب الصف الدراسي
+                    let frontImg = 'face_1.jpg'; // الافتراضي (أولى ثانوي)
+                    let backImg = 'back_1.jpg';
+                    
+                    if (foundStudent.level && foundStudent.level.includes('الثاني')) {
+                        frontImg = 'face_2.jpg'; 
+                        backImg = 'back_2.jpg';
+                    } else if (foundStudent.level && foundStudent.level.includes('الثالث')) {
+                        frontImg = 'face_3.jpg'; 
+                        backImg = 'back_3.jpg';
+                    }
+
+                    // تطبيق الصور على الكارت في الخلفية عشان تبدأ تحمل
+                    document.querySelector('.card-front').style.backgroundImage = `url('${frontImg}')`;
+                    document.querySelector('.card-back').style.backgroundImage = `url('${backImg}')`;
+                    
+                    // إظهار الكارت (هيكون لسه على وشه ومستني التحميل)
                     cardScene.style.display = "block";
                     flipHint.style.display = "block";
 
-                   // رسم الباركود (تصغير الطول سنة عشان الرقم يترفع جوه المربع)
+                   // رسم الباركود
                     document.getElementById("displayStudentCode").innerText = foundStudent.code;
                     JsBarcode("#barcodeSvg", foundStudent.code, {
                         format: "CODE128",
                         lineColor: "#000000",
                         background: "transparent", 
-                        width: 2.5, // عرض خطوط الباركود
-                        height: 50, // 👈 قللنا طول الخطوط هنا عشان الرقم يسحب لفوق ويدخل جوه المربع
+                        width: 2.5,
+                        height: 50,
                         displayValue: false, 
                         margin: 0
                     });
 
-                    // 🚀 توجيه الشاشة أوتوماتيك للكارت (Smooth Scroll)
+                    // توجيه الشاشة أوتوماتيك للكارت
                     setTimeout(() => {
                         cardScene.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }, 100);
 
-                    // لفة الكارت الأوتوماتيك
-                    setTimeout(() => {
-                        document.getElementById("studentIdCard").classList.add('is-flipped');
-                    }, 1200);
+                    // 🚀 التعديل السحري: استشعار تحميل الصور 100% قبل لفة الكارت
+                    let frontLoaded = false;
+                    let backLoaded = false;
+
+                    // الدالة دي بتشتغل كل ما صورة تحمل، ولما الاتنين يخلصوا بتنفذ اللفة
+                    function flipWhenReady() {
+                        if (frontLoaded && backLoaded) {
+                            // أول ما الصورتين يجهزوا، نستنى نص ثانية (عشان السكرول يكون نزل براحته) ونلف الكارت
+                            setTimeout(() => {
+                                document.getElementById("studentIdCard").classList.add('is-flipped');
+                            }, 600);
+                        }
+                    }
+
+                    // عمل كائن برمجي للصور لمراقبة حالة التحميل
+                    let preloaderFront = new Image();
+                    preloaderFront.onload = function() { frontLoaded = true; flipWhenReady(); };
+                    preloaderFront.onerror = function() { frontLoaded = true; flipWhenReady(); }; // أمان لو الصورة مش موجودة
+                    preloaderFront.src = frontImg;
+
+                    let preloaderBack = new Image();
+                    preloaderBack.onload = function() { backLoaded = true; flipWhenReady(); };
+                    preloaderBack.onerror = function() { backLoaded = true; flipWhenReady(); };
+                    preloaderBack.src = backImg;
 
                 } else {
                     alert("عفواً، لم يتم العثور على طالب مسجل بهذا الرقم. يرجى التأكد من الرقم أو مراجعة الإدارة.");
