@@ -258,8 +258,20 @@
                 <section id="group-details-view" class="students-section" style="display: none;">
                     <div class="section-header">
                         <div><button class="theme-btn" onclick="backToGroups()" style="margin-bottom: 15px;">🔙 عودة</button><h2 id="current-group-title" style="color: var(--primary-color);">إدارة مجموعة: </h2></div>
-                        <div class="header-actions"><button class="theme-btn" onclick="exportGroupStudentsToExcel()" style="border-color: #3b82f6; color: #3b82f6; background: white; padding: 10px 15px; font-weight: bold; border-radius: 8px;">📤 تحميل شيت المجموعة</button>
-                            <button class="add-btn exam-btn" onclick="quickExamForGroup()">⚡ امتحان مفاجئ</button><button class="add-btn" onclick="openAddStudentToGroupModal()">+ إضافة طالب هنا</button></div>
+                        <div class="header-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button class="theme-btn" onclick="exportGroupStudentsToExcel()" style="border-color: #3b82f6; color: #3b82f6; background: white; padding: 8px 12px; font-weight: bold; border-radius: 8px;">📤 تصدير المجموعة</button>
+                            
+                            <!-- الزراير الجديدة 👇 -->
+                            <button class="theme-btn" onclick="downloadGroupExcelTemplate()" style="border-color: #10b981; color: #10b981; background: white; padding: 8px 12px; font-weight: bold; border-radius: 8px;">📄 نموذج الإكسيل</button>
+                            <div style="position: relative; display: inline-block;">
+                                <input type="file" id="importGroupExcelInput" accept=".xlsx, .xls" style="position: absolute; width: 100%; height: 100%; opacity: 0; cursor: pointer;" onchange="importStudentsToGroupFromExcel(event)">
+                                <button class="add-btn" style="background-color: #10b981; padding: 8px 12px;">📥 استيراد للـمجموعة</button>
+                            </div>
+                            <!-- 👆 -->
+
+                            <button class="add-btn exam-btn" onclick="quickExamForGroup()" style="padding: 8px 12px;">⚡ امتحان</button>
+                            <button class="add-btn" onclick="openAddStudentToGroupModal()" style="padding: 8px 12px;">+ إضافة طالب</button>
+                        </div>
                     </div>
                     <div class="table-container">
                        <table class="students-table">
@@ -353,6 +365,7 @@
                 
 
                 <section id="student-profile-view" class="students-section print-area" style="display: none;">
+                    
                     <div class="no-print" style="display: flex; justify-content: space-between; margin-bottom: 20px;">
                         <button class="theme-btn" onclick="backToStudents()">🔙 عودة</button>
                         <div style="display: flex; gap: 10px;"><button class="add-btn admin-only" onclick="openEditStudentModal()">✏️ تعديل الطالب</button><button class="theme-btn" onclick="window.print()" style="border-color: var(--primary-color); color: var(--primary-color);">📄 طباعة تقرير</button></div>
@@ -383,6 +396,14 @@
                         <div class="stat-card" style="border-top: 4px solid var(--success-color);"><h3>نسبة الحضور</h3><p class="stat-number" id="profile-attendance" style="color: var(--success-color);">0%</p></div>
                         <div class="stat-card" style="border-top: 4px solid var(--exam-color);"><h3>متوسط الامتحانات</h3><p class="stat-number" id="profile-exams" style="color: var(--exam-color);">0%</p></div>
                         <div class="stat-card" style="border-top: 4px solid var(--hw-color);"><h3>متوسط الواجبات</h3><p class="stat-number" id="profile-hw" style="color: var(--hw-color);">0%</p></div>
+                    </div>
+                    <!-- صندوق الملاحظات في ملف الطالب -->
+                    <div class="stat-card no-print" style="margin-bottom: 20px; border-color: #8b5cf6; text-align: right;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h3 style="margin: 0; color: #8b5cf6;">📝 ملاحظات المعلم</h3>
+                            <button class="icon-btn admin-only" style="background: var(--hover-bg); border: 1px solid var(--border-color); color: var(--text-main);" onclick="openStudentNoteModalFromProfile()">تعديل ✏️</button>
+                        </div>
+                        <p id="profile-student-note" style="font-size: 15px; color: var(--text-main); font-weight: bold; white-space: pre-wrap; margin: 0; line-height: 1.6;">لا توجد ملاحظات مسجلة.</p>
                     </div>
                     <div class="profile-details-grid" style="margin-bottom: 30px;">
                         <div class="detail-box"><strong>📱 الهاتف:</strong> <span id="profile-phone"></span></div><div class="detail-box"><strong>👨‍👩‍👦 ولي الأمر:</strong> <span id="profile-parent"></span></div><div class="detail-box"><strong>🏫 الصف:</strong> <span id="profile-level"></span></div><div class="detail-box"><strong>👤 الجنس:</strong> <span id="profile-gender"></span></div>
@@ -2461,6 +2482,21 @@
     </div>
 
     
+    <!-- نافذة ملاحظات الطالب -->
+    <div id="studentNoteModal" class="modal" style="z-index: 1000000;">
+        <div class="modal-content" style="width: 400px; border-top: 5px solid #8b5cf6;">
+            <span class="close-btn" onclick="closeModal('studentNoteModal')">&times;</span>
+            <h2 style="color: #8b5cf6; margin-bottom: 15px;">📝 ملاحظات الطالب</h2>
+            <h4 id="noteStudentName" style="color: var(--secondary-color); margin-bottom: 15px;"></h4>
+            <input type="hidden" id="noteStudentCode">
+            <textarea id="studentNoteText" class="custom-input" rows="5" placeholder="اكتب ملاحظاتك عن مستوى الطالب، سلوكه، أو أي تنبيهات هنا..."></textarea>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="save-btn" style="flex: 2; margin: 0; background: #8b5cf6;" onclick="saveStudentNote()">حفظ الملاحظة 💾</button>
+                <button class="icon-btn danger" style="flex: 1; margin: 0;" onclick="deleteStudentNote()">مسح 🗑️</button>
+            </div>
+        </div>
+    </div>
+
 
 
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>

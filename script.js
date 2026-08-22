@@ -1476,21 +1476,32 @@ function backToHw() { document.getElementById("hw-overview").style.display = "bl
 
 
 
-function renderGradesTable(itemDetails, tbodyId, saveFunction, itemId, itemType) {
+window.renderGradesTable = function(itemDetails, tbodyId, saveFunction, itemId, itemType) {
     const tbody = document.getElementById(tbodyId); const gStudents = students.filter(s => s.group === itemDetails.group);
-    if(gStudents.length === 0) return tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">لا يوجد طلاب</td></tr>`; tbody.innerHTML = ""; 
+    if(gStudents.length === 0) return tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">لا يوجد طلاب</td></tr>`; 
+    
     let prevItem = null;
     if(itemType === 'exam') { const grpItems = exams.filter(e => e.group === itemDetails.group).sort((a,b)=>new Date(a.date)-new Date(b.date)); prevItem = grpItems[grpItems.findIndex(e=>e.id===itemDetails.id)-1]; }
     if(itemType === 'hw') { const grpItems = homeworks.filter(h => h.group === itemDetails.group).sort((a,b)=>new Date(a.date)-new Date(b.date)); prevItem = grpItems[grpItems.findIndex(h=>h.id===itemDetails.id)-1]; }
 
+    let htmlContent = ""; 
+
     gStudents.forEach(st => {
-        const grade = itemDetails.grades[st.phone] !== undefined ? itemDetails.grades[st.phone] : '';
+        let grade = itemDetails.grades[st.code] !== undefined ? itemDetails.grades[st.code] : (itemDetails.grades[st.phone] !== undefined ? itemDetails.grades[st.phone] : '');
         const isHw = tbodyId === 'hw-grades-list'; const btnColor = isHw ? 'var(--hw-color)' : 'var(--exam-color)';
         let pHT = `<span style="color:var(--text-muted)">--</span>`;
-        if(prevItem && prevItem.grades[st.phone] !== undefined) pHT = `<strong style="color:${btnColor}">${prevItem.grades[st.phone]} / ${prevItem.maxScore}</strong>`;
-        tbody.innerHTML += `<tr><td><strong>${st.code}</strong></td><td>${st.name}</td><td>${st.phone}</td><td style="direction:ltr;">${pHT}</td><td style="direction: ltr;"><span style="color:var(--text-muted);">/ ${itemDetails.maxScore}</span><input type="number" id="grade_${st.phone}" class="custom-input" style="width:70px; padding:5px; text-align:center;" value="${grade}" max="${itemDetails.maxScore}"></td><td><button class="btn-present" onclick="${saveFunction.name}('${st.phone}')" style="background-color: ${btnColor}; color: #fff;">حفظ</button></td></tr>`;
+        if(prevItem && (prevItem.grades[st.code] !== undefined || prevItem.grades[st.phone] !== undefined)) {
+            let pG = prevItem.grades[st.code] !== undefined ? prevItem.grades[st.code] : prevItem.grades[st.phone];
+            pHT = `<strong style="color:${btnColor}">${pG} / ${prevItem.maxScore}</strong>`;
+        }
+        
+        let noteIcon = st.note && st.note.trim() !== "" ? `<span style="cursor: pointer; margin-right: 8px; font-size: 16px; filter: drop-shadow(0 2px 4px rgba(139,92,246,0.4));" title="يوجد ملاحظة (اضغط للعرض)" onclick="openStudentNoteModal('${st.code}')">📝</span>` : `<span style="cursor: pointer; margin-right: 8px; font-size: 14px; opacity: 0.3;" title="إضافة ملاحظة" onclick="openStudentNoteModal('${st.code}')">📝</span>`;
+
+        htmlContent += `<tr><td><strong>${st.code}</strong></td><td>${st.name} ${noteIcon}</td><td>${st.phone}</td><td style="direction:ltr;">${pHT}</td><td style="direction: ltr;"><span style="color:var(--text-muted);">/ ${itemDetails.maxScore}</span><input type="number" id="grade_${st.code}" class="custom-input" style="width:70px; padding:5px; text-align:center;" value="${grade}" max="${itemDetails.maxScore}"></td><td><button class="btn-present" onclick="${saveFunction.name}('${st.code}')" style="background-color: ${btnColor}; color: #fff;">حفظ</button></td></tr>`;
     });
-}
+    
+    tbody.innerHTML = htmlContent; 
+};
 
 // ==========================================
 // 14. الرسوم البيانية (Dashboard Full)
@@ -5529,18 +5540,21 @@ window.backToStudents = function(fromHistory = false) {
 window.openStudentProfile = function(code) {
     const student = students.find(s => s.code === code); if(!student) return;
     
-    // 💡 تسجيل المكان اللي فتحنا منه الملف
     window.profileSourceView = document.getElementById("group-details-view")?.style.display === "block" ? 'group' : 'students';
-    
     switchPage('students'); currentStudentProfileCode = code;
     document.getElementById("students-overview").style.display = "none"; 
-    document.getElementById("group-details-view").style.display = "none"; // إخفاء المجموعة لو كانت مفتوحة
+    document.getElementById("group-details-view").style.display = "none";
     document.getElementById("student-profile-view").style.display = "block";
     
     let specialBadge = student.isSpecialCase ? `<span style="font-size: 14px; margin-right: 5px;" title="حالة خاصة: ${student.specialAmount > 0 ? 'يدفع ' + student.specialAmount + ' ج.م' : 'إعفاء تام'}">⭐</span>` : '';
     document.getElementById("profile-name").innerHTML = student.name + specialBadge; 
     document.getElementById("profile-code-group").innerText = `${student.code} | المجموعة: ${student.group}`;
     
+    // 💡 التحديث هنا لعرض الملاحظة
+    if (document.getElementById("profile-student-note")) {
+        document.getElementById("profile-student-note").innerText = student.note ? student.note : "لا توجد ملاحظات مسجلة.";
+    }
+
     if (typeof JsBarcode !== 'undefined') JsBarcode("#studentProfileBarcode", student.code, { format: "CODE128", lineColor: "#0f172a", width: 2, height: 40, displayValue: false });
     
     if(document.getElementById("profile-phone")) document.getElementById("profile-phone").innerText = student.phone;
@@ -5549,24 +5563,12 @@ window.openStudentProfile = function(code) {
     if(document.getElementById("profile-gender")) document.getElementById("profile-gender").innerText = student.gender;
     document.getElementById("profile-behavior-points").innerText = student.behaviorPoints || 0; 
 
-    // زراير الواتساب
     let waStudentBtn = document.getElementById("wa-student-btn");
-    if (waStudentBtn) {
-        waStudentBtn.onclick = function() {
-            if(student.phone && student.phone !== "0" && student.phone !== "") window.open(`https://wa.me/20${student.phone.replace(/^0+/, '')}`, '_blank');
-            else showToast("رقم هاتف الطالب غير مسجل!", "error");
-        };
-    }
+    if (waStudentBtn) waStudentBtn.onclick = function() { if(student.phone && student.phone !== "0" && student.phone !== "") window.open(`https://wa.me/20${student.phone.replace(/^0+/, '')}`, '_blank'); else showToast("رقم هاتف الطالب غير مسجل!", "error"); };
 
     let waParentBtn = document.getElementById("wa-parent-btn");
-    if (waParentBtn) {
-        waParentBtn.onclick = function() {
-            if(student.parentPhone && student.parentPhone !== "0" && student.parentPhone !== "") window.open(`https://wa.me/20${student.parentPhone.replace(/^0+/, '')}`, '_blank');
-            else showToast("رقم ولي الأمر غير مسجل!", "error");
-        };
-    }
+    if (waParentBtn) waParentBtn.onclick = function() { if(student.parentPhone && student.parentPhone !== "0" && student.parentPhone !== "") window.open(`https://wa.me/20${student.parentPhone.replace(/^0+/, '')}`, '_blank'); else showToast("رقم ولي الأمر غير مسجل!", "error"); };
 
-    // جداول الإحصائيات (حضور، امتحانات، واجبات)
     const groupSessions = classSessions.filter(s => s.group === student.group).sort((a,b) => new Date(b.date) - new Date(a.date));
     let attended = 0; const attTbody = document.getElementById("profile-attendance-list"); if(attTbody) attTbody.innerHTML = "";
     groupSessions.forEach(s => { 
@@ -5625,12 +5627,10 @@ window.sortGroupStudentsTable = function(column) {
     renderGroupStudentsTable();
 };
 
-// 3. رسم جدول سجل الطلاب الشامل مع الترتيب والأسهم
 window.renderTable = function() { 
     const tbody = document.getElementById("students-list"); 
     if(!tbody) return;
 
-    // تحديث أيقونات الترتيب في الهيدر
     ['code', 'name', 'level', 'group'].forEach(col => {
         let el = document.getElementById(`sort-st-${col}`);
         if(el) {
@@ -5646,17 +5646,17 @@ window.renderTable = function() {
         }
     });
     
-    // عمل نسخة وترتيبها
     let sortedList = [...students].sort((a, b) => smartCompare(a, b, window.studentsSortState.column, window.studentsSortState.direction));
 
     let html = ""; 
     sortedList.forEach((student) => { 
         let trackBadge = student.level.includes('ثانوي') || student.level.includes('بكالوريا') ? `<br><span style="font-size: 11px; color: var(--text-muted); font-weight: bold;">مسار: ${student.track || 'عام'}</span>` : '';
         let specialBadge = student.isSpecialCase ? `<span style="cursor: help; margin-right: 5px; font-size: 14px;" title="حالة خاصة: ${student.specialAmount > 0 ? 'يدفع ' + student.specialAmount + ' ج.م' : 'إعفاء تام'}">⭐</span>` : '';
+        let noteIcon = student.note && student.note.trim() !== "" ? `<span style="cursor: pointer; margin-right: 8px; font-size: 16px; filter: drop-shadow(0 2px 4px rgba(139,92,246,0.4));" title="يوجد ملاحظة (اضغط للعرض)" onclick="openStudentNoteModal('${student.code}')">📝</span>` : `<span style="cursor: pointer; margin-right: 8px; font-size: 14px; opacity: 0.3;" title="إضافة ملاحظة" onclick="openStudentNoteModal('${student.code}')">📝</span>`;
         
         html += `<tr>
             <td><strong style="color:var(--primary-color);">${student.code}</strong></td>
-            <td>${student.name} ${specialBadge}</td>
+            <td>${student.name} ${specialBadge} ${noteIcon}</td>
             <td>${student.level} ${trackBadge}</td>
             <td>${student.group}</td>
             <td><button class="profile-btn" onclick="openStudentProfile('${student.code}')">👤 الملف</button></td>
@@ -5669,17 +5669,14 @@ window.renderTable = function() {
     }
 };
 
-// 4. رسم جدول طلاب المجموعة مع الترتيب والأسهم
 window.renderGroupStudentsTable = function() { 
     const tbody = document.getElementById("group-students-list"); 
     if(!tbody) return;
 
-    // تحديث أيقونات الترتيب في الهيدر
-    ['code', 'name', 'phone'].forEach(col => {
-        let el = document.getElementById(`sort-grp-${col}`);
-        let actualCol = col === 'phone' ? 'parentPhone' : col;
+    ['code', 'name', 'parentPhone'].forEach(col => {
+        let el = document.getElementById(`sort-gs-${col}`);
         if(el) {
-            if(window.groupStudentsSortState.column === actualCol) {
+            if(window.groupStudentsSortState.column === col) {
                 el.innerHTML = window.groupStudentsSortState.direction === 'asc' ? '▲' : '▼';
                 el.style.color = 'var(--primary-color)';
                 el.style.fontWeight = '900';
@@ -5691,25 +5688,21 @@ window.renderGroupStudentsTable = function() {
         }
     });
 
-    let groupStudents = students.filter(s => s.group === currentActiveGroup); 
-    
-    if(groupStudents.length === 0) {
+    const groupStudentsFiltered = students.filter(s => s.group === currentActiveGroup); 
+    if(groupStudentsFiltered.length === 0) {
         return tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px; font-weight: bold; color: var(--text-muted);">لا يوجد طلاب في هذه المجموعة</td></tr>`; 
     }
 
-    // ترتيب طلاب المجموعة
-    groupStudents.sort((a, b) => smartCompare(a, b, window.groupStudentsSortState.column, window.groupStudentsSortState.direction));
+    let sortedGroupStudents = [...groupStudentsFiltered].sort((a, b) => smartCompare(a, b, window.groupStudentsSortState.column, window.groupStudentsSortState.direction));
 
-    let last4Sessions = classSessions
-        .filter(s => s.group === currentActiveGroup)
-        .sort((a, b) => new Date(a.date) - new Date(b.date))
-        .slice(-4);
+    let last4Sessions = classSessions.filter(s => s.group === currentActiveGroup).sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-4);
+    let htmlContent = ""; 
 
-    let html = ""; 
-
-    groupStudents.forEach((student) => { 
+    sortedGroupStudents.forEach((student) => { 
         let trackName = student.track || 'عام';
         let trackBadge = `<span style="font-size: 11px; background: rgba(59, 130, 246, 0.1); color: var(--primary-color); padding: 3px 8px; border-radius: 12px; border: 1px solid rgba(59, 130, 246, 0.2); margin-top: 5px; display: inline-block; font-weight: bold;">🎓 ${trackName}</span>`;
+        let specialBadge = student.isSpecialCase ? `<span style="cursor: help; margin-right: 5px; font-size: 13px;" title="حالة خاصة: ${student.specialAmount > 0 ? 'يدفع ' + student.specialAmount + ' ج.م' : 'إعفاء تام'}">⭐</span>` : '';
+        let noteIcon = student.note && student.note.trim() !== "" ? `<span style="cursor: pointer; margin-right: 8px; font-size: 16px; filter: drop-shadow(0 2px 4px rgba(139,92,246,0.4));" title="يوجد ملاحظة (اضغط للعرض)" onclick="openStudentNoteModal('${student.code}')">📝</span>` : `<span style="cursor: pointer; margin-right: 8px; font-size: 14px; opacity: 0.3;" title="إضافة ملاحظة" onclick="openStudentNoteModal('${student.code}')">📝</span>`;
 
         let attendanceDotsHtml = `<div style="display: flex; gap: 6px; justify-content: center; align-items: center;" dir="rtl">`;
         for(let i = 0; i < 4; i++) {
@@ -5722,17 +5715,20 @@ window.renderGroupStudentsTable = function() {
                 if (status === 'present') { dotColor = "#10b981"; tooltipText = `${session.date}: حاضر ✅`; }
                 else if (status === 'late') { dotColor = "#f59e0b"; tooltipText = `${session.date}: متأخر ⏳`; }
                 else if (status === 'absent') { dotColor = "#ef4444"; tooltipText = `${session.date}: غائب ❌`; }
+                else if (typeof status === 'object' && status.status === 'makeup') { dotColor = "#2563eb"; tooltipText = `${session.date}: حاضر كتعويض 💻`; }
             }
             attendanceDotsHtml += `<span style="width: 14px; height: 14px; border-radius: 50%; background-color: ${dotColor}; display: inline-block; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); cursor: help;" title="${tooltipText}"></span>`;
         }
         attendanceDotsHtml += `</div>`;
 
-        html += `
+        htmlContent += `
         <tr>
             <td><strong style="color:var(--primary-color); font-size: 16px;">${student.code}</strong></td>
             <td>
                 <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                    <strong style="font-size: 14px;">${student.name} ${student.isSpecialCase ? `<span style="cursor: help; font-size: 13px;" title="حالة خاصة: ${student.specialAmount > 0 ? 'يدفع ' + student.specialAmount + ' ج.م' : 'إعفاء تام'}">⭐</span>` : ''}</strong>
+                    <div style="display: flex; align-items: center;">
+                        <strong style="font-size: 14px;">${student.name}</strong> ${specialBadge} ${noteIcon}
+                    </div>
                     ${trackBadge}
                 </div>
             </td>
@@ -5746,9 +5742,65 @@ window.renderGroupStudentsTable = function() {
             </td>
         </tr>`; 
     }); 
-
-    tbody.innerHTML = html; 
+    tbody.innerHTML = htmlContent; 
 };
+
+// ==========================================
+// 📝 نظام الملاحظات الخاص بالطلاب
+// ==========================================
+window.openStudentNoteModal = function(code) {
+    const student = students.find(s => s.code === code);
+    if(!student) return;
+    document.getElementById("noteStudentCode").value = student.code;
+    document.getElementById("noteStudentName").innerText = student.name;
+    document.getElementById("studentNoteText").value = student.note || "";
+    openModal("studentNoteModal");
+};
+
+window.openStudentNoteModalFromProfile = function() {
+    if (currentStudentProfileCode) {
+        window.openStudentNoteModal(currentStudentProfileCode);
+    }
+};
+
+window.saveStudentNote = function() {
+    const code = document.getElementById("noteStudentCode").value;
+    const text = document.getElementById("studentNoteText").value.trim();
+    const studentIndex = students.findIndex(s => s.code === code);
+    
+    if(studentIndex > -1) {
+        students[studentIndex].note = text;
+        localStorage.setItem("students", JSON.stringify(students));
+        showToast("تم حفظ الملاحظة بنجاح! 📝");
+        closeModal("studentNoteModal");
+        
+        if (typeof refreshCurrentVisibleScreens === 'function') refreshCurrentVisibleScreens();
+        if (document.getElementById("student-profile-view")?.style.display === "block") {
+            document.getElementById("profile-student-note").innerText = text || "لا توجد ملاحظات مسجلة.";
+        }
+        if (typeof syncDataToBot === "function") syncDataToBot();
+    }
+};
+
+window.deleteStudentNote = function() {
+    const code = document.getElementById("noteStudentCode").value;
+    const studentIndex = students.findIndex(s => s.code === code);
+    
+    if(studentIndex > -1) {
+        students[studentIndex].note = "";
+        document.getElementById("studentNoteText").value = "";
+        localStorage.setItem("students", JSON.stringify(students));
+        showToast("تم مسح الملاحظة! 🗑️");
+        closeModal("studentNoteModal");
+        
+        if (typeof refreshCurrentVisibleScreens === 'function') refreshCurrentVisibleScreens();
+        if (document.getElementById("student-profile-view")?.style.display === "block") {
+            document.getElementById("profile-student-note").innerText = "لا توجد ملاحظات مسجلة.";
+        }
+        if (typeof syncDataToBot === "function") syncDataToBot();
+    }
+};
+
 
 window.generateAdvancedReport = function() {
     const type = document.getElementById("reportType").value; const groupFilter = document.getElementById("reportGroup").value; const fromDate = document.getElementById("reportDateFrom").value; const toDate = document.getElementById("reportDateTo").value;
@@ -5894,10 +5946,13 @@ window.markAttendance = function(codeOrPhone, status) {
 };
 window.renderAttendanceTable = function(session) { 
     const tbody = document.getElementById("attendance-list"); const gStudents = students.filter(s => s.group === session.group); 
-    if(gStudents.length===0) return tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;">لا يوجد طلاب</td></tr>`; tbody.innerHTML = ""; 
+    if(gStudents.length===0) return tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;">لا يوجد طلاب</td></tr>`; 
+    
     const groupS = classSessions.filter(s => s.group === session.group).sort((a,b)=>new Date(a.date)-new Date(b.date)); 
     const prevSession = groupS[groupS.findIndex(s => s.id === session.id) - 1]; 
     
+    let htmlContent = ""; 
+
     gStudents.forEach(st => { 
         const stat = session.attendance[st.code] || session.attendance[st.phone]; 
         const statHtml = stat === 'present' ? '<span style="color:#10b981; font-weight:bold;">حاضر ✓</span>' : stat === 'late' ? '<span style="color:#f59e0b; font-weight:bold;">متأخر ⏳</span>' : stat === 'absent' ? '<span style="color:#ef4444; font-weight:bold;">غائب ❌</span>' : '<span style="color:#64748b;">لم يسجل</span>'; 
@@ -5907,23 +5962,22 @@ window.renderAttendanceTable = function(session) {
             const p = prevSession.attendance[st.code] || prevSession.attendance[st.phone]; 
             pHT = p==='present'?'<span style="color:#10b981; font-weight:bold;">حاضر</span>':p==='late'?'<span style="color:#f59e0b; font-weight:bold;">متأخر</span>':p==='absent'?'<span style="color:#ef4444; font-weight:bold;">غائب</span>':'--'; 
             
-            // 💻 الاكتشاف التلقائي للمنصة (بدون تدخل المدرس)
             if (window.platformLectures && window.platformTracking) {
                 let linkedLecture = window.platformLectures.find(l => l.linkedSession === prevSession.id || (l.linkedSessions && l.linkedSessions.includes(prevSession.id)));
                 if (linkedLecture) {
                     let trackData = window.platformTracking[linkedLecture.id];
                     if (trackData && (trackData[st.phone] || trackData[st.code])) {
-                        // تصميم شيك جداً لكلمة حاضر منصة
                         pHT = '<span style="color:#2563eb; font-weight:900; background:rgba(37,99,235,0.1); padding:4px 10px; border-radius:8px; border: 1px solid rgba(37,99,235,0.2);">💻 حاضر منصة</span>';
                     }
                 }
             }
         } 
         
-        // ❌ تمت إزالة زرار المنصة اليدوي من هنا
-        tbody.innerHTML += `<tr>
+        let noteIcon = st.note && st.note.trim() !== "" ? `<span style="cursor: pointer; margin-right: 8px; font-size: 16px; filter: drop-shadow(0 2px 4px rgba(139,92,246,0.4));" title="يوجد ملاحظة (اضغط للعرض)" onclick="openStudentNoteModal('${st.code}')">📝</span>` : `<span style="cursor: pointer; margin-right: 8px; font-size: 14px; opacity: 0.3;" title="إضافة ملاحظة" onclick="openStudentNoteModal('${st.code}')">📝</span>`;
+
+        htmlContent += `<tr>
             <td><strong>${st.code}</strong></td>
-            <td>${st.name}</td>
+            <td>${st.name} ${noteIcon}</td>
             <td style="direction: ltr;">${st.phone}</td>
             <td>${pHT}</td>
             <td>${statHtml}</td>
@@ -5934,6 +5988,8 @@ window.renderAttendanceTable = function(session) {
             </td>
         </tr>`; 
     }); 
+    
+    tbody.innerHTML = htmlContent; 
 };
 
 
@@ -6984,4 +7040,87 @@ window.exportGroupStudentsToExcel = function() {
     let dateStr = new Date().toLocaleDateString('ar-EG').replace(/\//g, '-');
     XLSX.writeFile(wb, `طلاب_مجموعة_${currentActiveGroup}_${dateStr}.xlsx`);
     showToast(`تم تصدير شيت مجموعة (${currentActiveGroup}) بنجاح! 📥`);
+};
+
+
+
+// ==========================================
+// 📥 استيراد وتصدير طلاب مجموعة معينة
+// ==========================================
+window.downloadGroupExcelTemplate = function() {
+    // نموذج ذكي مبسط (مش محتاجين الصف ولا المجموعة لأنهم معروفين)
+    const headers = [["الاسم", "هاتف الطالب", "هاتف ولي الأمر", "الجنس"]]; 
+    const worksheet = XLSX.utils.aoa_to_sheet(headers); 
+    worksheet['!cols'] = [{wch: 30}, {wch: 20}, {wch: 20}, {wch: 15}]; 
+    const workbook = XLSX.utils.book_new(); 
+    XLSX.utils.book_append_sheet(workbook, worksheet, "الطلاب"); 
+    XLSX.writeFile(workbook, `نموذج_إضافة_طلاب_${currentActiveGroup}.xlsx`); 
+    showToast("تم تحميل النموذج المخصص للمجموعة! 📄"); 
+};
+
+window.importStudentsToGroupFromExcel = function(event) {
+    const file = event.target.files[0]; 
+    if (!file) return;
+    if (!currentActiveGroup) return showToast("حدث خطأ، يرجى العودة وإعادة فتح المجموعة", "error");
+
+    // جلب الصف الدراسي الخاص بالمجموعة الحالية
+    const activeGroupObj = groups.find(g => g.name === currentActiveGroup);
+    const groupLevel = activeGroupObj ? activeGroupObj.level : "غير محدد";
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result); 
+            const workbook = XLSX.read(data, {type: 'array'});
+            const excelData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+            let addedCount = 0, errorCount = 0;
+            
+            excelData.forEach(row => {
+                const name = row['الاسم'];
+                const phone = row['هاتف الطالب'] || '';
+                const parentPhone = row['هاتف ولي الأمر'] || '';
+                const gender = row['الجنس'] || 'ذكر';
+                
+                if(name) {
+                    // فحص التكرار الذكي
+                    const duplicate = students.find(s => 
+                        (phone && phone.toString() !== "0" && s.phone === phone.toString()) || 
+                        normalizeArabicName(s.name) === normalizeArabicName(name.toString())
+                    );
+
+                    if(!duplicate) { 
+                        students.push({ 
+                            code: window.generateStudentCode(), 
+                            name: name.toString().trim(), 
+                            level: groupLevel, 
+                            group: currentActiveGroup, 
+                            phone: phone.toString().trim(), 
+                            parentPhone: parentPhone.toString().trim(), 
+                            gender: gender.toString().trim(), 
+                            behaviorPoints: 0 
+                        }); 
+                        addedCount++; 
+                    } else { 
+                        errorCount++; 
+                    }
+                }
+            });
+            
+            localStorage.setItem("students", JSON.stringify(students)); 
+            
+            // تحديث الواجهات
+            renderGroupStudentsTable(); // تحديث جدول المجموعة اللي إنت فاتحها
+            renderTable(); // تحديث الجدول الرئيسي المخفي
+            
+            showToast(`تم استيراد ${addedCount} طالب للمجموعة، وتجاهل ${errorCount} مكرر ✅`);
+            
+            // رفع البيانات على السحابة أوتوماتيك بعد الاستيراد
+            if (typeof syncDataToBot === "function") syncDataToBot();
+            
+        } catch(err) { 
+            showToast("خطأ أثناء قراءة الملف!", "error"); 
+        }
+    };
+    reader.readAsArrayBuffer(file); 
+    event.target.value = ""; // تصفير الحقل عشان تقدر ترفع نفس الملف تاني لو حبيت
 };
