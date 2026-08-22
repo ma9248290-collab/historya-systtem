@@ -100,17 +100,27 @@
         }
 
         .hero-text h1 {
-            font-size: clamp(32px, 5vw, 55px);
+            font-size: clamp(35px, 5vw, 65px); /* 👈 كبرنا الخط الأساسي */
             font-weight: 900;
-            line-height: 1.6; /* 👈 كبرنا المسافة هنا من 1.2 لـ 1.6 عشان الكلام ياخد راحته */
-            margin-bottom: 15px;
+            line-height: 1.3;
+            margin-bottom: 5px; /* 👈 قربناها من الاسم اللي تحتها */
             text-shadow: 0 10px 20px rgba(0,0,0,0.8);
         }
 
         .hero-text h1 span {
-            background: linear-gradient(45deg, #fff, #cbd5e1);
+            background: linear-gradient(45deg, #fff, var(--gold)); /* 👈 إدينا كلمة هيستوريا تدرج ذهبي فخم */
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+        }
+
+        /* 👈 الكلاس الجديد لاسم المستر */
+        .hero-subtitle {
+            font-size: clamp(20px, 3vw, 32px); /* 👈 خط وسط متناسق */
+            font-weight: 700;
+            color: #cbd5e1; /* لون فضي شيك */
+            margin-bottom: 20px;
+            text-shadow: 0 5px 10px rgba(0,0,0,0.5);
+            letter-spacing: 1px;
         }
 
         .hero-text p {
@@ -402,7 +412,11 @@
         <div class="hero-section">
             <div class="hero-text">
                 <div class="badge-title">👑 المنصة الرسمية - هيستوريا</div>
-                <h1>مرحباً بك في كتيبة <br> <span>مستر أسامة رفعت</span></h1>
+                
+                <!-- 👈 التعديل هنا: فصلنا هيستوريا عن اسم المستر -->
+                <h1>مرحباً بك في كتيبة <br><span>هيستــــــــــــــوريا</span></h1>
+                <h2 class="hero-subtitle">مستر أسامة رفعت</h2>
+                
                 <p>أدخل رقم هاتف ولي الأمر الخاص بك والمسجل لدينا (أو في سنتر الأوائل) لاستخراج الكارت الذكي والباركود الخاص بك لدخول الحصص والامتحانات.</p>
             </div>
             
