@@ -7124,3 +7124,43 @@ window.importStudentsToGroupFromExcel = function(event) {
     reader.readAsArrayBuffer(file); 
     event.target.value = ""; // تصفير الحقل عشان تقدر ترفع نفس الملف تاني لو حبيت
 };
+
+// ==========================================
+// 🔄 المزامنة اللحظية بين التابات (بدون ريفريش حتى لو أوفلاين)
+// ==========================================
+window.addEventListener('storage', function(e) {
+    // 1. لو التغيير حصل في (الطلاب) من تاب تاني (إضافة، تعديل، حذف)
+    if (e.key === 'students') {
+        // تحديث الداتا في التاب الحالي أوتوماتيكياً
+        students = JSON.parse(e.newValue) || [];
+        
+        // تحديث جدول الطلاب الشامل لو المدرس فاتحه
+        if (document.getElementById("students-overview")?.style.display === "block") {
+            if (typeof renderTable === 'function') renderTable();
+        }
+        
+        // تحديث جدول طلاب المجموعة لو المدرس فاتح تفاصيل مجموعة معينة
+        if (document.getElementById("group-details-view")?.style.display === "block") {
+            if (typeof renderGroupStudentsTable === 'function') renderGroupStudentsTable();
+        }
+        
+        // تحديث أعداد الطلاب جوه كروت المجموعات من بره
+        if (document.getElementById("groups-overview")?.style.display === "block") {
+            if (typeof renderGroupCards === 'function') renderGroupCards();
+        }
+        
+        // تحديث العداد الإجمالي للطلاب في لوحة الإحصائيات (الرئيسية)
+        let totalEl = document.getElementById("total-students");
+        if (totalEl) totalEl.innerText = students.length;
+    }
+
+    // 2. لو التغيير حصل في (المجموعات) من تاب تاني (إنشاء مجموعة جديدة أو مسحها)
+    if (e.key === 'groups') {
+        groups = JSON.parse(e.newValue) || [];
+        
+        // تحديث كروت المجموعات
+        if (document.getElementById("groups-overview")?.style.display === "block") {
+            if (typeof renderGroupCards === 'function') renderGroupCards();
+        }
+    }
+});
