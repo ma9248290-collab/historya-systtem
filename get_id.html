@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>استخراج كارت الطالب | هيستوريا</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #b91c1c; /* أحمر تاريخي */
+            --primary-glow: rgba(185, 28, 28, 0.6);
+            --gold: #f59e0b;
+            --gold-glow: rgba(245, 158, 11, 0.5);
+            --dark-glass: rgba(15, 23, 42, 0.65);
+            --border-glass: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Cairo', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #020617;
+            color: #f8fafc;
+            min-height: 100vh;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        /* 🎬 خلفية الفيديو السينمائية */
+        .video-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            object-fit: cover;
+            opacity: 0.5; /* درجة وضوح الفيديو */
+        }
+
+        .overlay-gradient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, rgba(2, 6, 23, 0.4) 0%, rgba(2, 6, 23, 0.95) 100%);
+            z-index: -1;
+        }
+
+        /* 🌟 المحتوى الرئيسي */
+        .main-wrapper {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            z-index: 10;
+        }
+
+        .hero-section {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .hero-text {
+            flex: 1;
+            min-width: 300px;
+            text-align: right;
+            animation: slideInRight 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        .badge-title {
+            display: inline-block;
+            background: rgba(245, 158, 11, 0.15);
+            border-right: 4px solid var(--gold);
+            padding: 8px 20px;
+            border-radius: 8px;
+            color: var(--gold);
+            font-weight: 900;
+            margin-bottom: 20px;
+            font-size: 16px;
+            box-shadow: 0 4px 15px var(--gold-glow);
+            backdrop-filter: blur(10px);
+        }
+
+        .hero-text h1 {
+            font-size: clamp(32px, 5vw, 55px);
+            font-weight: 900;
+            line-height: 1.2;
+            margin-bottom: 15px;
+            text-shadow: 0 10px 20px rgba(0,0,0,0.8);
+        }
+
+        .hero-text h1 span {
+            background: linear-gradient(45deg, #fff, #cbd5e1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-text p {
+            font-size: clamp(15px, 2vw, 18px);
+            color: #cbd5e1;
+            line-height: 1.8;
+            max-width: 90%;
+        }
+
+        /* 📸 منطقة الصورة والعناصر الطائرة */
+        .hero-image-container {
+            flex: 1;
+            min-width: 300px;
+            display: flex;
+            justify-content: center;
+            position: relative;
+            animation: fadeInZoom 1.2s ease-out forwards;
+        }
+
+        .hero-image-container img {
+            width: 100%;
+            max-width: 450px;
+            z-index: 5;
+            filter: drop-shadow(0 20px 40px rgba(0,0,0,0.6));
+            animation: floatUpDown 5s ease-in-out infinite;
+        }
+
+        /* بادجات زجاجية 3D */
+        .glass-badge {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 12px 25px;
+            border-radius: 20px;
+            font-weight: 900;
+            z-index: 10;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: floatOrbit 4s linear infinite alternate;
+        }
+
+        .gb-1 { top: 10%; right: 0; color: white; }
+        .gb-2 { bottom: 15%; left: -5%; color: var(--gold); animation-delay: -2s; }
+        .gb-3 { top: 40%; left: 0; color: #fecdd3; animation-delay: -3s; }
+
+        /* 🔍 صندوق البحث الزجاجي الفخم */
+        .search-container {
+            background: var(--dark-glass);
+            border: 1px solid var(--border-glass);
+            backdrop-filter: blur(20px);
+            padding: 40px 30px;
+            border-radius: 30px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.7);
+            width: 100%;
+            max-width: 550px;
+            text-align: center;
+            z-index: 20;
+            margin-top: -20px; /* دمج خفيف مع الصورة */
+            animation: slideUp 1s ease-out forwards;
+        }
+
+        .search-container h3 {
+            color: white;
+            margin-bottom: 25px;
+            font-size: clamp(18px, 3vw, 24px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .input-wrapper {
+            position: relative;
+            margin-bottom: 25px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 20px;
+            border-radius: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0,0,0,0.4);
+            color: white;
+            font-size: 20px;
+            font-weight: 900;
+            text-align: center;
+            letter-spacing: 3px;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        .search-input::placeholder { color: #64748b; font-weight: normal; letter-spacing: 0; }
+        
+        .search-input:focus {
+            border-color: var(--primary);
+            background: rgba(0,0,0,0.6);
+            box-shadow: 0 0 25px var(--primary-glow);
+        }
+
+        .search-btn {
+            width: 100%;
+            padding: 20px;
+            border-radius: 18px;
+            border: none;
+            background: linear-gradient(45deg, var(--primary), #e11d48);
+            color: white;
+            font-size: 22px;
+            font-weight: 900;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 10px 30px var(--primary-glow);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-btn:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 15px 40px var(--primary-glow);
+        }
+
+        .loader {
+            display: none;
+            color: var(--gold);
+            font-weight: bold;
+            margin-top: 20px;
+            font-size: 18px;
+            animation: pulseText 1.5s infinite;
+        }
+
+        /* 💳 الكارت الـ 3D الديناميكي */
+        .card-scene {
+            display: none;
+            width: 340px;
+            height: 560px;
+            perspective: 1500px;
+            margin: 60px auto 20px auto;
+        }
+
+        .id-card {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transition: transform 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-style: preserve-3d;
+            cursor: pointer;
+        }
+
+        .id-card.is-flipped {
+            transform: rotateY(180deg) scale(1.05);
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 25px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8);
+            border: 1px solid rgba(255,255,255,0.15);
+            overflow: hidden;
+        }
+
+        .card-front {
+            background-image: url('face.jpg');
+            background-size: cover;
+            background-position: center;
+        }
+
+        .card-back {
+            background-image: url('back.jpg');
+            background-size: cover;
+            background-position: center;
+            transform: rotateY(180deg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        /* تظبيط المربع الأبيض للباركود */
+        .barcode-container {
+            position: absolute;
+            top: 23%; /* 👈 بتنزل وتطلع الباركود جوه المربع الأبيض */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: transparent;
+        }
+
+        .student-code-text {
+            color: #000;
+            font-size: 26px;
+            font-weight: 900;
+            letter-spacing: 12px; /* 👈 وسعنا المسافة بين الأرقام عشان يبقى شكلها أشيك */
+            margin-top: 5px;
+            font-family: monospace;
+        }
+
+        .flip-instruction {
+            color: var(--gold);
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 30px;
+            background: rgba(245, 158, 11, 0.1);
+            padding: 8px 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            animation: pulseText 2s infinite;
+        }
+
+        /* 🪄 الأنيميشنات */
+        @keyframes floatUpDown {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+        @keyframes floatOrbit {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-15px) rotate(4deg); }
+        }
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(50px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(50px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeInZoom {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes pulseText {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; transform: scale(1.05); }
+        }
+
+        /* 📱 ريسبونسيف الموبايل (التظبيط الصح) */
+        @media (max-width: 768px) {
+            .hero-section {
+                flex-direction: column-reverse;
+                text-align: center;
+                gap: 20px;
+            }
+            .hero-text { text-align: center; margin-top: 20px; }
+            .hero-text p { max-width: 100%; margin: 0 auto; }
+            .badge-title { margin: 0 auto 15px auto; display: block; width: max-content; }
+            
+            .hero-image-container img { max-width: 320px; }
+            .search-container { padding: 30px 20px; margin-top: 10px; width: 95%; }
+            
+            /* تظبيط البادجات في الموبايل عشان متطلعش بره الشاشة */
+            .glass-badge { padding: 8px 15px; font-size: 14px; }
+            .gb-1 { top: 5%; right: -5%; }
+            .gb-2 { bottom: 10%; left: -10%; }
+            .gb-3 { top: 30%; left: -5%; }
+
+            /* تصغير الكارت نسبياً للموبايلات الصغيرة */
+            .card-scene { transform: scale(0.9); margin: 20px auto; }
+        }
+
+        @media (max-width: 400px) {
+            .card-scene { transform: scale(0.85); margin: 0 auto; }
+            .search-input { font-size: 16px; padding: 15px; }
+            .search-btn { font-size: 18px; padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 🎬 خلفية الفيديو السينمائية (تقدر تحط لينك فيديو جاهز هنا) -->
+    <!-- لو معاك فيديو حطه في ال src, حالياً حطيتلك فيديو Abstract مجاني وفخم -->
+    <video class="video-background" autoplay muted loop playsinline>
+        <source src="https://cdn.pixabay.com/video/2020/05/25/40131-424917547_large.mp4" type="video/mp4">
+    </video>
+    <div class="overlay-gradient"></div>
+
+    <div class="main-wrapper">
+        
+        <!-- الهيرو سيكشن (الكلام والصورة) -->
+        <div class="hero-section">
+            <div class="hero-text">
+                <div class="badge-title">👑 المنصة الرسمية - هيستوريا</div>
+                <h1>مرحباً بك في كتيبة <br> <span>مستر أسامة رفعت</span></h1>
+                <p>أدخل رقم هاتف ولي الأمر الخاص بك والمسجل لدينا (أو في سنتر الأوائل) لاستخراج الكارت الذكي والباركود الخاص بك لدخول الحصص والامتحانات.</p>
+            </div>
+            
+            <div class="hero-image-container">
+                <!-- بادجات طايرة -->
+                <div class="glass-badge gb-1">📜 التاريخ</div>
+                <div class="glass-badge gb-2">🎯 +90</div>
+                <div class="glass-badge gb-3">👑 هيستوريا</div>
+                
+                <img src="mr.png" alt="مستر أسامة رفعت">
+            </div>
+        </div>
+
+        <!-- صندوق البحث -->
+        <div class="search-container" id="searchBoxContainer">
+            <h3>👇 أدخل رقم ولي الأمر هنا</h3>
+            <div class="input-wrapper">
+                <input type="tel" id="parentPhoneInput" class="search-input" placeholder="مثال: 01000000000" maxlength="11" autocomplete="off">
+            </div>
+            <button class="search-btn" id="searchBtn" onclick="fetchStudentID()">💳 استخراج الكارت الخاص بي</button>
+            <div class="loader" id="loaderMsg">جاري البحث في السجلات... ⏳</div>
+        </div>
+
+        <div class="flip-instruction" id="flipHint" style="display: none;">👇 اضغط على الكارت لقلبه وإظهار الباركود 👇</div>
+
+        <!-- الكارت الـ 3D السحري -->
+        <div class="card-scene" id="cardScene">
+            <div class="id-card" id="studentIdCard" onclick="this.classList.toggle('is-flipped')">
+                <!-- وش الكارت -->
+                <div class="card-face card-front"></div>
+                
+                <!-- ضهر الكارت (الصورة والمربع الأبيض) -->
+                <div class="card-face card-back">
+                    <div class="barcode-container">
+                        <svg id="barcodeSvg" style="width: 100%; max-height: 55px;"></svg>
+                        <div class="student-code-text" id="displayStudentCode">---</div>
+                    </div>
+                </div>
+            </div>
+        </div>  
+
+    </div>
+
+    <script>
+        const FIREBASE_URL = "https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master/data/students.json";
+        let cachedStudentsData = null; 
+
+        async function fetchStudentID() {
+            const phoneInput = document.getElementById("parentPhoneInput").value.trim();
+            const btn = document.getElementById("searchBtn");
+            const loader = document.getElementById("loaderMsg");
+            const cardScene = document.getElementById("cardScene");
+            const flipHint = document.getElementById("flipHint");
+            const searchContainer = document.getElementById("searchBoxContainer");
+
+            // فلترة الرقم وتحويل العربي لإنجليزي لو اتكتب بالغلط
+            const engPhone = phoneInput.replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
+
+            if(!engPhone || engPhone.length < 10) {
+                alert("يرجى إدخال رقم هاتف صحيح!");
+                return;
+            }
+
+            btn.style.display = "none";
+            loader.style.display = "block";
+            cardScene.style.display = "none";
+            flipHint.style.display = "none";
+            document.getElementById("studentIdCard").classList.remove('is-flipped');
+
+            try {
+                if (!cachedStudentsData) {
+                    let res = await fetch(FIREBASE_URL);
+                    let data = await res.json();
+                    cachedStudentsData = Array.isArray(data) ? data : Object.values(data || {}).filter(s => s !== null);
+                }
+
+                let foundStudent = cachedStudentsData.find(s => s && (s.parentPhone === engPhone || s.phone === engPhone));
+
+                if (foundStudent) {
+                    // إخفاء صندوق البحث وأنيميشن ظهوره
+                    searchContainer.style.display = "none";
+                    
+                    // إظهار الكارت
+                    cardScene.style.display = "block";
+                    flipHint.style.display = "block";
+
+                   // رسم الباركود (تصغير الطول سنة عشان الرقم يترفع جوه المربع)
+                    document.getElementById("displayStudentCode").innerText = foundStudent.code;
+                    JsBarcode("#barcodeSvg", foundStudent.code, {
+                        format: "CODE128",
+                        lineColor: "#000000",
+                        background: "transparent", 
+                        width: 2.5, // عرض خطوط الباركود
+                        height: 50, // 👈 قللنا طول الخطوط هنا عشان الرقم يسحب لفوق ويدخل جوه المربع
+                        displayValue: false, 
+                        margin: 0
+                    });
+
+                    // 🚀 توجيه الشاشة أوتوماتيك للكارت (Smooth Scroll)
+                    setTimeout(() => {
+                        cardScene.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+
+                    // لفة الكارت الأوتوماتيك
+                    setTimeout(() => {
+                        document.getElementById("studentIdCard").classList.add('is-flipped');
+                    }, 1200);
+
+                } else {
+                    alert("عفواً، لم يتم العثور على طالب مسجل بهذا الرقم. يرجى التأكد من الرقم أو مراجعة الإدارة.");
+                    btn.style.display = "flex";
+                    loader.style.display = "none";
+                }
+
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                alert("حدث خطأ في الاتصال بالسيرفر. يرجى التأكد من الإنترنت والمحاولة مرة أخرى.");
+                btn.style.display = "flex";
+                loader.style.display = "none";
+            }
+        }
+
+        document.getElementById("parentPhoneInput").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                // قفل الكيبورد في الموبايل لما يدوس Enter
+                this.blur();
+                fetchStudentID();
+            }
+        });
+    </script>
+</body>
+</html>
