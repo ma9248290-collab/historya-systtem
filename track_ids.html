@@ -139,19 +139,28 @@
                 
                 tbody.innerHTML = "";
                 
-                if (!data) {
+                // 👈 حماية لو السجل فاضي
+                if (!data || Object.keys(data).length === 0) {
                     tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--gold);">لم يقم أي طالب باستخراج الكارت حتى الآن.</td></tr>`;
                     return;
                 }
 
-                // تحويل الداتا لمصفوفة وترتيبها من الأحدث للأقدم
-                let logsArray = Object.keys(data).map(key => ({ id: key, ...data[key] })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                // 👈 فلترة ذكية وترتيب دقيق جداً بالتاريخ
+                let logsArray = Object.keys(data)
+                    .filter(key => data[key] !== null) 
+                    .map(key => ({ id: key, ...data[key] }))
+                    .sort((a, b) => {
+                        let timeA = new Date(a.timestamp).getTime() || 0;
+                        let timeB = new Date(b.timestamp).getTime() || 0;
+                        return timeB - timeA;
+                    });
                 
                 let todayCount = 0;
                 let todayString = new Date().toLocaleDateString('ar-EG');
 
                 logsArray.forEach(log => {
-                    let logDateObj = new Date(log.timestamp);
+                    let logTime = log.timestamp;
+                    let logDateObj = new Date(logTime);
                     let logDateStr = logDateObj.toLocaleDateString('ar-EG');
                     let logTimeStr = logDateObj.toLocaleTimeString('ar-EG', { hour: 'numeric', minute: 'numeric', hour12: true });
 
@@ -159,11 +168,14 @@
 
                     tbody.innerHTML += `
                         <tr class="log-row">
-                            <td style="font-size: 14px; color: var(--text-muted); direction: ltr; text-align: right;">${logTimeStr} <br> <span style="font-size:12px;">${logDateStr}</span></td>
+                            <td style="font-size: 14px; color: var(--text-muted); direction: ltr; text-align: right;">
+                                <strong style="color: var(--text-main); font-size: 15px;">${logTimeStr}</strong> <br> 
+                                <span style="font-size:12px;">${logDateStr}</span>
+                            </td>
                             <td><strong style="color: var(--primary); font-size: 18px; font-family: monospace;">${log.code}</strong></td>
                             <td style="font-weight: bold; font-size: 16px;">${log.name}</td>
                             <td><span class="badge">${log.level}</span></td>
-                            <td style="direction: ltr; text-align: right; font-size: 14px; color: var(--text-muted);">ط: ${log.phone} <br> أ: ${log.parentPhone}</td>
+                            <td style="direction: ltr; text-align: right; font-size: 14px; color: var(--text-muted);">ط: ${log.phone || 'غير مسجل'} <br> أ: ${log.parentPhone || 'غير مسجل'}</td>
                         </tr>
                     `;
                 });
@@ -177,6 +189,8 @@
             }
         }
 
+
+        
         function filterTable() {
             let filter = document.getElementById("searchInput").value.toLowerCase();
             let rows = document.querySelectorAll(".log-row");

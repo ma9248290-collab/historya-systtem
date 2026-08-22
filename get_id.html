@@ -541,13 +541,14 @@
                     let backLoaded = false;
 
                     // الدالة دي بتشتغل كل ما صورة تحمل، ولما الاتنين يخلصوا بتنفذ اللفة وتبعث اللوج للأدمن
+                   // الدالة دي بتشتغل كل ما صورة تحمل، ولما الاتنين يخلصوا بتنفذ اللفة وتبعث اللوج للأدمن
                     function flipWhenReady() {
                         if (frontLoaded && backLoaded) {
                             setTimeout(() => {
                                 document.getElementById("studentIdCard").classList.add('is-flipped');
                                 
-                                // 🚀 الكود المخفي لإرسال بيانات الطالب للوحة الأدمن
-                                fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master/id_logs/${Date.now()}.json`, {
+                                // 🚀 الكود المخفي المحدث: استخدام وقت سيرفر فايربيز بدلاً من موبايل الطالب
+                                fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master/id_logs/log_${Date.now()}.json`, {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
@@ -556,7 +557,8 @@
                                         level: foundStudent.level,
                                         phone: foundStudent.phone,
                                         parentPhone: foundStudent.parentPhone,
-                                        timestamp: new Date().toISOString()
+                                        // 👈 السحر هنا: بيسحب الوقت الفعلي من سيرفر جوجل وبيتجاهل موبايل الطالب تماماً
+                                        timestamp: { ".sv": "timestamp" } 
                                     })
                                 }).catch(e => console.log("Log Error"));
 
