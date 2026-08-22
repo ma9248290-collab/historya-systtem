@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مراقبة استخراج الكارنيهات | هيستوريا</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #b91c1c;
+            --gold: #f59e0b;
+            --dark: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { box-sizing: border-box; font-family: 'Cairo', sans-serif; margin: 0; padding: 0; }
+
+        body {
+            background-color: #020617;
+            color: var(--text-main);
+            padding: 30px 20px;
+        }
+
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 30px; max-width: 1200px; margin-left: auto; margin-right: auto;
+            border-bottom: 1px solid var(--border); padding-bottom: 15px;
+        }
+
+        .header h1 { color: var(--gold); font-weight: 900; }
+        .header p { color: var(--text-muted); font-size: 15px; }
+
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px; max-width: 1200px; margin: 0 auto 30px auto;
+        }
+
+        .stat-card {
+            background: var(--card-bg); padding: 25px; border-radius: 16px;
+            border: 1px solid var(--border); border-top: 4px solid var(--primary);
+            text-align: center; box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+
+        .stat-card h3 { color: var(--text-muted); font-size: 16px; margin-bottom: 10px; }
+        .stat-card h2 { color: white; font-size: 36px; font-weight: 900; }
+
+        .controls {
+            max-width: 1200px; margin: 0 auto 20px auto; display: flex; gap: 15px; justify-content: space-between;
+        }
+
+        .search-input {
+            flex: 1; padding: 12px 20px; border-radius: 12px; border: 1px solid var(--border);
+            background: rgba(0,0,0,0.3); color: white; font-size: 16px; outline: none; transition: 0.3s;
+        }
+        .search-input:focus { border-color: var(--gold); }
+
+        .btn {
+            padding: 12px 25px; border-radius: 12px; border: none; font-weight: 900; font-size: 16px;
+            cursor: pointer; transition: 0.3s;
+        }
+        .btn-danger { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; }
+        .btn-danger:hover { background: #ef4444; color: white; }
+
+        .table-container {
+            max-width: 1200px; margin: 0 auto; background: var(--card-bg);
+            border-radius: 16px; border: 1px solid var(--border); overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        table { width: 100%; border-collapse: collapse; text-align: right; }
+        th, td { padding: 15px 20px; border-bottom: 1px solid var(--border); }
+        th { background: rgba(0,0,0,0.2); color: var(--gold); font-weight: 900; }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+        
+        .badge {
+            background: rgba(59, 130, 246, 0.1); color: #3b82f6; padding: 4px 10px;
+            border-radius: 8px; font-size: 13px; font-weight: bold; border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <h1>مراقبة الكارنيهات 🕵️‍♂️</h1>
+            <p>سجل لحظي لعمليات استخراج كروت الطلاب عبر الموقع</p>
+        </div>
+        <img src="logo.png" alt="Logo" style="width: 60px; height: 60px; border-radius: 50%;">
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>إجمالي عمليات الاستخراج</h3>
+            <h2 id="totalCount">0</h2>
+        </div>
+        <div class="stat-card" style="border-top-color: var(--gold);">
+            <h3>تم استخراجها اليوم</h3>
+            <h2 id="todayCount" style="color: var(--gold);">0</h2>
+        </div>
+    </div>
+
+    <div class="controls">
+        <input type="text" id="searchInput" class="search-input" placeholder="🔍 ابحث بالاسم، الكود، أو رقم الهاتف..." onkeyup="filterTable()">
+        <button class="btn btn-danger" onclick="clearLogs()">🗑️ مسح السجل</button>
+    </div>
+
+    <div class="table-container">
+        <table id="logsTable">
+            <thead>
+                <tr>
+                    <th>تاريخ ووقت الاستخراج</th>
+                    <th>الكود</th>
+                    <th>اسم الطالب</th>
+                    <th>الصف الدراسي</th>
+                    <th>رقم الطالب / ولي الأمر</th>
+                </tr>
+            </thead>
+            <tbody id="logsBody">
+                <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">جاري تحميل السجل... ⏳</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const FIREBASE_LOGS_URL = "https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master/id_logs.json";
+
+        async function fetchLogs() {
+            try {
+                let res = await fetch(FIREBASE_LOGS_URL);
+                let data = await res.json();
+                
+                let tbody = document.getElementById("logsBody");
+                let totalCountEl = document.getElementById("totalCount");
+                let todayCountEl = document.getElementById("todayCount");
+                
+                tbody.innerHTML = "";
+                
+                if (!data) {
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--gold);">لم يقم أي طالب باستخراج الكارت حتى الآن.</td></tr>`;
+                    return;
+                }
+
+                // تحويل الداتا لمصفوفة وترتيبها من الأحدث للأقدم
+                let logsArray = Object.keys(data).map(key => ({ id: key, ...data[key] })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                
+                let todayCount = 0;
+                let todayString = new Date().toLocaleDateString('ar-EG');
+
+                logsArray.forEach(log => {
+                    let logDateObj = new Date(log.timestamp);
+                    let logDateStr = logDateObj.toLocaleDateString('ar-EG');
+                    let logTimeStr = logDateObj.toLocaleTimeString('ar-EG', { hour: 'numeric', minute: 'numeric', hour12: true });
+
+                    if (logDateStr === todayString) todayCount++;
+
+                    tbody.innerHTML += `
+                        <tr class="log-row">
+                            <td style="font-size: 14px; color: var(--text-muted); direction: ltr; text-align: right;">${logTimeStr} <br> <span style="font-size:12px;">${logDateStr}</span></td>
+                            <td><strong style="color: var(--primary); font-size: 18px; font-family: monospace;">${log.code}</strong></td>
+                            <td style="font-weight: bold; font-size: 16px;">${log.name}</td>
+                            <td><span class="badge">${log.level}</span></td>
+                            <td style="direction: ltr; text-align: right; font-size: 14px; color: var(--text-muted);">ط: ${log.phone} <br> أ: ${log.parentPhone}</td>
+                        </tr>
+                    `;
+                });
+
+                totalCountEl.innerText = logsArray.length;
+                todayCountEl.innerText = todayCount;
+
+            } catch (error) {
+                console.error("Error fetching logs:", error);
+                document.getElementById("logsBody").innerHTML = `<tr><td colspan="5" style="text-align: center; color: #ef4444;">حدث خطأ أثناء تحميل السجل!</td></tr>`;
+            }
+        }
+
+        function filterTable() {
+            let filter = document.getElementById("searchInput").value.toLowerCase();
+            let rows = document.querySelectorAll(".log-row");
+
+            rows.forEach(row => {
+                let text = row.innerText.toLowerCase();
+                row.style.display = text.includes(filter) ? "" : "none";
+            });
+        }
+
+        async function clearLogs() {
+            if (!confirm("هل أنت متأكد من مسح جميع سجلات الاستخراج نهائياً؟")) return;
+            
+            let pwd = prompt("أدخل الرقم السري للإدارة لتأكيد المسح:");
+            let savedPin = localStorage.getItem("adminPin") || "1234";
+            
+            if (pwd !== savedPin) {
+                alert("الرقم السري غير صحيح!");
+                return;
+            }
+
+            try {
+                await fetch(FIREBASE_LOGS_URL, { method: 'DELETE' });
+                alert("تم تفريغ السجل بنجاح! 🗑️");
+                fetchLogs();
+            } catch (e) {
+                alert("حدث خطأ أثناء مسح السجل!");
+            }
+        }
+
+        // تشغيل التحميل أول ما الصفحة تفتح
+        window.onload = fetchLogs;
+    </script>
+</body>
+</html>

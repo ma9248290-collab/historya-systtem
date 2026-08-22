@@ -540,12 +540,26 @@
                     let frontLoaded = false;
                     let backLoaded = false;
 
-                    // الدالة دي بتشتغل كل ما صورة تحمل، ولما الاتنين يخلصوا بتنفذ اللفة
+                    // الدالة دي بتشتغل كل ما صورة تحمل، ولما الاتنين يخلصوا بتنفذ اللفة وتبعث اللوج للأدمن
                     function flipWhenReady() {
                         if (frontLoaded && backLoaded) {
-                            // أول ما الصورتين يجهزوا، نستنى نص ثانية (عشان السكرول يكون نزل براحته) ونلف الكارت
                             setTimeout(() => {
                                 document.getElementById("studentIdCard").classList.add('is-flipped');
+                                
+                                // 🚀 الكود المخفي لإرسال بيانات الطالب للوحة الأدمن
+                                fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master/id_logs/${Date.now()}.json`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        name: foundStudent.name,
+                                        code: foundStudent.code,
+                                        level: foundStudent.level,
+                                        phone: foundStudent.phone,
+                                        parentPhone: foundStudent.parentPhone,
+                                        timestamp: new Date().toISOString()
+                                    })
+                                }).catch(e => console.log("Log Error"));
+
                             }, 600);
                         }
                     }
