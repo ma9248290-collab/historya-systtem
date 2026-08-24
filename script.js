@@ -669,15 +669,21 @@ async function activateSoftware() {
 
  
 
-window.isIncomingSync = false; // فلاج عشان نمنع الـ Loop
-["students", "classSessions", "exams", "homeworks", "schedule", "groups", "financeRecords", "expenses", "books", "monthlyPayments"].forEach(key => {
-    const originalSetItem = localStorage.setItem;
-    localStorage.setItem = function(k, v) {
-        originalSetItem.apply(this, arguments);
-        // لو التحديث ده إحنا اللي عاملينه (مش جي من جهاز تاني)، ارفعه للسيرفر
-        if(key === k && !window.isIncomingSync) syncDataToBot();
-    };
-});
+window.isIncomingSync = false; 
+const originalSetItem = localStorage.setItem;
+const keysToSync = ["students", "classSessions", "exams", "homeworks", "schedule", "groups", "financeRecords", "expenses", "books", "monthlyPayments", "onlineExams"];
+
+localStorage.setItem = function(k, v) {
+    originalSetItem.apply(this, arguments);
+    
+    // 🚀 التعديل السحري (Debounce): تجميع كل الحفظ ورفعه مرة واحدة للسيرفر كل 3 ثواني بدل ما يرفع مع كل طالب ويهنج المتصفح
+    if (keysToSync.includes(k) && !window.isIncomingSync) {
+        clearTimeout(window.syncTimeoutTimer);
+        window.syncTimeoutTimer = setTimeout(() => {
+            if(typeof syncDataToBot === 'function') syncDataToBot();
+        }, 3000); 
+    }
+};
 
 // ==========================================
 // 5. إدارة الجدول الأسبوعي (النسخة المرنة الديناميكية)
@@ -977,19 +983,18 @@ window.saveAndAddAnotherStudent = async function() {
 };
 
 
-
-function searchStudent() { 
+window.searchStudent = function() { 
     const filter = document.getElementById("searchInput").value.toLowerCase(); 
-    const rows = document.getElementById("students-list").getElementsByTagName("tr"); 
+    const tbody = document.getElementById("students-list");
+    if (!tbody) return;
+    const rows = tbody.rows; 
+    
     for (let i = 0; i < rows.length; i++) { 
-        const codeCol = rows[i].getElementsByTagName("td")[0]; 
-        const nameCol = rows[i].getElementsByTagName("td")[1]; 
-        if (codeCol && nameCol) { 
-            const txt = codeCol.innerText.toLowerCase() + " " + nameCol.innerText.toLowerCase(); 
-            rows[i].style.display = (txt.indexOf(filter) > -1) ? "" : "none"; 
-        } 
+        // استخدام textContent أسرع 100 مرة من innerText لأنه مبيعملش Reflow للشاشة
+        const txt = rows[i].textContent.toLowerCase(); 
+        rows[i].style.display = (txt.includes(filter)) ? "" : "none"; 
     } 
-}
+};
 
 
 
@@ -1034,9 +1039,8 @@ window.openEditStudentModal = function() {
         document.getElementById('editStudentName').value = student.name; 
 
         document.getElementById('editStudentLevel').value = student.level; 
-        toggleTrackDropdown('editStudentLevel', 'editTrackGroup');
         
-        // ... (باقي الدالة زي ما هي بدون تغيير)
+        // 👈 مسحنا سطر الـ toggleTrackDropdown اللي كان بيعمل الإيرور
         
         filterGroupsByLevel('editStudentLevel', 'editStudentGroup');
         
@@ -1047,10 +1051,13 @@ window.openEditStudentModal = function() {
 
         document.getElementById('editStudentGender').value = student.gender; 
         
-        const phoneInput = document.getElementById('editStudentPhone') || document.querySelector('#editStudentModal input[id="studentPhone"]');
+        const phoneInput = document.getElementById('editStudentPhone');
         if(phoneInput) phoneInput.value = student.phone; 
         
-        document.getElementById('editParentPhone').value = student.parentPhone; 
+        // 👈 ظبطنا استدعاء رقم ولي الأمر عشان يقرأ الـ ID الصح
+        const parentPhoneInput = document.getElementById('editParentPhone');
+        if(parentPhoneInput) parentPhoneInput.value = student.parentPhone; 
+        
         if (document.getElementById('editStudentIsSpecial')) {
             document.getElementById('editStudentIsSpecial').checked = student.isSpecialCase || false;
             document.getElementById('editStudentSpecialAmountDiv').style.display = student.isSpecialCase ? 'block' : 'none';
@@ -1503,55 +1510,54 @@ window.renderGradesTable = function(itemDetails, tbodyId, saveFunction, itemId, 
     tbody.innerHTML = htmlContent; 
 };
 
-// ==========================================
-// 14. الرسوم البيانية (Dashboard Full)
-// ==========================================
-function renderDashboardCharts() {
-    // 🔴 السطر السحري اللي بيجيب اللينك ويحطه في المربع أوتوماتيك
+window.renderDashboardCharts = function() {
     if(typeof updateParentLinkUI === "function") updateParentLinkUI(); 
-    
     if(sessionStorage.getItem("isLoggedIn") !== "true") return;
+    
     document.getElementById("total-students").innerText = students.length;
     document.getElementById("total-groups").innerText = groups.length;
     
     const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#fff';
     const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() || '#3b82f6';
     
-    // رسم الحضور
+    // 🚀 تسريع حساب الطلاب في كل مجموعة عشان ميهنجش
+    const groupCounts = {};
+    students.forEach(st => { groupCounts[st.group] = (groupCounts[st.group] || 0) + 1; });
+
     const ctxAtt = document.getElementById('attendanceChart')?.getContext('2d');
     if(ctxAtt) {
-        if(attendanceChartInstance) attendanceChartInstance.destroy();
+        if(window.attendanceChartInstance) window.attendanceChartInstance.destroy();
         const sessionsByDate = {};
         classSessions.forEach(s => {
             if(!sessionsByDate[s.date]) { sessionsByDate[s.date] = { expected: 0, attended: 0 }; }
-            const groupStudentsCount = students.filter(st => st.group === s.group).length;
-            const presentCount = Object.values(s.attendance).filter(v => v === 'present').length;
+            const groupStudentsCount = groupCounts[s.group] || 0; 
+            let presentCount = 0;
+            for (let key in s.attendance) {
+                if(s.attendance[key] === 'present') presentCount++;
+            }
             sessionsByDate[s.date].expected += groupStudentsCount;
             sessionsByDate[s.date].attended += presentCount;
         });
         const sortedDates = Object.keys(sessionsByDate).sort((a,b) => new Date(a) - new Date(b)).slice(-7);
         const sessionLabels = sortedDates.map(d => d.substring(5)); 
         const sessionData = sortedDates.map(d => { const exp = sessionsByDate[d].expected; return exp > 0 ? Math.round((sessionsByDate[d].attended / exp) * 100) : 0; });
-        attendanceChartInstance = new Chart(ctxAtt, { type: 'line', data: { labels: sessionLabels, datasets: [{ label: 'متوسط الحضور (%)', data: sessionData, borderColor: primaryColor, backgroundColor: 'rgba(59, 130, 246, 0.2)', borderWidth: 3, fill: true, tension: 0.3 }] }, options: { plugins: { legend: { labels: { color: textColor } } }, scales: { x: { ticks: { color: textColor } }, y: { ticks: { color: textColor }, min: 0, max: 100 } } } });
+        window.attendanceChartInstance = new Chart(ctxAtt, { type: 'line', data: { labels: sessionLabels, datasets: [{ label: 'متوسط الحضور (%)', data: sessionData, borderColor: primaryColor, backgroundColor: 'rgba(59, 130, 246, 0.2)', borderWidth: 3, fill: true, tension: 0.3 }] }, options: { plugins: { legend: { labels: { color: textColor } } }, scales: { x: { ticks: { color: textColor } }, y: { ticks: { color: textColor }, min: 0, max: 100 } } } });
     }
 
-    // رسم المجموعات
     const ctxGrp = document.getElementById('groupsChart')?.getContext('2d');
     if(ctxGrp) {
-        if(groupsChartInstance) groupsChartInstance.destroy();
+        if(window.groupsChartInstance) window.groupsChartInstance.destroy();
         const groupLabels = groups.map(g => g.name); 
-        const groupData = groups.map(g => students.filter(s => s.group === g.name).length); 
+        const groupData = groups.map(g => groupCounts[g.name] || 0); // 🚀 أسرع بكتير
         const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
-        groupsChartInstance = new Chart(ctxGrp, { type: 'doughnut', data: { labels: groupLabels, datasets: [{ data: groupData, backgroundColor: colors, borderWidth: 0 }] }, options: { plugins: { legend: { position: 'bottom', labels: { color: textColor } } } } });
+        window.groupsChartInstance = new Chart(ctxGrp, { type: 'doughnut', data: { labels: groupLabels, datasets: [{ data: groupData, backgroundColor: colors, borderWidth: 0 }] }, options: { plugins: { legend: { position: 'bottom', labels: { color: textColor } } } } });
     }
 
-    // إخفاء ماليّات المساعد
     if(isAssistantMode) return; 
 
-    // رسم المالية
     const ctxFin = document.getElementById('financeChart')?.getContext('2d');
     if(ctxFin) {
-        if(financeChartInstance) financeChartInstance.destroy();
+        if(window.financeChartInstance) window.financeChartInstance.destroy();
         const monthlyData = {}; const defaultStudentFee = 50; const defaultCenterFee = 10;
         classSessions.forEach(s => { const month = s.date.substring(0, 7); if(!monthlyData[month]) monthlyData[month] = { income: 0, expenses: 0, net: 0 }; });
         Object.keys(financeRecords).forEach(key => {
@@ -1559,7 +1565,7 @@ function renderDashboardCharts() {
                 const sessionId = key.replace('fin_session_', ''); const session = classSessions.find(s => s.id === sessionId);
                 if(session) {
                     const month = session.date.substring(0, 7); if(!monthlyData[month]) monthlyData[month] = { income: 0, expenses: 0, net: 0 };
-                    let paidCount = 0; Object.values(financeRecords[key]).forEach(status => { if(status === 'paid') paidCount++; });
+                    let paidCount = 0; Object.values(financeRecords[key]).forEach(status => { if(status === 'paid' || (status.status && status.status === 'paid')) paidCount++; });
                     monthlyData[month].income += paidCount * defaultStudentFee; monthlyData[month].expenses += paidCount * defaultCenterFee;
                 }
             }
@@ -1570,9 +1576,11 @@ function renderDashboardCharts() {
         });
         Object.keys(monthlyData).forEach(m => { monthlyData[m].net = monthlyData[m].income - monthlyData[m].expenses; });
         const sortedMonths = Object.keys(monthlyData).sort();
-        financeChartInstance = new Chart(ctxFin, { type: 'bar', data: { labels: sortedMonths, datasets: [ { label: 'الإيرادات', data: sortedMonths.map(m => monthlyData[m].income), backgroundColor: '#10b981' }, { label: 'المصروفات', data: sortedMonths.map(m => monthlyData[m].expenses), backgroundColor: '#ef4444' }, { label: 'الربح', data: sortedMonths.map(m => monthlyData[m].net), backgroundColor: '#3b82f6' } ] }, options: { plugins: { legend: { labels: { color: textColor } } }, scales: { x: { ticks: { color: textColor } }, y: { ticks: { color: textColor } } } } });
+        window.financeChartInstance = new Chart(ctxFin, { type: 'bar', data: { labels: sortedMonths, datasets: [ { label: 'الإيرادات', data: sortedMonths.map(m => monthlyData[m].income), backgroundColor: '#10b981' }, { label: 'المصروفات', data: sortedMonths.map(m => monthlyData[m].expenses), backgroundColor: '#ef4444' }, { label: 'الربح', data: sortedMonths.map(m => monthlyData[m].net), backgroundColor: '#3b82f6' } ] }, options: { plugins: { legend: { labels: { color: textColor } } }, scales: { x: { ticks: { color: textColor } }, y: { ticks: { color: textColor } } } } });
     }
-}
+};
+
+
 // ==========================================
 // 15. المالية والاشتراكات الشهرية (النسخة الميلادية الذكية)
 // ==========================================
@@ -1821,24 +1829,66 @@ function togglePayment(recordKey, studentCode, status) {
     renderFinanceTable(); 
 }
 
-function renderAtRiskStudents() {
-    const tbody = document.getElementById("atrisk-list"); tbody.innerHTML = "";
-    if(students.length === 0) return tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">لا يوجد طلاب</td></tr>`;
+window.renderAtRiskStudents = function() {
+    const tbody = document.getElementById("atrisk-list"); 
+    if (!tbody) return;
+    
+    if(students.length === 0) {
+        return tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">لا يوجد طلاب</td></tr>`;
+    }
+
+    // 🚀 تسريع الخوارزمية: تجميع الحصص والامتحانات حسب المجموعة الأول بدل ما نفلتر لكل طالب من الـ 800
+    let groupSessionsCache = {};
+    let groupExamsCache = {};
+    
+    groups.forEach(g => {
+        groupSessionsCache[g.name] = classSessions.filter(s => s.group === g.name).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0, 2);
+        groupExamsCache[g.name] = exams.filter(e => e.group === g.name).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0, 2);
+    });
+
     let atRiskCount = 0;
+    let htmlContent = "";
+
     students.forEach(student => {
         let reasons = [];
-        const gSessions = classSessions.filter(s => s.group === student.group).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0, 2);
-        if(gSessions.length === 2 && gSessions[0].attendance[student.phone] === 'absent' && gSessions[1].attendance[student.phone] === 'absent') { reasons.push("غياب آخر حصتين"); }
-        const gExams = exams.filter(e => e.group === student.group).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0, 2);
-        let failCount = 0; gExams.forEach(ex => { const grade = ex.grades[student.phone]; if(grade !== undefined && parseFloat(grade) < (parseFloat(ex.maxScore) / 2)) failCount++; });
+        const gSessions = groupSessionsCache[student.group] || [];
+        
+        if(gSessions.length === 2) {
+            let a1 = gSessions[0].attendance[student.code] || gSessions[0].attendance[student.phone];
+            let a2 = gSessions[1].attendance[student.code] || gSessions[1].attendance[student.phone];
+            if(a1 === 'absent' && a2 === 'absent') reasons.push("غياب آخر حصتين"); 
+        }
+
+        const gExams = groupExamsCache[student.group] || [];
+        let failCount = 0; 
+        gExams.forEach(ex => { 
+            let grade = ex.grades[student.code] !== undefined ? ex.grades[student.code] : ex.grades[student.phone]; 
+            if(grade !== undefined && parseFloat(grade) < (parseFloat(ex.maxScore) / 2)) failCount++; 
+        });
+        
         if(failCount === 2) reasons.push("رسوب في آخر امتحانين");
+        
         if(reasons.length > 0) {
-            atRiskCount++; const msg = encodeURIComponent(`تحذير من الإدارة: مستوى ${student.name} متراجع بسبب ${reasons.join(" و ")}.`); const waUrl = `https://wa.me/20${student.parentPhone.replace(/^0+/, '')}?text=${msg}`;
-            tbody.innerHTML += `<tr><td><strong>${student.code}</strong></td><td>${student.name}</td><td>${student.group}</td><td style="color:var(--danger-color); font-weight:bold;">${reasons.join("<br>")}</td><td><button class="icon-btn" style="background-color:#128C7E; color:white;" onclick="window.open('${waUrl}','_blank')">إنذار</button></td></tr>`;
+            atRiskCount++; 
+            const msg = encodeURIComponent(`تحذير من الإدارة: مستوى ${student.name} متراجع بسبب ${reasons.join(" و ")}.`); 
+            const waUrl = `https://wa.me/20${(student.parentPhone||"").replace(/^0+/, '')}?text=${msg}`;
+            
+            htmlContent += `<tr>
+                <td><strong>${student.code}</strong></td>
+                <td>${student.name}</td>
+                <td>${student.group}</td>
+                <td style="color:var(--danger-color); font-weight:bold;">${reasons.join("<br>")}</td>
+                <td><button class="icon-btn" style="background-color:#128C7E; color:white;" onclick="window.open('${waUrl}','_blank')">إنذار</button></td>
+            </tr>`;
         }
     });
-    if(atRiskCount === 0) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--success-color);">الطلاب في مستوى أمان!</td></tr>`;
-}
+
+    if(atRiskCount === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--success-color); font-weight:bold;">الطلاب في مستوى أمان!</td></tr>`;
+    } else {
+        tbody.innerHTML = htmlContent;
+    }
+};
 
 function generateLeaderboard() {
     const group = document.getElementById("leaderboardGroup").value; const container = document.getElementById("leaderboard-results");
