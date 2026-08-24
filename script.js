@@ -89,19 +89,42 @@ window.executeGlobalSearch = function() {
         return;
     }
 
-    // استخدام دالة البحث الذكية (اللي بتدور بالكود ولو ملقتهوش بتدور بالاسم)
+    // استخدام دالة البحث
     let student = findStudentByCodeOrName(val);
     
     if (student) {
-        // فتح ملف الطالب فوراً
+        // الطالب موجود -> افتح ملفه فوراً
         openStudentProfile(student.code);
-        
-        // تفريغ الخانة بعد ما يفتح الملف
         inputEl.value = ""; 
-        
         showToast(`تم فتح ملف: ${student.name} 🎓`);
     } else {
-        showToast("عفواً، هذا الطالب غير مسجل بالنظام!", "error");
+        // 🚀 السحر الجديد: نافذة تأكيد ذكية لو الطالب مش موجود
+        customConfirm(`الطالب "${val}" غير مسجل بالنظام!\nهل تريد تسجيل طالب جديد بهذه البيانات؟`, () => {
+            
+            // 1. التوجيه لصفحة الطلاب أولاً لضمان وجودنا في المكان الصحيح
+            switchPage('students');
+            
+            // 2. فتح نافذة الإضافة
+            openModal('addStudentModal');
+            
+            // 3. تأخير بسيط جداً لوضع القيمة في مكانها الصحيح وتخطي التوليد التلقائي للكود
+            setTimeout(() => {
+                let isNumber = /^\d+$/.test(val); // فحص هل المدخل أرقام فقط أم حروف
+                
+                if (isNumber) {
+                    // لو أرقام -> حطها في خانة الكود وخلي المؤشر على خانة الاسم
+                    document.getElementById('studentCode').value = val;
+                    document.getElementById('studentName').focus();
+                } else {
+                    // لو حروف -> حطها في خانة الاسم وخلي المؤشر على خانة الهاتف
+                    document.getElementById('studentName').value = val;
+                    document.getElementById('studentPhone').focus();
+                }
+            }, 50);
+            
+            // تفريغ صندوق البحث بعد التأكيد
+            inputEl.value = ""; 
+        });
     }
 };
 
