@@ -1927,20 +1927,16 @@
             <input type="hidden" id="editStudentCodeOriginal">
             
             <!-- الصف الأول: الكود والاسم -->
-<div class="input-group">
-    <label>كود الطالب</label>
-    <input type="text" id="editStudentCode" class="custom-input" style="font-weight:bold; color:var(--primary-color); background: #f8fafc;">
-</div>
-<div class="input-group">
-    <label>الاسم</label>
-    <input type="text" id="editStudentName" required class="custom-input">
-</div>
+            <div class="input-group">
+                <label>كود الطالب</label>
+                <input type="text" id="editStudentCode" class="custom-input" style="font-weight:bold; color:var(--primary-color); background: #f8fafc;">
+            </div>
+            <div class="input-group">
+                <label>الاسم</label>
+                <input type="text" id="editStudentName" required class="custom-input">
+            </div>
 
-<!-- الصف الثاني: الصف والمسار -->
-
-            <!-- الصف الثاني: الصف والمسار (سيبه زي ما هو عندك) -->
-
-            <!-- الصف الثاني: الصف والمسار -->
+            <!-- الصف الثاني: الصف والمجموعة -->
             <div class="input-group">
                 <label>الصف</label>
                 <select id="editStudentLevel" required class="custom-input" onchange="filterGroupsByLevel('editStudentLevel', 'editStudentGroup');">
@@ -1948,33 +1944,29 @@
                     <option value="الثالث الثانوي">الثالث الثانوي</option>
                 </select>
             </div>
-            <div class="input-group" id="editTrackGroup" style="display:none;">
-                
-            </div>
-
-            <!-- الصف الثالث: المجموعة والجنس -->
             <div class="input-group">
                 <label>المجموعة</label>
                 <select id="editStudentGroup" required class="custom-input"></select>
             </div>
+
+            <!-- الصف الثالث: الهواتف -->
             <div class="input-group">
+                <label>هاتف الطالب <span style="color:var(--text-muted); font-size: 11px;">(0 إذا لم يوجد)</span></label>
+                <input type="text" id="editStudentPhone" required class="custom-input" placeholder="01XXXXXXXXX">
+            </div>
+            <div class="input-group">
+                <label>هاتف ولي الأمر</label>
+                <input type="text" id="editParentPhone" required class="custom-input" placeholder="01XXXXXXXXX">
+            </div>
+
+            <!-- الصف الرابع: الجنس (واخد عرض الشاشة لضبط التصميم) -->
+            <div class="input-group full-width">
                 <label>الجنس</label>
                 <select id="editStudentGender" required class="custom-input">
                     <option value="ذكر">ذكر</option>
                     <option value="أنثى">أنثى</option>
                 </select>
             </div>
-
-            <!-- الصف الرابع: الهواتف -->
-            <div class="input-group">
-                <label>هاتف الطالب <span style="color:var(--text-muted); font-size: 11px;">(اكتب 0 إذا لم يوجد)</span></label>
-                <input type="text" id="editStudentPhone" required class="custom-input">
-            </div>
-            <div class="input-group">
-   <div class="input-group">
-    <label>هاتف ولي الأمر</label>
-    <input type="text" id="editParentPhone" required class="custom-input" placeholder="01XXXXXXXXX">
-
 
             <!-- حقل الحالة الخاصة (الإعفاء) -->
             <div class="input-group full-width" style="background: rgba(245, 158, 11, 0.05); padding: 12px; border-radius: 8px; border: 1px dashed #f59e0b; margin-top: 10px;">
