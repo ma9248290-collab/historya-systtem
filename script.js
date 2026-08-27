@@ -5884,28 +5884,7 @@ window.deleteStudentNote = function() {
 };
 
 
-window.generateAdvancedReport = function() {
-    const type = document.getElementById("reportType").value; const groupFilter = document.getElementById("reportGroup").value; const fromDate = document.getElementById("reportDateFrom").value; const toDate = document.getElementById("reportDateTo").value;
-    const thead = document.getElementById("report-table-head"); const tbody = document.getElementById("report-table-body");
-    thead.innerHTML = ""; tbody.innerHTML = "";
-    let sourceData = []; let itemName = ""; 
-    if (type === 'attendance') { sourceData = classSessions; itemName = "الغياب (الحالة)"; } else if (type === 'exams') { sourceData = exams; itemName = "الامتحان (الدرجة)"; } else if (type === 'homework') { sourceData = homeworks; itemName = "الواجب (الدرجة)"; }
-    let filteredItems = sourceData.filter(item => { let matchGroup = (groupFilter === 'all') || (item.group === groupFilter); let matchDate = true; if (fromDate) matchDate = matchDate && (new Date(item.date) >= new Date(fromDate)); if (toDate) matchDate = matchDate && (new Date(item.date) <= new Date(toDate)); return matchGroup && matchDate; }).sort((a,b) => new Date(a.date) - new Date(b.date)); 
-    if (filteredItems.length === 0) { thead.innerHTML = `<tr><th>لا توجد بيانات مطابقة لهذه الفلاتر</th></tr>`; return; }
-    let targetStudents = groupFilter !== 'all' ? students.filter(s => s.group === groupFilter) : students;
-    let headHtml = `<tr><th>كود الطالب</th><th>الاسم</th><th>المجموعة</th>`; filteredItems.forEach(item => { let title = type === 'attendance' ? item.date : `${item.name} (${item.date})`; headHtml += `<th>${title}</th>`; }); headHtml += `</tr>`; thead.innerHTML = headHtml;
-    targetStudents.forEach(st => {
-        let rowHtml = `<tr><td style="font-weight: bold; color: var(--primary-color);">${st.code}</td><td>${st.name}</td><td>${st.group}</td>`;
-        filteredItems.forEach(item => {
-            let cellValue = "--";
-            if (type === 'attendance') { let stat = item.attendance[st.code] || item.attendance[st.phone]; if (stat === 'present') cellValue = "حاضر"; else if (stat === 'absent') cellValue = "غائب"; } 
-            else if (type === 'exams' || type === 'homework') { let g = item.grades[st.code] !== undefined ? item.grades[st.code] : item.grades[st.phone]; if (g !== undefined) { cellValue = `${g} / ${item.maxScore}`; } else { cellValue = "لم يُمتحن/لم يُسلم"; } }
-            rowHtml += `<td>${cellValue}</td>`;
-        });
-        rowHtml += `</tr>`; tbody.innerHTML += rowHtml;
-    });
-    showToast("تم استخراج التقرير بنجاح! 📊");
-};
+
 
 window.renderAtRiskStudents = function() {
     const tbody = document.getElementById("atrisk-list"); tbody.innerHTML = "";
