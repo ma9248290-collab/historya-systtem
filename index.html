@@ -258,29 +258,17 @@
                 <section id="group-details-view" class="students-section" style="display: none;">
                     <div class="section-header">
                         <div><button class="theme-btn" onclick="backToGroups()" style="margin-bottom: 15px;">🔙 عودة</button><h2 id="current-group-title" style="color: var(--primary-color);">إدارة مجموعة: </h2></div>
-                        <div class="header-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                            <button class="theme-btn" onclick="exportGroupStudentsToExcel()" style="border-color: #3b82f6; color: #3b82f6; background: white; padding: 8px 12px; font-weight: bold; border-radius: 8px;">📤 تصدير المجموعة</button>
-                            
-                            <!-- الزراير الجديدة 👇 -->
-                            <button class="theme-btn" onclick="downloadGroupExcelTemplate()" style="border-color: #10b981; color: #10b981; background: white; padding: 8px 12px; font-weight: bold; border-radius: 8px;">📄 نموذج الإكسيل</button>
-                            <div style="position: relative; display: inline-block;">
-                                <input type="file" id="importGroupExcelInput" accept=".xlsx, .xls" style="position: absolute; width: 100%; height: 100%; opacity: 0; cursor: pointer;" onchange="importStudentsToGroupFromExcel(event)">
-                                <button class="add-btn" style="background-color: #10b981; padding: 8px 12px;">📥 استيراد للـمجموعة</button>
-                            </div>
-                            <!-- 👆 -->
-
-                            <button class="add-btn exam-btn" onclick="quickExamForGroup()" style="padding: 8px 12px;">⚡ امتحان</button>
-                            <button class="add-btn" onclick="openAddStudentToGroupModal()" style="padding: 8px 12px;">+ إضافة طالب</button>
-                        </div>
+                        <div class="header-actions"><button class="theme-btn" onclick="exportGroupStudentsToExcel()" style="border-color: #3b82f6; color: #3b82f6; background: white; padding: 10px 15px; font-weight: bold; border-radius: 8px;">📤 تحميل شيت المجموعة</button>
+                            <button class="add-btn exam-btn" onclick="quickExamForGroup()">⚡ امتحان مفاجئ</button><button class="add-btn" onclick="openAddStudentToGroupModal()">+ إضافة طالب هنا</button></div>
                     </div>
                     <div class="table-container">
-                       <table class="students-table">
+                        <table class="students-table">
     <thead>
         <tr>
-            <th onclick="sortGroupStudentsTable('code')" style="cursor: pointer; user-select: none;" title="ترتيب حسب الكود">الكود <span id="sort-grp-code" style="color: var(--primary-color); font-size: 13px;">⇅</span></th>
-            <th onclick="sortGroupStudentsTable('name')" style="cursor: pointer; user-select: none;" title="ترتيب حسب الاسم">اسم الطالب والمسار <span id="sort-grp-name" style="color: var(--text-muted); font-size: 13px;">⇅</span></th>
+            <th>الكود</th>
+            <th>اسم الطالب والمسار</th>
             <th style="text-align: center;">آخر 4 حصص</th>
-            <th onclick="sortGroupStudentsTable('parentPhone')" style="cursor: pointer; user-select: none;" title="ترتيب حسب الهاتف">رقم ولي الأمر <span id="sort-grp-phone" style="color: var(--text-muted); font-size: 13px;">⇅</span></th>
+            <th>رقم ولي الأمر</th>
             <th>إجراء</th>
         </tr>
     </thead>
@@ -348,24 +336,12 @@
                         </div>
                     </div>
                     <div class="table-container">
-                        <table class="students-table">
-    <thead>
-        <tr>
-            <th onclick="sortStudentsTable('code')" style="cursor: pointer; user-select: none;" title="ترتيب حسب الكود">الكود <span id="sort-st-code" style="color: var(--primary-color); font-size: 13px;">⇅</span></th>
-            <th onclick="sortStudentsTable('name')" style="cursor: pointer; user-select: none;" title="ترتيب حسب الاسم">اسم الطالب <span id="sort-st-name" style="color: var(--text-muted); font-size: 13px;">⇅</span></th>
-            <th onclick="sortStudentsTable('level')" style="cursor: pointer; user-select: none;" title="ترتيب حسب الصف">الصف <span id="sort-st-level" style="color: var(--text-muted); font-size: 13px;">⇅</span></th>
-            <th onclick="sortStudentsTable('group')" style="cursor: pointer; user-select: none;" title="ترتيب حسب المجموعة">المجموعة <span id="sort-st-group" style="color: var(--text-muted); font-size: 13px;">⇅</span></th>
-            <th>إجراءات</th>
-        </tr>
-    </thead>
-    <tbody id="students-list"></tbody>
-</table>
+                        <table class="students-table"><thead><tr><th>الكود</th><th>اسم الطالب</th><th>الصف</th><th>المجموعة</th><th>إجراءات</th></tr></thead><tbody id="students-list"></tbody></table>
                     </div>
                 </section>
                 
 
                 <section id="student-profile-view" class="students-section print-area" style="display: none;">
-                    
                     <div class="no-print" style="display: flex; justify-content: space-between; margin-bottom: 20px;">
                         <button class="theme-btn" onclick="backToStudents()">🔙 عودة</button>
                         <div style="display: flex; gap: 10px;"><button class="add-btn admin-only" onclick="openEditStudentModal()">✏️ تعديل الطالب</button><button class="theme-btn" onclick="window.print()" style="border-color: var(--primary-color); color: var(--primary-color);">📄 طباعة تقرير</button></div>
@@ -396,14 +372,6 @@
                         <div class="stat-card" style="border-top: 4px solid var(--success-color);"><h3>نسبة الحضور</h3><p class="stat-number" id="profile-attendance" style="color: var(--success-color);">0%</p></div>
                         <div class="stat-card" style="border-top: 4px solid var(--exam-color);"><h3>متوسط الامتحانات</h3><p class="stat-number" id="profile-exams" style="color: var(--exam-color);">0%</p></div>
                         <div class="stat-card" style="border-top: 4px solid var(--hw-color);"><h3>متوسط الواجبات</h3><p class="stat-number" id="profile-hw" style="color: var(--hw-color);">0%</p></div>
-                    </div>
-                    <!-- صندوق الملاحظات في ملف الطالب -->
-                    <div class="stat-card no-print" style="margin-bottom: 20px; border-color: #8b5cf6; text-align: right;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <h3 style="margin: 0; color: #8b5cf6;">📝 ملاحظات المعلم</h3>
-                            <button class="icon-btn admin-only" style="background: var(--hover-bg); border: 1px solid var(--border-color); color: var(--text-main);" onclick="openStudentNoteModalFromProfile()">تعديل ✏️</button>
-                        </div>
-                        <p id="profile-student-note" style="font-size: 15px; color: var(--text-main); font-weight: bold; white-space: pre-wrap; margin: 0; line-height: 1.6;">لا توجد ملاحظات مسجلة.</p>
                     </div>
                     <div class="profile-details-grid" style="margin-bottom: 30px;">
                         <div class="detail-box"><strong>📱 الهاتف:</strong> <span id="profile-phone"></span></div><div class="detail-box"><strong>👨‍👩‍👦 ولي الأمر:</strong> <span id="profile-parent"></span></div><div class="detail-box"><strong>🏫 الصف:</strong> <span id="profile-level"></span></div><div class="detail-box"><strong>👤 الجنس:</strong> <span id="profile-gender"></span></div>
@@ -441,12 +409,17 @@
             </label>
         </div>
     </div>
-    <div style="display: flex; gap: 10px;">
-        <input type="text" id="attendanceBarcode" class="custom-input" style="flex: 1; font-weight: bold; font-size: 16px;" placeholder="كود الطالب أو اسمه...">
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <input type="text" id="attendanceBarcode" class="custom-input" style="flex: 1; min-width: 200px; font-weight: bold; font-size: 16px;" placeholder="كود الطالب أو اسمه...">
         <button class="icon-btn" onclick="startCameraScanner('attendanceBarcode')" style="margin: 0; background-color: var(--primary-color); color: white; border: none;">📷 كاميرا</button>
         <button class="icon-btn voice-btn" id="voiceBtn_attendance" onclick="toggleVoiceRecognition('attendance', 'attendanceBarcode')">🎙️ رصد بالصوت</button>
+        
+        <!-- 🔥 الزرار الجديد لرفع شيت الإكسيل -->
+        <div style="position: relative; display: inline-block;">
+            <input type="file" id="importAttendanceExcel" accept=".xlsx, .xls" style="position: absolute; width: 100%; height: 100%; opacity: 0; cursor: pointer;" onchange="importAttendanceFromExcel(event)">
+            <button class="icon-btn" style="margin: 0; background-color: #10b981; color: white; border: none; font-weight: bold;">📥 رفع شيت حضور</button>
+        </div>
     </div>
-</div>
 <div class="table-container"><table class="students-table"><thead><tr><th>الكود</th><th>الطالب</th><th>الهاتف</th><th>السابق</th><th>الحالة</th><th>تسجيل يدوي</th></tr></thead><tbody id="attendance-list"></tbody></table></div>
                 </section>
             </div>
@@ -1927,16 +1900,20 @@
             <input type="hidden" id="editStudentCodeOriginal">
             
             <!-- الصف الأول: الكود والاسم -->
-            <div class="input-group">
-                <label>كود الطالب</label>
-                <input type="text" id="editStudentCode" class="custom-input" style="font-weight:bold; color:var(--primary-color); background: #f8fafc;">
-            </div>
-            <div class="input-group">
-                <label>الاسم</label>
-                <input type="text" id="editStudentName" required class="custom-input">
-            </div>
+<div class="input-group">
+    <label>كود الطالب</label>
+    <input type="text" id="editStudentCode" class="custom-input" style="font-weight:bold; color:var(--primary-color); background: #f8fafc;">
+</div>
+<div class="input-group">
+    <label>الاسم</label>
+    <input type="text" id="editStudentName" required class="custom-input">
+</div>
 
-            <!-- الصف الثاني: الصف والمجموعة -->
+<!-- الصف الثاني: الصف والمسار -->
+
+            <!-- الصف الثاني: الصف والمسار (سيبه زي ما هو عندك) -->
+
+            <!-- الصف الثاني: الصف والمسار -->
             <div class="input-group">
                 <label>الصف</label>
                 <select id="editStudentLevel" required class="custom-input" onchange="filterGroupsByLevel('editStudentLevel', 'editStudentGroup');">
@@ -1944,29 +1921,35 @@
                     <option value="الثالث الثانوي">الثالث الثانوي</option>
                 </select>
             </div>
+            <div class="input-group" id="editTrackGroup" style="display:none;">
+                
+            </div>
+
+            <!-- الصف الثالث: المجموعة والجنس -->
             <div class="input-group">
                 <label>المجموعة</label>
                 <select id="editStudentGroup" required class="custom-input"></select>
             </div>
-
-            <!-- الصف الثالث: الهواتف -->
             <div class="input-group">
-                <label>هاتف الطالب <span style="color:var(--text-muted); font-size: 11px;">(0 إذا لم يوجد)</span></label>
-                <input type="text" id="editStudentPhone" required class="custom-input" placeholder="01XXXXXXXXX">
-            </div>
-            <div class="input-group">
-                <label>هاتف ولي الأمر</label>
-                <input type="text" id="editParentPhone" required class="custom-input" placeholder="01XXXXXXXXX">
-            </div>
-
-            <!-- الصف الرابع: الجنس (واخد عرض الشاشة لضبط التصميم) -->
-            <div class="input-group full-width">
                 <label>الجنس</label>
                 <select id="editStudentGender" required class="custom-input">
                     <option value="ذكر">ذكر</option>
                     <option value="أنثى">أنثى</option>
                 </select>
             </div>
+
+            <!-- الصف الرابع: الهواتف -->
+            <div class="input-group">
+                <label>هاتف الطالب <span style="color:var(--text-muted); font-size: 11px;">(اكتب 0 إذا لم يوجد)</span></label>
+                <input type="text" id="editStudentPhone" required class="custom-input">
+            </div>
+            <div class="input-group">
+    <label>هاتف ولي الأمر</label>
+    <!-- ضفنا onkeyup عشان يفحص الرقم وإنت بتكتب -->
+    <input type="text" id="parentPhone" required class="custom-input" placeholder="01XXXXXXXXX" onkeyup="checkDuplicateParentPhone()">
+    <!-- رسالة التنبيه المخفية -->
+    <p id="parentPhoneWarning" style="color: var(--danger-color); font-size: 12px; font-weight: bold; margin-top: 5px; display: none;"></p>
+</div>
 
             <!-- حقل الحالة الخاصة (الإعفاء) -->
             <div class="input-group full-width" style="background: rgba(245, 158, 11, 0.05); padding: 12px; border-radius: 8px; border: 1px dashed #f59e0b; margin-top: 10px;">
@@ -2472,21 +2455,6 @@
     </div>
 
     
-    <!-- نافذة ملاحظات الطالب -->
-    <div id="studentNoteModal" class="modal" style="z-index: 1000000;">
-        <div class="modal-content" style="width: 400px; border-top: 5px solid #8b5cf6;">
-            <span class="close-btn" onclick="closeModal('studentNoteModal')">&times;</span>
-            <h2 style="color: #8b5cf6; margin-bottom: 15px;">📝 ملاحظات الطالب</h2>
-            <h4 id="noteStudentName" style="color: var(--secondary-color); margin-bottom: 15px;"></h4>
-            <input type="hidden" id="noteStudentCode">
-            <textarea id="studentNoteText" class="custom-input" rows="5" placeholder="اكتب ملاحظاتك عن مستوى الطالب، سلوكه، أو أي تنبيهات هنا..."></textarea>
-            <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button class="save-btn" style="flex: 2; margin: 0; background: #8b5cf6;" onclick="saveStudentNote()">حفظ الملاحظة 💾</button>
-                <button class="icon-btn danger" style="flex: 1; margin: 0;" onclick="deleteStudentNote()">مسح 🗑️</button>
-            </div>
-        </div>
-    </div>
-
 
 
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>

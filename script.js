@@ -3536,10 +3536,9 @@ window.generateAdvancedReport = function() {
 
     // 1. تحديد الداتا بناءً على النوع المختار (حصص ولا امتحانات ولا واجبات)
     let sourceData = [];
-    let itemName = ""; // اسم العمود (حصة / امتحان / واجب)
-    if (type === 'attendance') { sourceData = classSessions; itemName = "الغياب (الحالة)"; }
-    else if (type === 'exams') { sourceData = exams; itemName = "الامتحان (الدرجة)"; }
-    else if (type === 'homework') { sourceData = homeworks; itemName = "الواجب (الدرجة)"; }
+    if (type === 'attendance') { sourceData = classSessions; }
+    else if (type === 'exams') { sourceData = exams; }
+    else if (type === 'homework') { sourceData = homeworks; }
 
     // 2. فلترة الداتا بالتاريخ والمجموعة
     let filteredItems = sourceData.filter(item => {
@@ -3548,19 +3547,25 @@ window.generateAdvancedReport = function() {
         if (fromDate) matchDate = matchDate && (new Date(item.date) >= new Date(fromDate));
         if (toDate) matchDate = matchDate && (new Date(item.date) <= new Date(toDate));
         return matchGroup && matchDate;
-    }).sort((a,b) => new Date(a.date) - new Date(b.date)); // ترتيب تصاعدي بالزمن
+    }).sort((a,b) => new Date(a.date) - new Date(b.date)); 
 
     if (filteredItems.length === 0) {
         thead.innerHTML = `<tr><th>لا توجد بيانات مطابقة لهذه الفلاتر</th></tr>`;
         return;
     }
 
-    // 3. فلترة الطلاب (لو اختار مجموعة معينة نجيب طلابها بس، لو الكل نجيب الكل)
+    // 3. فلترة الطلاب
     let targetStudents = students;
     if (groupFilter !== 'all') targetStudents = students.filter(s => s.group === groupFilter);
 
-    // 4. رسم رأس الجدول (الهيدر)
-    let headHtml = `<tr><th>كود الطالب</th><th>الاسم</th><th>المجموعة</th>`;
+    // 4. رسم رأس الجدول (تم إضافة أرقام الهواتف هنا 👇)
+    let headHtml = `<tr>
+        <th>كود الطالب</th>
+        <th>الاسم</th>
+        <th>رقم الطالب</th>
+        <th>رقم ولي الأمر</th>
+        <th>المجموعة</th>`;
+        
     filteredItems.forEach(item => {
         let title = type === 'attendance' ? item.date : `${item.name} (${item.date})`;
         headHtml += `<th>${title}</th>`;
@@ -3568,24 +3573,28 @@ window.generateAdvancedReport = function() {
     headHtml += `</tr>`;
     thead.innerHTML = headHtml;
 
-    // 5. رسم جسم الجدول (الطلاب ونتائجهم)
+    // 5. رسم جسم الجدول (الطلاب ونتائجهم وأرقامهم)
     targetStudents.forEach(st => {
         let rowHtml = `<tr>
             <td style="font-weight: bold; color: var(--primary-color);">${st.code}</td>
             <td>${st.name}</td>
+            <td style="direction: ltr;">${st.phone && st.phone !== "0" ? st.phone : "--"}</td>
+            <td style="direction: ltr;">${st.parentPhone && st.parentPhone !== "0" ? st.parentPhone : "--"}</td>
             <td>${st.group}</td>`;
         
         filteredItems.forEach(item => {
             let cellValue = "--";
             
             if (type === 'attendance') {
-                let stat = item.attendance[st.phone];
+                let stat = item.attendance[st.code] || item.attendance[st.phone];
                 if (stat === 'present') cellValue = "حاضر";
+                else if (stat === 'late') cellValue = "متأخر";
                 else if (stat === 'absent') cellValue = "غائب";
             } 
             else if (type === 'exams' || type === 'homework') {
-                if (item.grades && item.grades[st.phone] !== undefined) {
-                    cellValue = `${item.grades[st.phone]} / ${item.maxScore}`;
+                if (item.grades && (item.grades[st.code] !== undefined || item.grades[st.phone] !== undefined)) {
+                    let g = item.grades[st.code] !== undefined ? item.grades[st.code] : item.grades[st.phone];
+                    cellValue = `${g} / ${item.maxScore}`;
                 } else {
                     cellValue = "لم يُمتحن/لم يُسلم";
                 }
@@ -3597,7 +3606,7 @@ window.generateAdvancedReport = function() {
         tbody.innerHTML += rowHtml;
     });
     
-    showToast("تم استخراج التقرير بنجاح! 📊");
+    if (typeof showToast === "function") showToast("تم استخراج التقرير بنجاح! 📊");
 };
 
 // 📥 دالة تصدير الجدول لإكسيل باستخدام مكتبة XLSX الموجودة عندك
@@ -6063,6 +6072,87 @@ window.renderAttendanceTable = function(session) {
     }); 
     
     tbody.innerHTML = htmlContent; 
+};
+
+// ==========================================
+// 📥 رفع شيت إكسيل لتسجيل الحضور المجمع
+// ==========================================
+window.importAttendanceFromExcel = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // التأكد إن في حصة مفتوحة الأول
+    const session = classSessions.find(s => s.id === currentActiveSessionId);
+    if (!session || session.status === 'closed') {
+        showToast("يرجى فتح حصة أولاً لتسجيل الحضور!", "error");
+        event.target.value = "";
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const excelData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName]);
+
+            let successCount = 0;
+            let notFoundCount = 0;
+            let wrongGroupCount = 0;
+
+            // جلب حالة "تأخير" من التشيك بوكس لو المدرس معلم عليه وقت رفع الشيت
+            let isLate = document.getElementById('markAsLateCheckbox')?.checked;
+            let attStatus = isLate ? 'late' : 'present';
+
+            excelData.forEach(row => {
+                // 💡 الذكاء هنا: بندور على عمود اسمه "الكود" أو "الاسم"، 
+                // ولو ملقیهمش بياخد أول قيمة موجودة في الصف أياً كان اسم العمود!
+                let searchValue = row['الكود'] || row['كود'] || row['كود الطالب'] || row['الاسم'] || row['اسم الطالب'] || Object.values(row)[0];
+
+                if (searchValue) {
+                    // الدالة دي بتدعم الأكواد والأسماء وبتعالج الـ (أ,ا,إ,ة,ه,ي,ى) أوتوماتيك[cite: 28]
+                    let student = findStudentByCodeOrName(String(searchValue));
+
+                    if (!student) {
+                        notFoundCount++;
+                    } else if (student.group !== session.group) {
+                        wrongGroupCount++; // طالب مسجل بس في مجموعة تانية
+                    } else {
+                        // التحضير الفعلي وإعطاء النقاط
+                        let oldStatus = session.attendance[student.code] || session.attendance[student.phone];
+                        if (!oldStatus) { // لو لسه متسجلش في الحصة دي
+                            if (attStatus === 'present') student.behaviorPoints = (student.behaviorPoints || 0) + 5;
+                            if (attStatus === 'late') student.behaviorPoints = (student.behaviorPoints || 0) + 2;
+
+                            session.attendance[student.code] = attStatus;
+                            successCount++;
+                        }
+                    }
+                }
+            });
+
+            // 💾 حفظ التغييرات وتحديث الشاشة مرة واحدة عشان ميهنجش
+            localStorage.setItem("classSessions", JSON.stringify(classSessions));
+            localStorage.setItem("students", JSON.stringify(students));
+            renderAttendanceTable(session);
+
+            // 🚀 مزامنة مع السيرفر
+            if (typeof syncDataToBot === "function") syncDataToBot();
+
+            // 📊 عرض رسالة مجمعة باللي حصل
+            let msg = `تم تحضير ${successCount} طالب بنجاح ✅`;
+            if (notFoundCount > 0) msg += `\n- ${notFoundCount} غير مسجلين بالنظام.`;
+            if (wrongGroupCount > 0) msg += `\n- ${wrongGroupCount} في مجموعات أخرى.`;
+
+            showToast(msg, successCount > 0 ? "success" : "warning");
+
+        } catch (err) {
+            showToast("حدث خطأ أثناء قراءة ملف الإكسيل!", "error");
+        }
+    };
+    reader.readAsArrayBuffer(file);
+    event.target.value = ""; // تصفير الملف عشان نقدر نرفعه تاني
 };
 
 
