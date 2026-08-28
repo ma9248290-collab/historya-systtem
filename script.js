@@ -7348,36 +7348,42 @@ window.checkWhatsappServer = async function() {
     }
 
     try {
-        // 👈 غيرنا المسار لـ /qr بدل /status عشان نتخطى مشكلة الـ 404
-        let url = `${WHATSAPP_SERVER_URL}/qr?clientId=${getSafeUid()}&t=${Date.now()}`;
-        
-        let response = await fetch(url, { mode: 'cors' });
+        // 👈 نرجع لمسار status عشان هو اللي بيدينا الحالة الحقيقية للسيرفر
+        let statusUrl = `${WHATSAPP_SERVER_URL}/status?clientId=${getSafeUid()}&t=${Date.now()}`;
+        let response = await fetch(statusUrl, { mode: 'cors' });
         
         if (!response.ok) throw new Error("Server returned " + response.status);
         
-        // طالما رد، يبقى السيرفر نفسه شغال
         nodeStatus.innerHTML = "<span style='color: #10b981; font-weight: bold;'>متصل ويعمل بنجاح ✅</span>";
         let data = await response.json();
         
-        // لو مفيش QR راجع، وفي نفس الوقت السيرفر رد سليم، يبقى الواتساب مربوط جاهز
-        if (!data.qr || data.qr === null || data.status === "CONNECTED") {
+        if (data.status === "connected") {
             waStatus.innerHTML = "<span style='color: #10b981; font-weight: bold;'>الرقم مربوط وجاهز للعمل 📱</span>";
             if (qrContainer) qrContainer.style.display = "none";
-            if (window.waCheckInterval) clearInterval(window.waCheckInterval); // وقف العداد خلاص ربطنا
+            if (window.waCheckInterval) clearInterval(window.waCheckInterval); // وقف العداد
             
-        } else if (data.qr) {
+        } else if (data.status === "need_scan") {
             waStatus.innerHTML = "<span style='color: #f59e0b; font-weight: bold;'>في انتظار مسح الباركود ⚠️</span>";
-            if (qrContainer && qrImage) {
-                // رسم الباركود لو اتغير بس عشان ميرعش
-                if (qrContainer.getAttribute('data-last-qr') !== data.qr) {
+            
+            // 👈 جلب الباركود فقط لما السيرفر يطلبه
+            let qrUrl = `${WHATSAPP_SERVER_URL}/qr?clientId=${getSafeUid()}&t=${Date.now()}`;
+            let qrRes = await fetch(qrUrl, { mode: 'cors' });
+            let qrData = await qrRes.json();
+
+            if (qrData.qr && qrContainer && qrImage) {
+                if (qrContainer.getAttribute('data-last-qr') !== qrData.qr) {
                     qrContainer.style.display = "block";
                     qrImage.innerHTML = ""; 
                     if (typeof QRCode !== 'undefined') {
-                        new QRCode(qrImage, { text: data.qr, width: 200, height: 200 });
-                        qrContainer.setAttribute('data-last-qr', data.qr);
+                        new QRCode(qrImage, { text: qrData.qr, width: 200, height: 200 });
+                        qrContainer.setAttribute('data-last-qr', qrData.qr);
                     }
                 }
             }
+        } else {
+            // الحالة دي بتظهر في أول 10 لـ 15 ثانية والسيرفر بيحمل الواتساب
+            waStatus.innerHTML = "<span style='color: #f59e0b; font-weight: bold;'>جاري تهيئة محرك الواتساب (انتظر 15 ثانية)... ⏳</span>";
+            if (qrContainer) qrContainer.style.display = "none";
         }
     } catch (error) {
         console.error("الفحص فشل:", error);
