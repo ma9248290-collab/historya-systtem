@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بوابة استلام الأكواد | هيستوريا</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #980000;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+        body { font-family: 'Cairo', sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .container { width: 100%; max-width: 500px; }
+        
+        .card { background: var(--card-bg); padding: 40px 30px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.05); border: 1px solid var(--border); text-align: center; }
+        .logo { width: 80px; height: 80px; background: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 35px; margin: 0 auto 20px auto; box-shadow: 0 10px 20px rgba(152,0,0,0.2); }
+        
+        h2 { color: var(--primary); font-weight: 900; margin-bottom: 10px; font-size: 26px; }
+        p { color: var(--text-muted); font-weight: bold; margin-bottom: 30px; line-height: 1.6; }
+        
+        .input-group { margin-bottom: 15px; text-align: right; }
+        .input-group label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 14px; color: var(--text-main); }
+        .custom-input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--border); font-family: 'Cairo'; font-size: 18px; outline: none; transition: 0.3s; text-align: center; font-weight: 900; letter-spacing: 2px; box-sizing: border-box; }
+        .custom-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(152,0,0,0.1); }
+        
+        .btn { width: 100%; background: linear-gradient(45deg, var(--primary), #660000); color: white; border: none; padding: 16px; border-radius: 12px; font-size: 18px; font-weight: 900; cursor: pointer; transition: 0.3s; font-family: 'Cairo'; box-shadow: 0 10px 20px rgba(152,0,0,0.2); margin-top: 10px; }
+        .btn:hover { transform: translateY(-3px); box-shadow: 0 15px 25px rgba(152,0,0,0.3); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        .campaign-box { background: var(--bg-color); border: 2px dashed var(--primary); padding: 20px; border-radius: 16px; margin-top: 25px; text-align: right; display: none; animation: fadeIn 0.4s ease; }
+        
+        .code-display { font-size: 35px; font-weight: 900; letter-spacing: 5px; color: var(--success); text-align: center; margin-top: 15px; background: #d1fae5; padding: 20px; border-radius: 12px; border: 2px dashed var(--success); }
+        .error-msg { background: #fee2e2; color: var(--danger); padding: 20px; border-radius: 12px; font-weight: bold; text-align: center; margin-top: 25px; border: 1px solid #fca5a5; display: none; line-height: 1.8; animation: fadeIn 0.4s ease; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <div class="logo">🎫</div>
+        <h2>بوابة استلام الأكواد</h2>
+        <p>الرجاء إدخال بياناتك للتحقق من حضورك واستلام كود المنصة الخاص بك بأمان.</p>
+        
+        <!-- حقول البيانات الجديدة للحماية -->
+        <div class="input-group">
+            <label>🔢 كود الطالب</label>
+            <input type="text" id="studentCode" class="custom-input" placeholder="مثال: 1234">
+        </div>
+
+        <div class="input-group">
+            <label>📞 رقم هاتف ولي الأمر (للتأكيد)</label>
+            <input type="text" id="parentPhone" class="custom-input" placeholder="01XXXXXXXXX" style="letter-spacing: 1px;">
+        </div>
+
+        <button class="btn" id="checkBtn" onclick="checkEligibility()">فحص واستلام الكود 🚀</button>
+
+        <!-- رسالة الخطأ والغياب -->
+        <div id="error-box" class="error-msg"></div>
+
+        <!-- المربع اللي بيظهر فيه الكود لو كان متاح -->
+        <div id="campaign-box" class="campaign-box">
+            <h4 style="margin: 0 0 10px 0; color: var(--text-main);" id="camp-title">اسم الحملة</h4>
+            <div id="action-area"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const DB_URL = "https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master";
+    let activeCampaigns = {};
+    let dbSessions = [];
+
+    async function checkEligibility() {
+        let stCode = document.getElementById("studentCode").value.trim();
+        let pPhone = document.getElementById("parentPhone").value.trim();
+        let btn = document.getElementById("checkBtn");
+        let errorBox = document.getElementById("error-box");
+        let campBox = document.getElementById("campaign-box");
+
+        errorBox.style.display = 'none';
+        campBox.style.display = 'none';
+
+        if (!stCode || !pPhone) {
+            errorBox.innerHTML = "يرجى كتابة كود الطالب ورقم هاتف ولي الأمر أولاً!";
+            errorBox.style.display = 'block';
+            return;
+        }
+
+        btn.innerText = "جاري التحقق... ⏳"; btn.disabled = true;
+
+        try {
+            // 🛡️ 1. التحقق من هوية الطالب (الحماية)
+            let stRes = await fetch(`${DB_URL}/data/students.json`);
+            let studentsData = await stRes.json() || [];
+            let studentsArray = Array.isArray(studentsData) ? studentsData : Object.values(studentsData).filter(s => s !== null);
+
+            let validStudent = studentsArray.find(s => s.code == stCode && s.parentPhone == pPhone);
+
+            if (!validStudent) {
+                errorBox.innerHTML = "❌ كود الطالب أو رقم هاتف ولي الأمر غير صحيح!<br><span style='font-size: 13px; color: var(--text-main);'>تأكد من البيانات وحاول مرة أخرى.</span>";
+                errorBox.style.display = 'block';
+                btn.innerText = "فحص واستلام الكود 🚀"; btn.disabled = false;
+                return;
+            }
+
+            // 2. جلب الحملات المتاحة
+            let campRes = await fetch(`${DB_URL}/code_campaigns.json`);
+            activeCampaigns = await campRes.json() || {};
+            
+            let campKeys = Object.keys(activeCampaigns);
+            if (campKeys.length === 0) {
+                errorBox.innerHTML = "أهلاً بك يا <strong>" + validStudent.name + "</strong><br>لا توجد أكواد متاحة في الوقت الحالي.";
+                errorBox.style.display = 'block';
+                btn.innerText = "فحص واستلام الكود 🚀"; btn.disabled = false;
+                return;
+            }
+
+            // 3. جلب الحصص للتأكد من الحضور
+            let sessRes = await fetch(`${DB_URL}/data/classSessions.json`);
+            let sData = await sessRes.json() || [];
+            dbSessions = Array.isArray(sData) ? sData : Object.values(sData).filter(s => s !== null);
+
+            // نعرض أحدث حملة أكواد موجودة للطالب
+            let currentCampKey = campKeys[campKeys.length - 1]; 
+            let camp = activeCampaigns[currentCampKey];
+            
+            document.getElementById("camp-title").innerText = `🎁 ${camp.name}`;
+
+            // 4. هل الطالب استلم كود من الحملة دي قبل كده؟
+            let myUsedCode = Object.keys(camp.codes).find(codeKey => camp.codes[codeKey].usedBy == stCode);
+            
+            let actionArea = document.getElementById("action-area");
+
+            if (myUsedCode) {
+                // مستلم الكود مسبقاً
+                actionArea.innerHTML = `
+                    <p style="margin: 0 0 10px 0; color: var(--success); font-weight: bold; text-align: center;">أهلاً <strong>${validStudent.name}</strong><br>لقد قمت باستلام كودك مسبقاً:</p>
+                    <div class="code-display" style="display: block;">${myUsedCode}</div>
+                `;
+                campBox.style.display = 'block';
+            } else {
+                // لم يستلم، نفحص حضوره في الحصص المربوطة
+                let linkedSessionsIds = camp.linkedSessions || [];
+                let isEligible = false;
+
+                for (let sessId of linkedSessionsIds) {
+                    let session = dbSessions.find(s => s.id === sessId);
+                    if (session && session.attendance) {
+                        let stat = session.attendance[stCode];
+                        // لو حاضر أو متأخر، يبقى مستحق
+                        if (stat === 'present' || stat === 'late') {
+                            isEligible = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (isEligible) {
+                    // مستحق للكود
+                    actionArea.innerHTML = `
+                        <p style="text-align:center; font-weight:bold; margin-top:0;">أهلاً بك يا بطل: <span style="color:var(--primary);">${validStudent.name}</span></p>
+                        <button class="btn" style="padding: 10px; background: var(--success); box-shadow: 0 10px 20px rgba(16, 185, 129, 0.2);" onclick="claimMyCode('${currentCampKey}', '${stCode}')">اضغط هنا لاستلام الكود الآن</button>
+                    `;
+                    campBox.style.display = 'block';
+                } else {
+                    // 🚨 غائب! رسالة المنع المطلوبة
+                    errorBox.innerHTML = `
+                        <span style="font-size: 40px; display: block; margin-bottom: 10px;">❌</span>
+                        عفواً يا <strong>${validStudent.name}</strong>!<br>
+                        يبدو أنك كنت <strong>(غائباً)</strong> في الحصة المطلوبة لاستلام هذا الكود.<br><br>
+                        <span style="color: var(--text-main); font-size: 14px;">إذا كان هناك خطأ في التسجيل، يرجى التواصل مع الإدارة فوراً عبر الواتساب على الرقم:</span><br>
+                        <strong style="font-size: 26px; color: var(--primary); display: inline-block; margin-top: 10px; background: white; padding: 5px 15px; border-radius: 10px;">01019664462</strong>
+                    `;
+                    errorBox.style.display = 'block';
+                }
+            }
+
+        } catch (e) {
+            errorBox.innerHTML = "حدث خطأ في الاتصال بالسيرفر. تأكد من الإنترنت.";
+            errorBox.style.display = 'block';
+        }
+
+        btn.innerText = "فحص واستلام الكود 🚀"; btn.disabled = false;
+    }
+
+    async function claimMyCode(campId, studentCode) {
+        let actionArea = document.getElementById("action-area");
+        actionArea.innerHTML = `<p style="text-align: center; color: var(--primary); font-weight: bold;">جاري توليد الكود... ⏳</p>`;
+
+        try {
+            // جلب الحملة اللحظية لضمان عدم تعارض الأكواد لو اتنين داسوا في نفس الثانية
+            let res = await fetch(`${DB_URL}/code_campaigns/${campId}.json`);
+            let camp = await res.json();
+            
+            let unusedCode = Object.keys(camp.codes).find(k => camp.codes[k].status === 'unused');
+
+            if (!unusedCode) {
+                actionArea.innerHTML = `<p style="color: var(--danger); text-align: center; font-weight: bold;">عفواً، لقد نفدت جميع الأكواد من السيرفر! تواصل مع المستر.</p>`;
+                return;
+            }
+
+            // تحديث الكود في الداتابيز ليصبح مستخدماً باسم هذا الطالب
+            await fetch(`${DB_URL}/code_campaigns/${campId}/codes/${unusedCode}.json`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'used', usedBy: studentCode })
+            });
+
+            // عرض الكود للطالب
+            actionArea.innerHTML = `
+                <p style="margin: 0 0 10px 0; color: var(--success); font-weight: bold; text-align: center;">مبروك! تم حجز الكود الخاص بك بنجاح:</p>
+                <div class="code-display" style="display: block;">${unusedCode}</div>
+                <p style="margin: 0; font-size: 13px; color: var(--danger); text-align: center;">احتفظ بهذا الكود، لا يمكن استخراجه لشخص آخر.</p>
+            `;
+
+        } catch(e) {
+            actionArea.innerHTML = `<p style="color: var(--danger); text-align: center; font-weight: bold;">خطأ في الاتصال أثناء سحب الكود.</p>`;
+        }
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة أكواد الحصص | هيستوريا</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #980000;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+        body { font-family: 'Cairo', sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 30px; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 2px solid var(--border); padding-bottom: 15px; }
+        .header h1 { color: var(--primary); margin: 0; font-size: 28px; font-weight: 900; }
+        
+        .card { background: var(--card-bg); padding: 25px; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.02); margin-bottom: 25px; }
+        .card-title { color: var(--primary); margin-top: 0; margin-bottom: 20px; font-size: 20px; border-bottom: 1px dashed var(--border); padding-bottom: 10px; }
+        
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 14px; }
+        .custom-input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); font-family: 'Cairo'; font-size: 14px; outline: none; box-sizing: border-box; }
+        .custom-input:focus { border-color: var(--primary); }
+        
+        .checkbox-list { background: var(--bg-color); border: 1px solid var(--border); border-radius: 8px; padding: 10px; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .checkbox-item { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; font-weight: 600; padding: 5px; border-radius: 5px; transition: 0.2s; }
+        .checkbox-item:hover { background: #fee2e2; }
+        .checkbox-item input { accent-color: var(--primary); width: 16px; height: 16px; cursor: pointer; }
+
+        .btn { width: 100%; background: var(--primary); color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; font-family: 'Cairo'; }
+        .btn:hover { opacity: 0.9; transform: translateY(-2px); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        table { width: 100%; border-collapse: collapse; text-align: right; font-size: 14px; }
+        th, td { padding: 15px; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-color); color: var(--text-muted); }
+        tr:hover td { background: #f1f5f9; }
+        .badge { padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>⚙️ لوحة الإدارة | توزيع الأكواد</h1>
+        <button class="btn" style="width: auto; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border);" onclick="loadSystemData()">🔄 تحديث البيانات</button>
+    </div>
+
+    <!-- كارت إنشاء حملة أكواد -->
+    <div class="card">
+        <h3 class="card-title">➕ إنشاء وتوزيع أكواد جديدة</h3>
+        
+        <div class="input-group">
+            <label>اسم المجموعة / الأكواد (سيظهر للطالب، مثال: أكواد منصة الباب الأول)</label>
+            <input type="text" id="campName" class="custom-input" placeholder="اكتب اسم يعبر عن الأكواد...">
+        </div>
+
+        <div class="grid-3">
+            <!-- 1. اختيار الصفوف -->
+            <div class="input-group">
+                <label>1. حدد الصفوف الدراسية</label>
+                <div class="checkbox-list" id="levels-list">جاري التحميل...</div>
+            </div>
+            
+            <!-- 2. اختيار المجموعات -->
+            <div class="input-group">
+                <label>2. حدد المجموعات المستهدفة</label>
+                <div class="checkbox-list" id="groups-list">اختر الصفوف أولاً...</div>
+            </div>
+
+            <!-- 3. اختيار الحصص -->
+            <div class="input-group">
+                <label>3. اربط بالحضور في هذه الحصص</label>
+                <div class="checkbox-list" id="sessions-list">اختر المجموعات أولاً...</div>
+            </div>
+        </div>
+
+        <div class="input-group" style="margin-top: 20px;">
+            <label>أدخل الأكواد (كود في كل سطر)</label>
+            <textarea id="campCodes" class="custom-input" rows="6" placeholder="8907520033&#10;6040595462&#10;8616035493..." style="direction: ltr; text-align: left;"></textarea>
+        </div>
+
+        <button class="btn" id="saveBtn" onclick="saveCampaign()">إصدار الأكواد وتفعيلها للطلاب 🚀</button>
+    </div>
+
+    <!-- كارت عرض الأكواد النشطة -->
+    <div class="card">
+        <h3 class="card-title">📊 مجموعات الأكواد النشطة</h3>
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>اسم الحملة</th>
+                        <th>مربوطة بـ (حصص)</th>
+                        <th>الإجمالي</th>
+                        <th>تم السحب</th>
+                        <th>المتبقي</th>
+                        <th>إجراء</th>
+                    </tr>
+                </thead>
+                <tbody id="campaigns-tbody">
+                    <tr><td colspan="6" style="text-align: center;">جاري التحميل...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const DB_URL = "https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master";
+    let dbGroups = [];
+    let dbSessions = [];
+
+    // 1. جلب بيانات السيستم الأساسية
+    async function loadSystemData() {
+        try {
+            let [grpRes, sessRes] = await Promise.all([
+                fetch(`${DB_URL}/data/groups.json`),
+                fetch(`${DB_URL}/data/classSessions.json`)
+            ]);
+            
+            let gData = await grpRes.json() || [];
+            let sData = await sessRes.json() || [];
+
+            dbGroups = Array.isArray(gData) ? gData : Object.values(gData).filter(g => g !== null);
+            dbSessions = Array.isArray(sData) ? sData : Object.values(sData).filter(s => s !== null);
+
+            renderLevels();
+            loadCampaigns();
+        } catch (e) { alert("خطأ في الاتصال بالإنترنت!"); }
+    }
+
+    // 2. رسم الصفوف الدراسية
+    function renderLevels() {
+        let levels = [...new Set(dbGroups.map(g => g.level))];
+        let html = "";
+        levels.forEach(lvl => {
+            html += `<label class="checkbox-item"><input type="checkbox" value="${lvl}" onchange="renderGroups()"> ${lvl}</label>`;
+        });
+        document.getElementById("levels-list").innerHTML = html || "لا توجد صفوف مسجلة";
+        renderGroups();
+    }
+
+    // 3. رسم المجموعات بناءً على الصفوف المختارة
+    function renderGroups() {
+        let selectedLevels = Array.from(document.querySelectorAll('#levels-list input:checked')).map(cb => cb.value);
+        let groupsContainer = document.getElementById("groups-list");
+        
+        if (selectedLevels.length === 0) {
+            groupsContainer.innerHTML = "<span style='color:var(--text-muted); font-size:12px;'>اختر الصفوف أولاً...</span>";
+            renderSessions();
+            return;
+        }
+
+        let filteredGroups = dbGroups.filter(g => selectedLevels.includes(g.level));
+        let html = "";
+        filteredGroups.forEach(g => {
+            html += `<label class="checkbox-item"><input type="checkbox" value="${g.name}" onchange="renderSessions()"> ${g.name}</label>`;
+        });
+        groupsContainer.innerHTML = html;
+        renderSessions();
+    }
+
+    // 4. رسم الحصص بناءً على المجموعات المختارة
+    function renderSessions() {
+        let selectedGroups = Array.from(document.querySelectorAll('#groups-list input:checked')).map(cb => cb.value);
+        let sessionsContainer = document.getElementById("sessions-list");
+
+        if (selectedGroups.length === 0) {
+            sessionsContainer.innerHTML = "<span style='color:var(--text-muted); font-size:12px;'>اختر المجموعات أولاً...</span>";
+            return;
+        }
+
+        let filteredSessions = dbSessions.filter(s => selectedGroups.includes(s.group)).reverse();
+        let html = "";
+        filteredSessions.forEach(s => {
+            html += `<label class="checkbox-item"><input type="checkbox" value="${s.id}"> ${s.date} - ${s.topic || 'حصة'} (${s.group})</label>`;
+        });
+        sessionsContainer.innerHTML = html || "لا توجد حصص مسجلة لهذه المجموعات";
+    }
+
+    // 5. حفظ حملة الأكواد
+    async function saveCampaign() {
+        let name = document.getElementById("campName").value.trim();
+        let selectedSessions = Array.from(document.querySelectorAll('#sessions-list input:checked')).map(cb => cb.value);
+        let rawCodes = document.getElementById("campCodes").value.trim();
+
+        if (!name || selectedSessions.length === 0 || !rawCodes) {
+            return alert("يرجى ملء الاسم، واختيار حصة واحدة على الأقل، ووضع الأكواد!");
+        }
+
+        let codesArray = rawCodes.split('\n').map(c => c.trim()).filter(c => c !== "");
+        let codesObj = {};
+        codesArray.forEach(c => { codesObj[c] = { status: 'unused', usedBy: '' }; });
+
+        let campaignId = "camp_" + Date.now();
+        let newCampaign = {
+            id: campaignId,
+            name: name,
+            linkedSessions: selectedSessions, // مصفوفة الحصص المربوطة
+            codes: codesObj,
+            createdAt: new Date().toLocaleDateString('ar-EG')
+        };
+
+        let btn = document.getElementById("saveBtn");
+        btn.innerText = "جاري الرفع... ⏳"; btn.disabled = true;
+
+        try {
+            await fetch(`${DB_URL}/code_campaigns/${campaignId}.json`, {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newCampaign)
+            });
+            alert("تم حفظ الأكواد وإتاحتها للطلاب بنجاح! ✅");
+            document.getElementById("campName").value = "";
+            document.getElementById("campCodes").value = "";
+            document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+            renderGroups(); // تصفير الفلاتر
+            loadCampaigns();
+        } catch (e) { alert("خطأ في الاتصال بالإنترنت."); }
+        btn.innerText = "إصدار الأكواد وتفعيلها للطلاب 🚀"; btn.disabled = false;
+    }
+
+    // 6. عرض الحملات المحفوظة
+    async function loadCampaigns() {
+        try {
+            let res = await fetch(`${DB_URL}/code_campaigns.json`);
+            let data = await res.json() || {};
+            let tbody = document.getElementById("campaigns-tbody");
+            tbody.innerHTML = "";
+            let keys = Object.keys(data).reverse();
+
+            if (keys.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center;">لا توجد أكواد نشطة.</td></tr>`;
+                return;
+            }
+
+            keys.forEach(k => {
+                let camp = data[k];
+                let codesList = Object.values(camp.codes || {});
+                let total = codesList.length;
+                let used = codesList.filter(c => c.status === 'used').length;
+                let unused = total - used;
+                let linkedCount = (camp.linkedSessions || []).length;
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong style="color: var(--primary);">${camp.name}</strong><br><span style="font-size:11px; color:var(--text-muted);">${camp.createdAt}</span></td>
+                        <td><span class="badge" style="background:#f1f5f9; color:var(--text-muted);">مربوط بـ ${linkedCount} حصص</span></td>
+                        <td style="font-weight: bold;">${total}</td>
+                        <td style="color: var(--danger); font-weight: bold;">${used}</td>
+                        <td style="color: var(--success); font-weight: bold;">${unused}</td>
+                        <td><button onclick="deleteCampaign('${k}')" style="background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight:bold;">حذف 🗑️</button></td>
+                    </tr>
+                `;
+            });
+        } catch (e) {}
+    }
+
+    async function deleteCampaign(id) {
+        if(!confirm("هل أنت متأكد من حذف هذه الأكواد نهائياً؟")) return;
+        await fetch(`${DB_URL}/code_campaigns/${id}.json`, { method: 'DELETE' });
+        loadCampaigns();
+    }
+
+    window.onload = loadSystemData;
+</script>
+</body>
+</html>
