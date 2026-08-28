@@ -7309,15 +7309,27 @@ window.addEventListener('storage', function(e) {
 
 
 // ==========================================
-// 🌐 فحص حالة السيرفر والواتساب (مركز التحكم)
+// 🌐 فحص حالة السيرفر والواتساب (بالتحديث التلقائي)
 // ==========================================
+window.waCheckInterval = null; // عداد الفحص التلقائي
+
 const oldModalOpenerForServer = window.openModal;
 window.openModal = function(modalId) {
     if (oldModalOpenerForServer) oldModalOpenerForServer(modalId);
     
-    // أول ما المدرس يفتح إعدادات السيرفر، نشغل الفحص أوتوماتيك
+    // أول ما المدرس يفتح الإعدادات، نشغل الفحص الفوري والعداد
     if (modalId === 'settingsModal') {
-        checkWhatsappServer();
+        checkWhatsappServer(); 
+        window.waCheckInterval = setInterval(checkWhatsappServer, 3000); // يفحص كل 3 ثواني
+    }
+};
+
+const oldCloseModalForServer = window.closeModal;
+window.closeModal = function(modalId) {
+    if (oldCloseModalForServer) oldCloseModalForServer(modalId);
+    // إيقاف العداد لو قفل النافذة عشان منسحبش نت على الفاضي
+    if (modalId === 'settingsModal') {
+        if (window.waCheckInterval) clearInterval(window.waCheckInterval); 
     }
 };
 
@@ -7329,41 +7341,46 @@ window.checkWhatsappServer = async function() {
 
     if (!nodeStatus || !waStatus) return;
 
-    nodeStatus.innerHTML = "جاري الفحص... ⏳";
-    waStatus.innerHTML = "جاري الفحص... ⏳";
-    qrContainer.style.display = "none";
+    if (!nodeStatus.innerHTML.includes('✅')) {
+        nodeStatus.innerHTML = "جاري الفحص... ⏳";
+        waStatus.innerHTML = "جاري الفحص... ⏳";
+        if (qrContainer) qrContainer.style.display = "none";
+    }
 
     try {
-        // محاولة الاتصال بالسيرفر
-        let response = await fetch(`${WHATSAPP_SERVER_URL}/status?clientId=${getSafeUid()}`);
+        // 👈 غيرنا المسار لـ /qr بدل /status عشان نتخطى مشكلة الـ 404
+        let url = `${WHATSAPP_SERVER_URL}/qr?clientId=${getSafeUid()}&t=${Date.now()}`;
         
-        // لو السيرفر رد علينا، يبقى الـ Node.js شغال
+        let response = await fetch(url, { mode: 'cors' });
+        
+        if (!response.ok) throw new Error("Server returned " + response.status);
+        
+        // طالما رد، يبقى السيرفر نفسه شغال
         nodeStatus.innerHTML = "<span style='color: #10b981; font-weight: bold;'>متصل ويعمل بنجاح ✅</span>";
+        let data = await response.json();
         
-        try {
-            let data = await response.json();
+        // لو مفيش QR راجع، وفي نفس الوقت السيرفر رد سليم، يبقى الواتساب مربوط جاهز
+        if (!data.qr || data.qr === null || data.status === "CONNECTED") {
+            waStatus.innerHTML = "<span style='color: #10b981; font-weight: bold;'>الرقم مربوط وجاهز للعمل 📱</span>";
+            if (qrContainer) qrContainer.style.display = "none";
+            if (window.waCheckInterval) clearInterval(window.waCheckInterval); // وقف العداد خلاص ربطنا
             
-            // فحص حالة الواتساب نفسه من رد السيرفر
-            if (data.status === "CONNECTED" || data.status === "ready" || data.connected === true) {
-                waStatus.innerHTML = "<span style='color: #10b981; font-weight: bold;'>الرقم مربوط وجاهز للعمل 📱</span>";
-            } else if (data.qr) {
-                waStatus.innerHTML = "<span style='color: #f59e0b; font-weight: bold;'>في انتظار مسح الباركود ⚠️</span>";
-                qrContainer.style.display = "block";
-                qrImage.innerHTML = ""; 
-                if (typeof QRCode !== 'undefined') {
-                    new QRCode(qrImage, { text: data.qr, width: 200, height: 200 });
-                } else {
-                    waStatus.innerHTML += " (يرجى إغلاق النافذة وفتحها مرة أخرى لتحميل الباركود)";
+        } else if (data.qr) {
+            waStatus.innerHTML = "<span style='color: #f59e0b; font-weight: bold;'>في انتظار مسح الباركود ⚠️</span>";
+            if (qrContainer && qrImage) {
+                // رسم الباركود لو اتغير بس عشان ميرعش
+                if (qrContainer.getAttribute('data-last-qr') !== data.qr) {
+                    qrContainer.style.display = "block";
+                    qrImage.innerHTML = ""; 
+                    if (typeof QRCode !== 'undefined') {
+                        new QRCode(qrImage, { text: data.qr, width: 200, height: 200 });
+                        qrContainer.setAttribute('data-last-qr', data.qr);
+                    }
                 }
-            } else {
-                waStatus.innerHTML = "<span style='color: #f59e0b; font-weight: bold;'>جاري تهيئة الواتساب... ⏳</span>";
             }
-        } catch(e) {
-            // لو السيرفر شغال بس مش مبرمج يرجع JSON في الرابط ده
-            waStatus.innerHTML = "<span style='color: #3b82f6; font-weight: bold;'>الخدمة تعمل (جرب إرسال رسالة) 🚀</span>";
         }
     } catch (error) {
-        console.error("Server connection error:", error);
+        console.error("الفحص فشل:", error);
         nodeStatus.innerHTML = "<span style='color: #ef4444; font-weight: bold;'>متوقف (Offline) ❌</span>";
         waStatus.innerHTML = "<span style='color: #ef4444; font-weight: bold;'>غير متصل ❌</span>";
     }
