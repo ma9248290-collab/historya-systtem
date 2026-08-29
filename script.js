@@ -5212,7 +5212,16 @@ window.loadPlatformForumQuestions = async function() {
         keys.forEach(id => {
             let q = data[id];
             let ansBtn = `<button class="save-btn" style="background:#3b82f6; width:auto; padding:5px 12px; margin:0;" onclick="answerForumQuestion('${id}')">💬 الرد</button>`;
-            tbody.innerHTML += `<tr><td><strong>${q.studentName}</strong> (${q.studentGroup})</td><td>${q.questionText}</td><td>${q.replyText ? `<span style="color:var(--success-color)">${q.replyText}</span>` : '<span style="color:var(--danger-color)">بانتظار ردك ⏳</span>'}</td><td>${ansBtn}</td></tr>`;
+            let replyHtml = q.replyText
+                ? `<span style="color:var(--success-color)">💡 <strong>الرد:</strong> <span style="color:#059669; font-weight:bold;">${q.replyText}</span></span>`
+                : '<span class="live-typing-text">⏳ <em>بانتظار الرد...</em></span>';
+
+            tbody.innerHTML += `<tr>
+                <td><strong>${q.studentName}</strong> (${q.studentGroup})</td>
+                <td>${q.questionText}</td>
+                <td>${replyHtml}</td>
+                <td>${ansBtn}</td>
+            </tr>`;
         });
     } catch(e) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:red;">خطأ بالاتصال</td></tr>`; }
 };
@@ -6054,7 +6063,7 @@ window.renderAttendanceTable = function(session) {
 };
 
 // ==========================================
-// 📥 رفع شيت إكسيل لتسجيل الحضور المجمع
+// 📥 رفع شيت إكسيل لتسجيل الحضور المجمع (المطورة)
 // ==========================================
 window.importAttendanceFromExcel = function(event) {
     const file = event.target.files[0];
@@ -6076,62 +6085,132 @@ window.importAttendanceFromExcel = function(event) {
             const firstSheetName = workbook.SheetNames[0];
             const excelData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName]);
 
-            let successCount = 0;
-            let notFoundCount = 0;
-            let wrongGroupCount = 0;
+            let successList = [];
+            let notFoundList = [];
+            let wrongGroupQueue = [];
 
             // جلب حالة "تأخير" من التشيك بوكس لو المدرس معلم عليه وقت رفع الشيت
             let isLate = document.getElementById('markAsLateCheckbox')?.checked;
             let attStatus = isLate ? 'late' : 'present';
 
             excelData.forEach(row => {
-                // 💡 الذكاء هنا: بندور على عمود اسمه "الكود" أو "الاسم"، 
-                // ولو ملقیهمش بياخد أول قيمة موجودة في الصف أياً كان اسم العمود!
                 let searchValue = row['الكود'] || row['كود'] || row['كود الطالب'] || row['الاسم'] || row['اسم الطالب'] || Object.values(row)[0];
 
                 if (searchValue) {
-                    // الدالة دي بتدعم الأكواد والأسماء وبتعالج الـ (أ,ا,إ,ة,ه,ي,ى) أوتوماتيك[cite: 28]
-                    let student = findStudentByCodeOrName(String(searchValue));
+                    searchValue = String(searchValue).trim();
+                    let student = findStudentByCodeOrName(searchValue);
+
+                    // 💡 السحر هنا: لو ملقاهوش بالاسم المطابق 100%، هيدور بنظام (التطابق الجزئي) لتجاهل الأخطاء الإملائية
+                    if (!student && isNaN(searchValue)) {
+                        let normalizedExcel = normalizeArabicName(searchValue);
+                        student = students.find(s => {
+                            let sysName = normalizeArabicName(s.name);
+                            // لو الاسم اللي في السيستم جواه الاسم اللي في الإكسيل أو العكس
+                            return sysName.includes(normalizedExcel) || normalizedExcel.includes(sysName);
+                        });
+                    }
 
                     if (!student) {
-                        notFoundCount++;
+                        notFoundList.push(searchValue); // مش مسجل خالص
                     } else if (student.group !== session.group) {
-                        wrongGroupCount++; // طالب مسجل بس في مجموعة تانية
+                        wrongGroupQueue.push(student); // مسجل بس في مجموعة تانية
                     } else {
-                        // التحضير الفعلي وإعطاء النقاط
+                        // طالب سليم وفي مجموعته
                         let oldStatus = session.attendance[student.code] || session.attendance[student.phone];
-                        if (!oldStatus) { // لو لسه متسجلش في الحصة دي
+                        if (!oldStatus) { 
                             if (attStatus === 'present') student.behaviorPoints = (student.behaviorPoints || 0) + 5;
                             if (attStatus === 'late') student.behaviorPoints = (student.behaviorPoints || 0) + 2;
 
                             session.attendance[student.code] = attStatus;
-                            successCount++;
+                            successList.push(student.name);
                         }
                     }
                 }
             });
 
-            // 💾 حفظ التغييرات وتحديث الشاشة مرة واحدة عشان ميهنجش
+            // 💾 حفظ التغييرات الأساسية
             localStorage.setItem("classSessions", JSON.stringify(classSessions));
             localStorage.setItem("students", JSON.stringify(students));
             renderAttendanceTable(session);
-
-            // 🚀 مزامنة مع السيرفر
             if (typeof syncDataToBot === "function") syncDataToBot();
 
-            // 📊 عرض رسالة مجمعة باللي حصل
-            let msg = `تم تحضير ${successCount} طالب بنجاح ✅`;
-            if (notFoundCount > 0) msg += `\n- ${notFoundCount} غير مسجلين بالنظام.`;
-            if (wrongGroupCount > 0) msg += `\n- ${wrongGroupCount} في مجموعات أخرى.`;
-
-            showToast(msg, successCount > 0 ? "success" : "warning");
+            // 📊 عرض شاشة التقرير المجمعة
+            showExcelImportReport(successList, wrongGroupQueue, notFoundList, session);
 
         } catch (err) {
             showToast("حدث خطأ أثناء قراءة ملف الإكسيل!", "error");
         }
     };
     reader.readAsArrayBuffer(file);
-    event.target.value = ""; // تصفير الملف عشان نقدر نرفعه تاني
+    event.target.value = ""; // تصفير الملف
+};
+
+// 📊 دالة رسم شاشة التقرير الذكية بعد رفع الإكسيل
+window.showExcelImportReport = function(successList, wrongGroupQueue, notFoundList, session) {
+    let oldModal = document.getElementById('excelReportModal');
+    if (oldModal) oldModal.remove();
+
+    // 1. بوكس الطلاب اللي مش مسجلين (مع زرار النسخ)
+    let notFoundHtml = "";
+    if (notFoundList.length > 0) {
+        let textToCopy = notFoundList.join('\\n');
+        notFoundHtml = `
+            <div style="background: rgba(239, 68, 68, 0.05); padding: 15px; border-radius: 8px; border: 1px dashed #ef4444; margin-bottom: 15px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+                    <h4 style="color: #ef4444; margin:0;">❌ غير مسجلين بالنظام (${notFoundList.length})</h4>
+                    <button onclick="navigator.clipboard.writeText('${textToCopy}'); showToast('تم النسخ! 📋');" style="background:#ef4444; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer; font-weight:bold;">📋 نسخ الأسماء</button>
+                </div>
+                <textarea readonly style="width:100%; height:80px; border-radius:5px; border:1px solid #ef4444; padding:10px; font-family:'Cairo'; resize:none; background: #fff;">${notFoundList.join('\\n')}</textarea>
+            </div>
+        `;
+    }
+
+    // 2. بوكس المجموعات الأخرى (مع زرار المعالجة)
+    let wrongGroupHtml = "";
+    if (wrongGroupQueue.length > 0) {
+        wrongGroupHtml = `
+            <div style="background: rgba(245, 158, 11, 0.05); padding: 15px; border-radius: 8px; border: 1px dashed #f59e0b; margin-bottom: 15px;">
+                <h4 style="color: #f59e0b; margin:0 0 10px 0;">⚠️ طلاب في مجموعات أخرى (${wrongGroupQueue.length})</h4>
+                <div style="max-height: 150px; overflow-y: auto; background: #fff; border-radius: 6px; border: 1px solid #e2e8f0;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        ${wrongGroupQueue.map(st => `
+                            <tr style="border-bottom: 1px solid #e2e8f0;">
+                                <td style="padding: 10px; font-weight:bold;">${st.name}</td>
+                                <td style="padding: 10px; color:var(--text-muted);">${st.group}</td>
+                                <td style="padding: 10px; text-align:left;">
+                                    <button onclick="openWrongGroupModal(students.find(s=>s.code=='${st.code}'), classSessions.find(s=>s.id=='${session.id}'));" style="background:#f59e0b; color:white; border:none; padding:5px 12px; border-radius:5px; cursor:pointer; font-weight:bold;">معالجة ⚙️</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </table>
+                </div>
+                <p style="font-size: 11px; color: var(--text-muted); margin: 5px 0 0 0;">* اضغط معالجة لاختيار تحضيرهم كتعويض في هذه الحصة أو نقلهم نهائياً.</p>
+            </div>
+        `;
+    }
+
+    // 3. بوكس الناجحين
+    let successHtml = `
+        <div style="background: rgba(16, 185, 129, 0.1); padding: 15px; border-radius: 8px; border: 1px dashed #10b981; margin-bottom: 15px; text-align:center;">
+            <h3 style="color: #10b981; margin:0;">✅ تم تحضير ${successList.length} طالب بنجاح</h3>
+        </div>
+    `;
+
+    // تجميع النافذة
+    let modalHtml = `
+        <div id="excelReportModal" class="modal" style="display:flex; z-index: 1000000; align-items:center; justify-content:center;">
+            <div class="modal-content" style="width: 600px; max-width: 95%; max-height: 90vh; overflow-y:auto; border-top: 5px solid var(--primary-color);">
+                <span class="close-btn" onclick="this.parentElement.parentElement.remove()">&times;</span>
+                <h2 style="color: var(--primary-color); margin-bottom: 20px;">📊 تقرير رفع شيت الحضور</h2>
+                ${successHtml}
+                ${wrongGroupHtml}
+                ${notFoundHtml}
+                <button class="save-btn" style="width: 100%; margin-top: 10px;" onclick="this.parentElement.parentElement.remove()">إغلاق التقرير 👍</button>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
 };
 
 
@@ -7390,4 +7469,37 @@ window.checkWhatsappServer = async function() {
         nodeStatus.innerHTML = "<span style='color: #ef4444; font-weight: bold;'>متوقف (Offline) ❌</span>";
         waStatus.innerHTML = "<span style='color: #ef4444; font-weight: bold;'>غير متصل ❌</span>";
     }
+};
+
+
+
+window.showShefoTypingIndicator = function() {
+    const chatBox = document.getElementById("shefo-chat-messages");
+    if (!chatBox) return;
+
+    hideShefoTypingIndicator(); // مسح أي مؤشر قديم احتياطياً
+
+    const typingDiv = document.createElement("div");
+    typingDiv.id = "shefo-typing-indicator";
+    // استخدمنا الكلاسات بتاعتك بالظبط عشان ياخد لون وخلفية رسالة البوت (#334155)
+    typingDiv.className = "shefo-message bot-message"; 
+    typingDiv.style.display = "flex";
+    typingDiv.style.alignItems = "center";
+    typingDiv.style.gap = "4px";
+    typingDiv.style.padding = "15px";
+    typingDiv.style.width = "fit-content";
+    
+    typingDiv.innerHTML = `
+        <div class="shefo-typing-dot"></div>
+        <div class="shefo-typing-dot"></div>
+        <div class="shefo-typing-dot"></div>
+    `;
+    
+    chatBox.appendChild(typingDiv);
+    chatBox.scrollTop = chatBox.scrollHeight; // النزول لآخر الشات
+};
+
+window.hideShefoTypingIndicator = function() {
+    const indicator = document.getElementById("shefo-typing-indicator");
+    if (indicator) indicator.remove();
 };
