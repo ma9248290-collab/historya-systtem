@@ -15,13 +15,14 @@
             --border: #e2e8f0;
             --success: #10b981;
             --danger: #ef4444;
+            --warning: #f59e0b;
         }
         body { font-family: 'Cairo', sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 30px; }
         .container { max-width: 1100px; margin: 0 auto; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 2px solid var(--border); padding-bottom: 15px; }
         .header h1 { color: var(--primary); margin: 0; font-size: 28px; font-weight: 900; }
         
-        .card { background: var(--card-bg); padding: 25px; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.02); margin-bottom: 25px; }
+        .card { background: var(--card-bg); padding: 25px; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.02); margin-bottom: 25px; transition: 0.3s; }
         .card-title { color: var(--primary); margin-top: 0; margin-bottom: 20px; font-size: 20px; border-bottom: 1px dashed var(--border); padding-bottom: 10px; }
         
         .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
@@ -36,8 +37,8 @@
         .checkbox-item:hover { background: #fee2e2; }
         .checkbox-item input { accent-color: var(--primary); width: 16px; height: 16px; cursor: pointer; }
 
-        .btn { width: 100%; background: var(--primary); color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; font-family: 'Cairo'; }
-        .btn:hover { opacity: 0.9; transform: translateY(-2px); }
+        .btn { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; font-family: 'Cairo'; }
+        .btn:hover { opacity: 0.9; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(152, 0, 0, 0.2); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         table { width: 100%; border-collapse: collapse; text-align: right; font-size: 14px; }
@@ -52,13 +53,15 @@
 <div class="container">
     <div class="header">
         <h1>⚙️ لوحة الإدارة | توزيع الأكواد</h1>
-        <button class="btn" style="width: auto; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border);" onclick="loadSystemData()">🔄 تحديث البيانات</button>
+        <button class="btn" style="width: auto; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border); box-shadow: none;" onclick="loadSystemData()">🔄 تحديث البيانات</button>
     </div>
 
-    <!-- كارت إنشاء حملة أكواد -->
-    <div class="card">
-        <h3 class="card-title">➕ إنشاء وتوزيع أكواد جديدة</h3>
+    <!-- كارت إنشاء أو تعديل حملة أكواد -->
+    <div class="card" id="formCard">
+        <h3 class="card-title" id="formTitle">➕ إنشاء وتوزيع أكواد جديدة</h3>
         
+        <input type="hidden" id="editCampId"> <!-- حقل مخفي عشان نعرف إحنا بنعدل ولا بنعمل جديد -->
+
         <div class="input-group">
             <label>اسم المجموعة / الأكواد (سيظهر للطالب، مثال: أكواد منصة الباب الأول)</label>
             <input type="text" id="campName" class="custom-input" placeholder="اكتب اسم يعبر عن الأكواد...">
@@ -85,11 +88,15 @@
         </div>
 
         <div class="input-group" style="margin-top: 20px;">
-            <label>أدخل الأكواد (كود في كل سطر)</label>
+            <label id="codesLabel">أدخل الأكواد (كود في كل سطر)</label>
             <textarea id="campCodes" class="custom-input" rows="6" placeholder="8907520033&#10;6040595462&#10;8616035493..." style="direction: ltr; text-align: left;"></textarea>
+            <small id="codesNote" style="color: var(--success); font-weight: bold; display: none; margin-top: 5px;">* في حالة التعديل: الأكواد التي ستضعها هنا سيتم إضافتها للأكواد القديمة ولن تحذفها.</small>
         </div>
 
-        <button class="btn" id="saveBtn" onclick="saveCampaign()">إصدار الأكواد وتفعيلها للطلاب 🚀</button>
+        <div style="display: flex; gap: 15px; margin-top: 20px;">
+            <button class="btn" id="saveBtn" style="flex: 3;" onclick="saveCampaign()">إصدار الأكواد وتفعيلها للطلاب 🚀</button>
+            <button class="btn" id="cancelBtn" style="flex: 1; background: var(--text-muted); display: none;" onclick="cancelEdit()">إلغاء التعديل ❌</button>
+        </div>
     </div>
 
     <!-- كارت عرض الأكواد النشطة -->
@@ -104,7 +111,7 @@
                         <th>الإجمالي</th>
                         <th>تم السحب</th>
                         <th>المتبقي</th>
-                        <th>إجراء</th>
+                        <th style="text-align: center;">إجراء</th>
                     </tr>
                 </thead>
                 <tbody id="campaigns-tbody">
@@ -119,6 +126,7 @@
     const DB_URL = "https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master";
     let dbGroups = [];
     let dbSessions = [];
+    let globalCampaigns = {}; // متغير جلوبال لحفظ الأكواد عشان نقدر نعدل عليها
 
     // 1. جلب بيانات السيستم الأساسية
     async function loadSystemData() {
@@ -188,51 +196,144 @@
         sessionsContainer.innerHTML = html || "لا توجد حصص مسجلة لهذه المجموعات";
     }
 
-    // 5. حفظ حملة الأكواد
+    // 5. فتح حملة للتعديل
+    function editCampaign(id) {
+        let camp = globalCampaigns[id];
+        if(!camp) return;
+
+        // وضع الـ ID في الحقل المخفي
+        document.getElementById("editCampId").value = id;
+        document.getElementById("campName").value = camp.name;
+        
+        // تظبيط واجهة التعديل
+        document.getElementById("formTitle").innerHTML = "⚙️ تعديل بيانات الأكواد وإضافة المزيد";
+        document.getElementById("formCard").style.borderColor = "var(--warning)";
+        document.getElementById("saveBtn").innerText = "حفظ التعديلات 💾";
+        document.getElementById("saveBtn").style.background = "var(--warning)";
+        document.getElementById("cancelBtn").style.display = "block";
+        document.getElementById("campCodes").value = ""; // بنفضي المربع عشان يضيف الجديد بس
+        document.getElementById("codesLabel").innerText = "➕ إضافة أكواد جديدة (اختياري)";
+        document.getElementById("codesNote").style.display = "block";
+
+        let linkedSessIds = camp.linkedSessions || [];
+        let targetGroups = [];
+        let targetLevels = [];
+        
+        // استنتاج المجموعات والصفوف من الحصص عشان نعلّم عليهم صح أوتوماتيك
+        linkedSessIds.forEach(sessId => {
+            let sessionObj = dbSessions.find(s => s.id === sessId);
+            if (sessionObj) {
+                targetGroups.push(sessionObj.group);
+                let groupObj = dbGroups.find(g => g.name === sessionObj.group);
+                if (groupObj) targetLevels.push(groupObj.level);
+            }
+        });
+
+        targetGroups = [...new Set(targetGroups)];
+        targetLevels = [...new Set(targetLevels)];
+
+        // التحديد التلقائي
+        document.querySelectorAll('#levels-list input[type="checkbox"]').forEach(cb => { cb.checked = targetLevels.includes(cb.value); });
+        renderGroups();
+        document.querySelectorAll('#groups-list input[type="checkbox"]').forEach(cb => { cb.checked = targetGroups.includes(cb.value); });
+        renderSessions();
+        document.querySelectorAll('#sessions-list input[type="checkbox"]').forEach(cb => { cb.checked = linkedSessIds.includes(cb.value); });
+
+        // سكرول لفوق
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // 6. إلغاء التعديل
+    function cancelEdit() {
+        document.getElementById("editCampId").value = "";
+        document.getElementById("campName").value = "";
+        document.getElementById("campCodes").value = "";
+        
+        document.getElementById("formTitle").innerHTML = "➕ إنشاء وتوزيع أكواد جديدة";
+        document.getElementById("formCard").style.borderColor = "var(--border)";
+        document.getElementById("saveBtn").innerText = "إصدار الأكواد وتفعيلها للطلاب 🚀";
+        document.getElementById("saveBtn").style.background = "var(--primary)";
+        document.getElementById("cancelBtn").style.display = "none";
+        document.getElementById("codesLabel").innerText = "أدخل الأكواد (كود في كل سطر)";
+        document.getElementById("codesNote").style.display = "none";
+
+        document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+        renderGroups();
+    }
+
+    // 7. حفظ حملة الأكواد (جديدة أو تعديل)
     async function saveCampaign() {
+        let editId = document.getElementById("editCampId").value; // بنشوف احنا في وضع التعديل ولا الإضافة
         let name = document.getElementById("campName").value.trim();
         let selectedSessions = Array.from(document.querySelectorAll('#sessions-list input:checked')).map(cb => cb.value);
         let rawCodes = document.getElementById("campCodes").value.trim();
 
-        if (!name || selectedSessions.length === 0 || !rawCodes) {
-            return alert("يرجى ملء الاسم، واختيار حصة واحدة على الأقل، ووضع الأكواد!");
+        if (!name || selectedSessions.length === 0) {
+            return alert("يرجى ملء الاسم، واختيار حصة واحدة على الأقل!");
         }
 
-        let codesArray = rawCodes.split('\n').map(c => c.trim()).filter(c => c !== "");
-        let codesObj = {};
-        codesArray.forEach(c => { codesObj[c] = { status: 'unused', usedBy: '' }; });
+        // لو بنعمل جديد لازم يكون فيه أكواد، لو بنعدل ممكن يكون بيعدل الحصص بس من غير أكواد
+        if (!editId && !rawCodes) {
+            return alert("يرجى وضع الأكواد!");
+        }
 
-        let campaignId = "camp_" + Date.now();
-        let newCampaign = {
-            id: campaignId,
-            name: name,
-            linkedSessions: selectedSessions, // مصفوفة الحصص المربوطة
-            codes: codesObj,
-            createdAt: new Date().toLocaleDateString('ar-EG')
-        };
+        let newCodesObj = {};
+        if (rawCodes) {
+            let codesArray = rawCodes.split('\n').map(c => c.trim()).filter(c => c !== "");
+            codesArray.forEach(c => { newCodesObj[c] = { status: 'unused', usedBy: '' }; });
+        }
 
         let btn = document.getElementById("saveBtn");
+        let originalText = btn.innerText;
         btn.innerText = "جاري الرفع... ⏳"; btn.disabled = true;
 
         try {
-            await fetch(`${DB_URL}/code_campaigns/${campaignId}.json`, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newCampaign)
-            });
-            alert("تم حفظ الأكواد وإتاحتها للطلاب بنجاح! ✅");
-            document.getElementById("campName").value = "";
-            document.getElementById("campCodes").value = "";
-            document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-            renderGroups(); // تصفير الفلاتر
-            loadCampaigns();
+            if (editId) {
+                // وضع التعديل (دمج الأكواد القديمة مع الجديدة وتحديث البيانات)
+                let oldCamp = globalCampaigns[editId];
+                let mergedCodes = { ...(oldCamp.codes || {}), ...newCodesObj };
+
+                await fetch(`${DB_URL}/code_campaigns/${editId}.json`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name,
+                        linkedSessions: selectedSessions,
+                        codes: mergedCodes
+                    })
+                });
+                alert("تم تحديث بيانات الحملة وإضافة الأكواد الجديدة بنجاح! ✅");
+                cancelEdit(); // تصفير الفورم
+            } else {
+                // وضع إنشاء جديد
+                let campaignId = "camp_" + Date.now();
+                let newCampaign = {
+                    id: campaignId,
+                    name: name,
+                    linkedSessions: selectedSessions,
+                    codes: newCodesObj,
+                    createdAt: new Date().toLocaleDateString('ar-EG')
+                };
+                await fetch(`${DB_URL}/code_campaigns/${campaignId}.json`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newCampaign)
+                });
+                alert("تم حفظ الأكواد وإتاحتها للطلاب بنجاح! ✅");
+                cancelEdit(); // تصفير الفورم
+            }
+
+            loadCampaigns(); // تحديث الجدول
         } catch (e) { alert("خطأ في الاتصال بالإنترنت."); }
-        btn.innerText = "إصدار الأكواد وتفعيلها للطلاب 🚀"; btn.disabled = false;
+        
+        btn.innerText = originalText; btn.disabled = false;
     }
 
-    // 6. عرض الحملات المحفوظة
+    // 8. عرض الحملات المحفوظة
     async function loadCampaigns() {
         try {
             let res = await fetch(`${DB_URL}/code_campaigns.json`);
             let data = await res.json() || {};
+            globalCampaigns = data; // تخزين الداتا عشان نقدر نستدعيها في التعديل
+            
             let tbody = document.getElementById("campaigns-tbody");
             tbody.innerHTML = "";
             let keys = Object.keys(data).reverse();
@@ -257,7 +358,12 @@
                         <td style="font-weight: bold;">${total}</td>
                         <td style="color: var(--danger); font-weight: bold;">${used}</td>
                         <td style="color: var(--success); font-weight: bold;">${unused}</td>
-                        <td><button onclick="deleteCampaign('${k}')" style="background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight:bold;">حذف 🗑️</button></td>
+                        <td style="text-align: center;">
+                            <div style="display: flex; gap: 5px; justify-content: center;">
+                                <button onclick="editCampaign('${k}')" style="background: var(--warning); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight:bold;">تعديل ⚙️</button>
+                                <button onclick="deleteCampaign('${k}')" style="background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight:bold;">حذف 🗑️</button>
+                            </div>
+                        </td>
                     </tr>
                 `;
             });
@@ -265,7 +371,7 @@
     }
 
     async function deleteCampaign(id) {
-        if(!confirm("هل أنت متأكد من حذف هذه الأكواد نهائياً؟")) return;
+        if(!confirm("هل أنت متأكد من حذف هذه الأكواد نهائياً؟ (هذا سيؤدي لإلغاء تفعيل الفيديوهات للطلاب الذين استخدموها!)")) return;
         await fetch(`${DB_URL}/code_campaigns/${id}.json`, { method: 'DELETE' });
         loadCampaigns();
     }
