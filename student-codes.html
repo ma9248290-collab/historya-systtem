@@ -73,8 +73,6 @@
 
 <script>
     const DB_URL = "https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master";
-    let activeCampaigns = {};
-    let dbSessions = [];
 
     async function checkEligibility() {
         let stCode = document.getElementById("studentCode").value.trim();
@@ -95,6 +93,7 @@
         btn.innerText = "جاري التحقق... ⏳"; btn.disabled = true;
 
         try {
+            // 🛡️ تدمير الكاش لضمان سحب أحدث بيانات لحظية
             let cacheBuster = `?t=${new Date().getTime()}`;
             let fetchOptions = { cache: 'no-store' };
 
@@ -114,49 +113,59 @@
 
             // 2. جلب الحملات المتاحة
             let campRes = await fetch(`${DB_URL}/code_campaigns.json${cacheBuster}`, fetchOptions);
-            activeCampaigns = await campRes.json() || {};
-            
-            let campKeys = Object.keys(activeCampaigns).reverse(); // 💡 فحص الأحدث فالأقدم
+            let activeCampaigns = await campRes.json() || {};
+            let campKeys = Object.keys(activeCampaigns);
+
             if (campKeys.length === 0) {
-                errorBox.innerHTML = "أهلاً بك يا <strong>" + validStudent.name + "</strong><br>لا توجد أكواد متاحة في الوقت الحالي.";
+                errorBox.innerHTML = `أهلاً بك يا <strong>${validStudent.name}</strong><br>لا توجد أكواد متاحة في الوقت الحالي.`;
                 errorBox.style.display = 'block';
                 btn.innerText = "فحص واستلام الكود 🚀"; btn.disabled = false;
                 return;
             }
 
-            // 3. جلب الحصص
+            // 3. جلب الحصص للتأكد من الحضور
             let sessRes = await fetch(`${DB_URL}/data/classSessions.json${cacheBuster}`, fetchOptions);
             let sData = await sessRes.json() || [];
-            dbSessions = Array.isArray(sData) ? sData : Object.values(sData).filter(s => s !== null);
+            let dbSessions = Array.isArray(sData) ? sData : Object.values(sData).filter(s => s !== null);
 
             let foundAlreadyUsed = null;
             let eligibleCampaign = null;
 
-            // 💡 4. البحث الذكي في كل الحملات
+            // 💡 4. البحث الذكي (بيلف على كل الحملات من الأحدث للأقدم)
+            campKeys.reverse(); 
+
             for (let key of campKeys) {
                 let camp = activeCampaigns[key];
                 
-                // هل استلم كود هنا؟
-                let myUsedCode = Object.keys(camp.codes).find(codeKey => camp.codes[codeKey].usedBy === stCode);
+                // هل الطالب ده سحب كود في الحملة دي قبل كده؟
+                let myUsedCode = Object.keys(camp.codes || {}).find(codeKey => camp.codes[codeKey].usedBy === stCode);
                 if (myUsedCode) {
-                    foundAlreadyUsed = { camp: camp, code: myUsedCode };
-                    break; 
+                    foundAlreadyUsed = { id: key, camp: camp, code: myUsedCode };
+                    break; // لقينا كوده، نوقف تدوير
                 }
 
-                // لو مستلمش، هل مستحق (حاضر أو متعوض) في حصة مربوطة بالحملة دي؟
+                // لو مسحبش، نفحص حضوره في الحصص المربوطة بالحملة دي تحديداً
                 let linkedSessionsIds = camp.linkedSessions || [];
                 let isEligibleForThis = false;
 
                 for (let sessId of linkedSessionsIds) {
                     let session = dbSessions.find(s => String(s.id) === String(sessId));
                     if (session && session.attendance) {
-                        let validCode = String(validStudent.code).trim();
-                        let validPhone = String(validStudent.phone).trim();
                         
-                        let stat = session.attendance[validCode] || session.attendance[validPhone];
+                        let validCode = String(validStudent.code).trim();
+                        let validPhone = String(validStudent.phone || "").trim();
+                        
+                        // الفحص بكود الطالب أو تليفونه عشان نضمن إنه ميقعش
+                        let stat = session.attendance[validCode];
+                        if (!stat && validPhone !== "0" && validPhone !== "") {
+                            stat = session.attendance[validPhone];
+                        }
 
+                        // لو حاضر أو متأخر أو متعوض
                         if (
-                            stat === 'present' || stat === 'late' || stat === 'makeup' ||
+                            stat === 'present' || 
+                            stat === 'late' || 
+                            stat === 'makeup' ||
                             (typeof stat === 'object' && (stat.status === 'present' || stat.status === 'late' || stat.status === 'makeup'))
                         ) {
                             isEligibleForThis = true;
@@ -167,13 +176,13 @@
 
                 if (isEligibleForThis) {
                     eligibleCampaign = { id: key, camp: camp };
-                    break; // لقينا حملة مستحقة
+                    break; // الطالب ده مستحق للحملة دي! نوقف تدوير
                 }
             }
 
             let actionArea = document.getElementById("action-area");
 
-            // --- 5. اتخاذ القرار وعرض النتيجة ---
+            // 5. اتخاذ القرار بناءً على البحث
             if (foundAlreadyUsed) {
                 document.getElementById("camp-title").innerText = `🎁 ${foundAlreadyUsed.camp.name}`;
                 actionArea.innerHTML = `
@@ -206,6 +215,7 @@
 
         btn.innerText = "فحص واستلام الكود 🚀"; btn.disabled = false;
     }
+
     async function claimMyCode(campId, studentCode) {
         let actionArea = document.getElementById("action-area");
         actionArea.innerHTML = `<p style="text-align: center; color: var(--primary); font-weight: bold;">جاري توليد الكود... ⏳</p>`;

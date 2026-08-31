@@ -126,7 +126,11 @@
     const DB_URL = "https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master";
     let dbGroups = [];
     let dbSessions = [];
-    let globalCampaigns = {}; // متغير جلوبال لحفظ الأكواد عشان نقدر نعدل عليها
+    let globalCampaigns = {}; 
+
+    // 🔥 المتغيرات دي هي الذاكرة الذكية اللي هتفتكر اختياراتك طول ما انت شغال
+    window.memGroups = [];
+    window.memSessions = [];
 
     // 1. جلب بيانات السيستم الأساسية
     async function loadSystemData() {
@@ -158,7 +162,25 @@
         renderGroups();
     }
 
-    // 3. رسم المجموعات بناءً على الصفوف المختارة
+    // 🔥 دوال تحديث الذاكرة الذكية
+    window.updateMemGroups = function(cb) {
+        if(cb.checked) {
+            if(!window.memGroups.includes(cb.value)) window.memGroups.push(cb.value);
+        } else {
+            window.memGroups = window.memGroups.filter(val => val !== cb.value);
+        }
+        renderSessions();
+    }
+
+    window.updateMemSessions = function(cb) {
+        if(cb.checked) {
+            if(!window.memSessions.includes(cb.value)) window.memSessions.push(cb.value);
+        } else {
+            window.memSessions = window.memSessions.filter(val => val !== cb.value);
+        }
+    }
+
+    // 3. رسم المجموعات بناءً على الصفوف المختارة والذاكرة
     function renderGroups() {
         let selectedLevels = Array.from(document.querySelectorAll('#levels-list input:checked')).map(cb => cb.value);
         let groupsContainer = document.getElementById("groups-list");
@@ -172,15 +194,17 @@
         let filteredGroups = dbGroups.filter(g => selectedLevels.includes(g.level));
         let html = "";
         filteredGroups.forEach(g => {
-            html += `<label class="checkbox-item"><input type="checkbox" value="${g.name}" onchange="renderSessions()"> ${g.name}</label>`;
+            // بنسأل الذاكرة: هل المجموعة دي متعلم عليها ولا لأ؟
+            let isChecked = window.memGroups.includes(g.name) ? "checked" : "";
+            html += `<label class="checkbox-item"><input type="checkbox" value="${g.name}" ${isChecked} onchange="updateMemGroups(this)"> ${g.name}</label>`;
         });
         groupsContainer.innerHTML = html;
         renderSessions();
     }
 
-    // 4. رسم الحصص بناءً على المجموعات المختارة
+    // 4. رسم الحصص بناءً على المجموعات والذاكرة
     function renderSessions() {
-        let selectedGroups = Array.from(document.querySelectorAll('#groups-list input:checked')).map(cb => cb.value);
+        let selectedGroups = window.memGroups; 
         let sessionsContainer = document.getElementById("sessions-list");
 
         if (selectedGroups.length === 0) {
@@ -191,7 +215,9 @@
         let filteredSessions = dbSessions.filter(s => selectedGroups.includes(s.group)).reverse();
         let html = "";
         filteredSessions.forEach(s => {
-            html += `<label class="checkbox-item"><input type="checkbox" value="${s.id}"> ${s.date} - ${s.topic || 'حصة'} (${s.group})</label>`;
+            // بنسأل الذاكرة: هل الحصة دي متعلم عليها ولا لأ؟
+            let isChecked = window.memSessions.includes(s.id) ? "checked" : "";
+            html += `<label class="checkbox-item"><input type="checkbox" value="${s.id}" ${isChecked} onchange="updateMemSessions(this)"> ${s.date} - ${s.topic || 'حصة'} (${s.group})</label>`;
         });
         sessionsContainer.innerHTML = html || "لا توجد حصص مسجلة لهذه المجموعات";
     }
@@ -201,17 +227,15 @@
         let camp = globalCampaigns[id];
         if(!camp) return;
 
-        // وضع الـ ID في الحقل المخفي
         document.getElementById("editCampId").value = id;
         document.getElementById("campName").value = camp.name;
         
-        // تظبيط واجهة التعديل
         document.getElementById("formTitle").innerHTML = "⚙️ تعديل بيانات الأكواد وإضافة المزيد";
         document.getElementById("formCard").style.borderColor = "var(--warning)";
         document.getElementById("saveBtn").innerText = "حفظ التعديلات 💾";
         document.getElementById("saveBtn").style.background = "var(--warning)";
         document.getElementById("cancelBtn").style.display = "block";
-        document.getElementById("campCodes").value = ""; // بنفضي المربع عشان يضيف الجديد بس
+        document.getElementById("campCodes").value = ""; 
         document.getElementById("codesLabel").innerText = "➕ إضافة أكواد جديدة (اختياري)";
         document.getElementById("codesNote").style.display = "block";
 
@@ -219,9 +243,8 @@
         let targetGroups = [];
         let targetLevels = [];
         
-        // استنتاج المجموعات والصفوف من الحصص عشان نعلّم عليهم صح أوتوماتيك
         linkedSessIds.forEach(sessId => {
-            let sessionObj = dbSessions.find(s => s.id === sessId);
+            let sessionObj = dbSessions.find(s => String(s.id) === String(sessId));
             if (sessionObj) {
                 targetGroups.push(sessionObj.group);
                 let groupObj = dbGroups.find(g => g.name === sessionObj.group);
@@ -232,14 +255,18 @@
         targetGroups = [...new Set(targetGroups)];
         targetLevels = [...new Set(targetLevels)];
 
-        // التحديد التلقائي
-        document.querySelectorAll('#levels-list input[type="checkbox"]').forEach(cb => { cb.checked = targetLevels.includes(cb.value); });
-        renderGroups();
-        document.querySelectorAll('#groups-list input[type="checkbox"]').forEach(cb => { cb.checked = targetGroups.includes(cb.value); });
-        renderSessions();
-        document.querySelectorAll('#sessions-list input[type="checkbox"]').forEach(cb => { cb.checked = linkedSessIds.includes(cb.value); });
+        // 🔥 شحن الذاكرة الذكية بالداتا القديمة بتاعت الحملة عشان تتعلم عليها أوتوماتيك
+        window.memGroups = [...targetGroups];
+        window.memSessions = [...linkedSessIds];
 
-        // سكرول لفوق
+        // نعلم على الصفوف
+        document.querySelectorAll('#levels-list input[type="checkbox"]').forEach(cb => { 
+            cb.checked = targetLevels.includes(cb.value); 
+        });
+        
+        // رسم القوائم (لوحدها هتقرأ من الذاكرة وتعلم على الصح)
+        renderGroups();
+
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -257,22 +284,26 @@
         document.getElementById("codesLabel").innerText = "أدخل الأكواد (كود في كل سطر)";
         document.getElementById("codesNote").style.display = "none";
 
+        // 🔥 تفريغ الذاكرة الذكية
+        window.memGroups = [];
+        window.memSessions = [];
+
         document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
         renderGroups();
     }
 
     // 7. حفظ حملة الأكواد (جديدة أو تعديل)
     async function saveCampaign() {
-        let editId = document.getElementById("editCampId").value; // بنشوف احنا في وضع التعديل ولا الإضافة
+        let editId = document.getElementById("editCampId").value; 
         let name = document.getElementById("campName").value.trim();
-        let selectedSessions = Array.from(document.querySelectorAll('#sessions-list input:checked')).map(cb => cb.value);
+        // 💡 السحب من الذاكرة بدل من مربعات الشاشة عشان مفيش حاجة تضيع
+        let selectedSessions = window.memSessions; 
         let rawCodes = document.getElementById("campCodes").value.trim();
 
         if (!name || selectedSessions.length === 0) {
             return alert("يرجى ملء الاسم، واختيار حصة واحدة على الأقل!");
         }
 
-        // لو بنعمل جديد لازم يكون فيه أكواد، لو بنعدل ممكن يكون بيعدل الحصص بس من غير أكواد
         if (!editId && !rawCodes) {
             return alert("يرجى وضع الأكواد!");
         }
@@ -289,7 +320,6 @@
 
         try {
             if (editId) {
-                // وضع التعديل (دمج الأكواد القديمة مع الجديدة وتحديث البيانات)
                 let oldCamp = globalCampaigns[editId];
                 let mergedCodes = { ...(oldCamp.codes || {}), ...newCodesObj };
 
@@ -303,9 +333,8 @@
                     })
                 });
                 alert("تم تحديث بيانات الحملة وإضافة الأكواد الجديدة بنجاح! ✅");
-                cancelEdit(); // تصفير الفورم
+                cancelEdit(); 
             } else {
-                // وضع إنشاء جديد
                 let campaignId = "camp_" + Date.now();
                 let newCampaign = {
                     id: campaignId,
@@ -318,10 +347,10 @@
                     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newCampaign)
                 });
                 alert("تم حفظ الأكواد وإتاحتها للطلاب بنجاح! ✅");
-                cancelEdit(); // تصفير الفورم
+                cancelEdit(); 
             }
 
-            loadCampaigns(); // تحديث الجدول
+            loadCampaigns(); 
         } catch (e) { alert("خطأ في الاتصال بالإنترنت."); }
         
         btn.innerText = originalText; btn.disabled = false;
@@ -332,7 +361,7 @@
         try {
             let res = await fetch(`${DB_URL}/code_campaigns.json`);
             let data = await res.json() || {};
-            globalCampaigns = data; // تخزين الداتا عشان نقدر نستدعيها في التعديل
+            globalCampaigns = data; 
             
             let tbody = document.getElementById("campaigns-tbody");
             tbody.innerHTML = "";
