@@ -50,7 +50,6 @@
         <h2>بوابة استلام الأكواد</h2>
         <p>الرجاء إدخال بياناتك للتحقق من حضورك واستلام كود المنصة الخاص بك بأمان.</p>
         
-        <!-- حقول البيانات الجديدة للحماية -->
         <div class="input-group">
             <label>🔢 كود الطالب</label>
             <input type="text" id="studentCode" class="custom-input" placeholder="مثال: 1234">
@@ -63,10 +62,8 @@
 
         <button class="btn" id="checkBtn" onclick="checkEligibility()">فحص واستلام الكود 🚀</button>
 
-        <!-- رسالة الخطأ والغياب -->
         <div id="error-box" class="error-msg"></div>
 
-        <!-- المربع اللي بيظهر فيه الكود لو كان متاح -->
         <div id="campaign-box" class="campaign-box">
             <h4 style="margin: 0 0 10px 0; color: var(--text-main);" id="camp-title">اسم الحملة</h4>
             <div id="action-area"></div>
@@ -98,12 +95,15 @@
         btn.innerText = "جاري التحقق... ⏳"; btn.disabled = true;
 
         try {
-            // 🛡️ 1. التحقق من هوية الطالب (الحماية)
-            let stRes = await fetch(`${DB_URL}/data/students.json`);
+            let cacheBuster = `?t=${new Date().getTime()}`;
+            let fetchOptions = { cache: 'no-store' };
+
+            // 1. التحقق من هوية الطالب
+            let stRes = await fetch(`${DB_URL}/data/students.json${cacheBuster}`, fetchOptions);
             let studentsData = await stRes.json() || [];
             let studentsArray = Array.isArray(studentsData) ? studentsData : Object.values(studentsData).filter(s => s !== null);
 
-            let validStudent = studentsArray.find(s => s.code == stCode && s.parentPhone == pPhone);
+            let validStudent = studentsArray.find(s => String(s.code).trim() === stCode && String(s.parentPhone).trim() === pPhone);
 
             if (!validStudent) {
                 errorBox.innerHTML = "❌ كود الطالب أو رقم هاتف ولي الأمر غير صحيح!<br><span style='font-size: 13px; color: var(--text-main);'>تأكد من البيانات وحاول مرة أخرى.</span>";
@@ -113,10 +113,10 @@
             }
 
             // 2. جلب الحملات المتاحة
-            let campRes = await fetch(`${DB_URL}/code_campaigns.json`);
+            let campRes = await fetch(`${DB_URL}/code_campaigns.json${cacheBuster}`, fetchOptions);
             activeCampaigns = await campRes.json() || {};
             
-            let campKeys = Object.keys(activeCampaigns);
+            let campKeys = Object.keys(activeCampaigns).reverse(); // 💡 فحص الأحدث فالأقدم
             if (campKeys.length === 0) {
                 errorBox.innerHTML = "أهلاً بك يا <strong>" + validStudent.name + "</strong><br>لا توجد أكواد متاحة في الوقت الحالي.";
                 errorBox.style.display = 'block';
@@ -124,64 +124,79 @@
                 return;
             }
 
-            // 3. جلب الحصص للتأكد من الحضور
-            let sessRes = await fetch(`${DB_URL}/data/classSessions.json`);
+            // 3. جلب الحصص
+            let sessRes = await fetch(`${DB_URL}/data/classSessions.json${cacheBuster}`, fetchOptions);
             let sData = await sessRes.json() || [];
             dbSessions = Array.isArray(sData) ? sData : Object.values(sData).filter(s => s !== null);
 
-            // نعرض أحدث حملة أكواد موجودة للطالب
-            let currentCampKey = campKeys[campKeys.length - 1]; 
-            let camp = activeCampaigns[currentCampKey];
-            
-            document.getElementById("camp-title").innerText = `🎁 ${camp.name}`;
+            let foundAlreadyUsed = null;
+            let eligibleCampaign = null;
 
-            // 4. هل الطالب استلم كود من الحملة دي قبل كده؟
-            let myUsedCode = Object.keys(camp.codes).find(codeKey => camp.codes[codeKey].usedBy == stCode);
-            
-            let actionArea = document.getElementById("action-area");
+            // 💡 4. البحث الذكي في كل الحملات
+            for (let key of campKeys) {
+                let camp = activeCampaigns[key];
+                
+                // هل استلم كود هنا؟
+                let myUsedCode = Object.keys(camp.codes).find(codeKey => camp.codes[codeKey].usedBy === stCode);
+                if (myUsedCode) {
+                    foundAlreadyUsed = { camp: camp, code: myUsedCode };
+                    break; 
+                }
 
-            if (myUsedCode) {
-                // مستلم الكود مسبقاً
-                actionArea.innerHTML = `
-                    <p style="margin: 0 0 10px 0; color: var(--success); font-weight: bold; text-align: center;">أهلاً <strong>${validStudent.name}</strong><br>لقد قمت باستلام كودك مسبقاً:</p>
-                    <div class="code-display" style="display: block;">${myUsedCode}</div>
-                `;
-                campBox.style.display = 'block';
-            } else {
-                // لم يستلم، نفحص حضوره في الحصص المربوطة
+                // لو مستلمش، هل مستحق (حاضر أو متعوض) في حصة مربوطة بالحملة دي؟
                 let linkedSessionsIds = camp.linkedSessions || [];
-                let isEligible = false;
+                let isEligibleForThis = false;
 
                 for (let sessId of linkedSessionsIds) {
-                    let session = dbSessions.find(s => s.id === sessId);
+                    let session = dbSessions.find(s => String(s.id) === String(sessId));
                     if (session && session.attendance) {
-                        let stat = session.attendance[stCode];
-                        // لو حاضر أو متأخر، يبقى مستحق
-                        if (stat === 'present' || stat === 'late') {
-                            isEligible = true;
+                        let validCode = String(validStudent.code).trim();
+                        let validPhone = String(validStudent.phone).trim();
+                        
+                        let stat = session.attendance[validCode] || session.attendance[validPhone];
+
+                        if (
+                            stat === 'present' || stat === 'late' || stat === 'makeup' ||
+                            (typeof stat === 'object' && (stat.status === 'present' || stat.status === 'late' || stat.status === 'makeup'))
+                        ) {
+                            isEligibleForThis = true;
                             break;
                         }
                     }
                 }
 
-                if (isEligible) {
-                    // مستحق للكود
-                    actionArea.innerHTML = `
-                        <p style="text-align:center; font-weight:bold; margin-top:0;">أهلاً بك يا بطل: <span style="color:var(--primary);">${validStudent.name}</span></p>
-                        <button class="btn" style="padding: 10px; background: var(--success); box-shadow: 0 10px 20px rgba(16, 185, 129, 0.2);" onclick="claimMyCode('${currentCampKey}', '${stCode}')">اضغط هنا لاستلام الكود الآن</button>
-                    `;
-                    campBox.style.display = 'block';
-                } else {
-                    // 🚨 غائب! رسالة المنع المطلوبة
-                    errorBox.innerHTML = `
-                        <span style="font-size: 40px; display: block; margin-bottom: 10px;">❌</span>
-                        عفواً يا <strong>${validStudent.name}</strong>!<br>
-                        يبدو أنك كنت <strong>(غائباً)</strong> في الحصة المطلوبة لاستلام هذا الكود.<br><br>
-                        <span style="color: var(--text-main); font-size: 14px;">إذا كان هناك خطأ في التسجيل، يرجى التواصل مع الإدارة فوراً عبر الواتساب على الرقم:</span><br>
-                        <strong style="font-size: 26px; color: var(--primary); display: inline-block; margin-top: 10px; background: white; padding: 5px 15px; border-radius: 10px;">01019664462</strong>
-                    `;
-                    errorBox.style.display = 'block';
+                if (isEligibleForThis) {
+                    eligibleCampaign = { id: key, camp: camp };
+                    break; // لقينا حملة مستحقة
                 }
+            }
+
+            let actionArea = document.getElementById("action-area");
+
+            // --- 5. اتخاذ القرار وعرض النتيجة ---
+            if (foundAlreadyUsed) {
+                document.getElementById("camp-title").innerText = `🎁 ${foundAlreadyUsed.camp.name}`;
+                actionArea.innerHTML = `
+                    <p style="margin: 0 0 10px 0; color: var(--success); font-weight: bold; text-align: center;">أهلاً <strong>${validStudent.name}</strong><br>لقد قمت باستلام كودك مسبقاً:</p>
+                    <div class="code-display" style="display: block;">${foundAlreadyUsed.code}</div>
+                `;
+                campBox.style.display = 'block';
+            } else if (eligibleCampaign) {
+                document.getElementById("camp-title").innerText = `🎁 ${eligibleCampaign.camp.name}`;
+                actionArea.innerHTML = `
+                    <p style="text-align:center; font-weight:bold; margin-top:0;">أهلاً بك يا بطل: <span style="color:var(--primary);">${validStudent.name}</span></p>
+                    <button class="btn" style="padding: 10px; background: var(--success); box-shadow: 0 10px 20px rgba(16, 185, 129, 0.2);" onclick="claimMyCode('${eligibleCampaign.id}', '${stCode}')">اضغط هنا لاستلام الكود الآن</button>
+                `;
+                campBox.style.display = 'block';
+            } else {
+                errorBox.innerHTML = `
+                    <span style="font-size: 40px; display: block; margin-bottom: 10px;">❌</span>
+                    عفواً يا <strong>${validStudent.name}</strong>!<br>
+                    يبدو أنك كنت <strong>(غائباً)</strong> في الحصص المطلوبة لاستلام الأكواد المتاحة حالياً.<br><br>
+                    <span style="color: var(--text-main); font-size: 14px;">إذا كان هناك خطأ في التسجيل، يرجى التواصل مع الإدارة فوراً عبر الواتساب على الرقم:</span><br>
+                    <strong style="font-size: 26px; color: var(--primary); display: inline-block; margin-top: 10px; background: white; padding: 5px 15px; border-radius: 10px;">01019664462</strong>
+                `;
+                errorBox.style.display = 'block';
             }
 
         } catch (e) {
@@ -191,14 +206,13 @@
 
         btn.innerText = "فحص واستلام الكود 🚀"; btn.disabled = false;
     }
-
     async function claimMyCode(campId, studentCode) {
         let actionArea = document.getElementById("action-area");
         actionArea.innerHTML = `<p style="text-align: center; color: var(--primary); font-weight: bold;">جاري توليد الكود... ⏳</p>`;
 
         try {
-            // جلب الحملة اللحظية لضمان عدم تعارض الأكواد لو اتنين داسوا في نفس الثانية
-            let res = await fetch(`${DB_URL}/code_campaigns/${campId}.json`);
+            let cacheBuster = `?t=${new Date().getTime()}`;
+            let res = await fetch(`${DB_URL}/code_campaigns/${campId}.json${cacheBuster}`, { cache: 'no-store' });
             let camp = await res.json();
             
             let unusedCode = Object.keys(camp.codes).find(k => camp.codes[k].status === 'unused');
@@ -208,14 +222,12 @@
                 return;
             }
 
-            // تحديث الكود في الداتابيز ليصبح مستخدماً باسم هذا الطالب
             await fetch(`${DB_URL}/code_campaigns/${campId}/codes/${unusedCode}.json`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: 'used', usedBy: studentCode })
             });
 
-            // عرض الكود للطالب
             actionArea.innerHTML = `
                 <p style="margin: 0 0 10px 0; color: var(--success); font-weight: bold; text-align: center;">مبروك! تم حجز الكود الخاص بك بنجاح:</p>
                 <div class="code-display" style="display: block;">${unusedCode}</div>
