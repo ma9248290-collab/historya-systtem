@@ -6566,6 +6566,12 @@ window.openApproveModal = function(id) {
     document.getElementById("approveStName").innerText = req.name;
     document.getElementById("approveStLevel").innerText = req.level;
 
+    // 🔥 التعديل هنا: توليد الكود وعرضه في الخانة
+    let codeInput = document.getElementById("approveStCode");
+    if(codeInput) {
+        codeInput.value = window.generateStudentCode(); 
+    }
+
     let groupSelect = document.getElementById("approveStGroup");
     groupSelect.innerHTML = "<option value=''>اختر المجموعة...</option>";
     
@@ -6585,14 +6591,19 @@ window.confirmApproveRequest = async function() {
     
     if(!selectedGroup) return showToast("يجب اختيار مجموعة لتسكين الطالب!", "error");
 
+    // 🔥 التعديل هنا: قراءة الكود من الخانة بدل توليده
+    let newCode = document.getElementById("approveStCode").value.trim();
+    if(!newCode) return showToast("كود الطالب لا يمكن أن يكون فارغاً!", "error");
+
+    // فحص منع تكرار الكود
+    const duplicate = students.find(s => String(s.code) === String(newCode));
+    if(duplicate) return showToast(`تنبيه! هذا الكود مستخدم بالفعل للطالب: ${duplicate.name}`, "error");
+
     let btn = document.querySelector("#approveRequestModal .save-btn");
     let origText = btn.innerText;
     btn.innerText = "جاري المعالجة... ⏳"; btn.disabled = true;
 
     try {
-        // توليد الكود التالي
-        let newCode = generateStudentCode();
-
         // تجهيز بيانات الطالب
         let newStudent = {
             code: newCode,

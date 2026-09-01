@@ -305,7 +305,13 @@
         
         <div style="background: var(--hover-bg); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: right;">
             <p style="margin: 0 0 5px 0;">اسم الطالب: <strong id="approveStName" style="color: var(--primary-color);"></strong></p>
-            <p style="margin: 0;">الصف: <strong id="approveStLevel"></strong></p>
+            <p style="margin: 0 0 10px 0;">الصف: <strong id="approveStLevel"></strong></p>
+            
+            <!-- 🔥 الخانة الجديدة للكود -->
+            <div class="input-group" style="margin-bottom: 0;">
+                <label style="color: var(--success-color);">الكود المخصص للطالب (يمكنك تعديله):</label>
+                <input type="text" id="approveStCode" class="custom-input" style="font-weight: bold; color: var(--primary-color); text-align: center; letter-spacing: 2px;">
+            </div>
         </div>
 
         <input type="hidden" id="approveReqId">
