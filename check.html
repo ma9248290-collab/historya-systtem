@@ -269,7 +269,13 @@
             btn.innerText = "جاري الإرسال... ⏳";
             btn.disabled = true;
 
+
+            // 👈 السطر ده جديد: هنسحب الكود اللي الطالب كتبه في خانة البحث
+    let searchedCode = document.getElementById("searchCode").value.trim();
+
+
             let requestData = {
+                code: searchedCode, // 👈 السطر ده جديد: هنبعت الكود ده مع بيانات الطالب
                 name: document.getElementById("regName").value.trim(),
                 phone: document.getElementById("regPhone").value.trim(),
                 parentPhone: document.getElementById("regParentPhone").value.trim(),

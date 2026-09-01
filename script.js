@@ -6566,10 +6566,11 @@ window.openApproveModal = function(id) {
     document.getElementById("approveStName").innerText = req.name;
     document.getElementById("approveStLevel").innerText = req.level;
 
-    // 🔥 التعديل هنا: توليد الكود وعرضه في الخانة
+    // 🔥 التعديل هنا: هنحط الكود اللي الطالب كتبه في صفحة الفحص
+    // لو مفيش كود مبعوت (أو طلب قديم)، هيولد كود جديد أوتوماتيك
     let codeInput = document.getElementById("approveStCode");
     if(codeInput) {
-        codeInput.value = window.generateStudentCode(); 
+        codeInput.value = req.code ? req.code : window.generateStudentCode(); 
     }
 
     let groupSelect = document.getElementById("approveStGroup");
