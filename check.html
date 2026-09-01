@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>فحص وتسجيل الطلاب | هيستوريا</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #980000;
+            --primary-hover: #700000;
+            --secondary: #0f172a;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, var(--bg-color) 0%, #e2e8f0 100%);
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-main);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 40px 30px;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.5);
+            text-align: center;
+            animation: fadeIn 0.5s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .logo {
+            width: 90px;
+            height: auto;
+            margin-bottom: 15px;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+        }
+
+        h2 { color: var(--secondary); margin: 0 0 10px 0; font-size: 28px; font-weight: 900; }
+        p { color: var(--text-muted); font-size: 15px; font-weight: 600; margin-bottom: 25px; line-height: 1.6; }
+
+        .input-group { margin-bottom: 20px; text-align: right; }
+        .input-group label { display: block; margin-bottom: 8px; font-weight: 800; color: var(--secondary); font-size: 14px; }
+        .custom-input {
+            width: 100%; padding: 15px 20px; border: 2px solid var(--border);
+            border-radius: 12px; font-size: 16px; font-family: 'Cairo', sans-serif;
+            transition: all 0.3s ease; background: #f8fafc; color: var(--text-main); font-weight: 700;
+            box-sizing: border-box;
+        }
+        .custom-input:focus { border-color: var(--primary); outline: none; background: white; box-shadow: 0 0 0 4px rgba(152, 0, 0, 0.1); }
+
+        .btn {
+            width: 100%; background: linear-gradient(45deg, var(--primary), var(--primary-hover));
+            color: white; border: none; padding: 16px; border-radius: 12px;
+            font-size: 18px; font-weight: 900; cursor: pointer; transition: all 0.3s ease;
+            box-shadow: 0 10px 20px rgba(152,0,0,0.2);
+        }
+        .btn:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(152,0,0,0.3); }
+        .btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+
+        .btn-success { background: linear-gradient(45deg, var(--success), #059669); box-shadow: 0 10px 20px rgba(16,185,129,0.2); }
+        .btn-success:hover { box-shadow: 0 15px 30px rgba(16,185,129,0.3); }
+
+        .btn-outline { background: transparent; color: var(--text-muted); border: 2px solid var(--border); box-shadow: none; margin-top: 10px; }
+        .btn-outline:hover { background: #f1f5f9; color: var(--secondary); border-color: #cbd5e1; }
+
+        /* الشاشات */
+        #step-result, #step-register { display: none; }
+
+        /* كارت بيانات الطالب الموجود */
+        .student-badge {
+            background: #f0fdf4; border: 2px dashed var(--success); padding: 20px;
+            border-radius: 16px; text-align: center; margin-bottom: 25px;
+        }
+
+        /* رسالة التنبيه */
+        #toast {
+            position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%);
+            background: var(--secondary); color: white; padding: 12px 25px;
+            border-radius: 50px; font-weight: bold; font-size: 15px;
+            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 1000;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div id="toast">رسالة التنبيه</div>
+
+    <div class="container">
+        <!-- 1. شاشة البحث بالكود -->
+        <div class="card" id="step-search">
+            <img src="logo.png" alt="Logo" class="logo">
+            <h2>بوابة الطلاب</h2>
+            <p>أدخل الكود الخاص بك للتحقق من بياناتك في النظام.</p>
+            
+            <div class="input-group">
+                <input type="text" id="searchCode" class="custom-input" placeholder="مثال: 1050" style="text-align: center; font-size: 24px; letter-spacing: 3px;">
+            </div>
+            
+            <button class="btn" id="checkBtn" onclick="checkStudentCode()">تحقق من الكود 🔍</button>
+            <div id="loadingText" style="display:none; color: var(--primary); font-weight: bold; margin-top: 15px;">جاري الاتصال بالسيرفر... ⏳</div>
+        </div>
+
+        <!-- 2. شاشة النتيجة (لو الطالب موجود) -->
+        <div class="card" id="step-result">
+            <div style="font-size: 60px; margin-bottom: 10px;">🎉</div>
+            <h2 style="color: var(--success);">الطالب مسجل بنجاح</h2>
+            <p>بياناتك مسجلة ومفعلة على منصة هيستوريا.</p>
+            
+            <div class="student-badge">
+                <h3 id="resName" style="color: var(--secondary); margin: 0 0 10px 0; font-size: 22px;">اسم الطالب</h3>
+                <div style="font-size: 15px; font-weight: bold; color: var(--text-muted); display: flex; flex-direction: column; gap: 8px;">
+                    <span id="resLevel">الصف: </span>
+                    <span id="resGroup">المجموعة: </span>
+                </div>
+            </div>
+
+            <button class="btn btn-success" onclick="resetToSearch()">تم، فحص طالب آخر 🔄</button>
+        </div>
+
+        <!-- 3. شاشة التسجيل (لو الطالب مش موجود) -->
+        <div class="card" id="step-register">
+            <div style="font-size: 50px; margin-bottom: 10px;">⚠️</div>
+            <h2 style="color: var(--danger);">الكود غير مسجل!</h2>
+            <p style="color: var(--text-main); font-weight: 800;">يبدو أنك طالب جديد، يرجى إدخال بياناتك لطلب الانضمام للمجموعة.</p>
+            
+            <form id="registerForm" onsubmit="submitJoinRequest(event)">
+                <div class="input-group">
+                    <label>الاسم رباعي</label>
+                    <input type="text" id="regName" required class="custom-input" placeholder="اكتب اسمك بالكامل">
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <div class="input-group" style="flex: 1;">
+                        <label>رقم الطالب</label>
+                        <input type="text" id="regPhone" required class="custom-input" placeholder="01...">
+                    </div>
+                    <div class="input-group" style="flex: 1;">
+                        <label>رقم ولي الأمر</label>
+                        <input type="text" id="regParentPhone" required class="custom-input" placeholder="01...">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>الصف الدراسي</label>
+                    <select id="regLevel" required class="custom-input" onchange="filterGroups()">
+                        <option value="">اختر الصف...</option>
+                        <option value="الصف الأول الثانوي">الصف الأول الثانوي</option>
+                        <option value="الصف الثاني الثانوي">الصف الثاني الثانوي</option>
+                        <option value="الصف الثالث الثانوي">الصف الثالث الثانوي</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label>المجموعة المراد الانضمام لها</label>
+                    <select id="regGroup" required class="custom-input">
+                        <option value="">اختر الصف أولاً...</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn" id="submitBtn">إرسال طلب الانضمام 🚀</button>
+                <button type="button" class="btn btn-outline" onclick="resetToSearch()">إلغاء والعودة</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ⚙️ إعدادات السيرفر
+        const TEACHER_ID = "Historia_System_Master";
+        let studentsList = [];
+        let groupsList = [];
+
+        // 1. تحميل الداتا من الفايربيز أول ما الصفحة تفتح
+        async function loadSystemData() {
+            try {
+                let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${TEACHER_ID}/data.json`);
+                let data = await res.json() || {};
+                
+                // تظبيط المصفوفات
+                studentsList = Array.isArray(data.students) ? data.students : Object.values(data.students || {}).filter(i => i !== null);
+                groupsList = Array.isArray(data.groups) ? data.groups : Object.values(data.groups || {}).filter(i => i !== null);
+                
+                console.log("✅ Data Loaded:", studentsList.length, "Students");
+            } catch (e) {
+                showToast("خطأ في الاتصال بالسيرفر، تأكد من الإنترنت", "error");
+            }
+        }
+
+        // تشغيل التحميل
+        loadSystemData();
+
+        // 2. دالة التحقق من الكود
+        function checkStudentCode() {
+            let code = document.getElementById("searchCode").value.trim();
+            if(!code) return showToast("يرجى إدخال الكود أولاً!", "error");
+
+            let btn = document.getElementById("checkBtn");
+            let loader = document.getElementById("loadingText");
+            
+            btn.style.display = "none";
+            loader.style.display = "block";
+
+            setTimeout(() => {
+                // البحث في الذاكرة
+                let student = studentsList.find(s => String(s.code) === String(code));
+
+                if (student) {
+                    // الطالب موجود -> افتح كارت النجاح
+                    document.getElementById("resName").innerText = student.name;
+                    document.getElementById("resLevel").innerText = `الصف: ${student.level}`;
+                    document.getElementById("resGroup").innerText = `المجموعة: ${student.group}`;
+                    
+                    switchView("step-result");
+                } else {
+                    // الطالب مش موجود -> افتح كارت التسجيل
+                    switchView("step-register");
+                }
+                
+                btn.style.display = "block";
+                loader.style.display = "none";
+            }, 800); // تأخير وهمي بسيط بيدي إحساس إن السيستم بيفحص
+        }
+
+        // 3. فلترة المجموعات حسب الصف (جوه شاشة التسجيل)
+        function filterGroups() {
+            let selectedLevel = document.getElementById("regLevel").value;
+            let groupSelect = document.getElementById("regGroup");
+            
+            groupSelect.innerHTML = "<option value=''>اختر المجموعة...</option>";
+            
+            let matchedGroups = groupsList.filter(g => g.level === selectedLevel);
+            matchedGroups.forEach(g => {
+                groupSelect.innerHTML += `<option value="${g.name}">${g.name}</option>`;
+            });
+
+            if(matchedGroups.length === 0 && selectedLevel !== "") {
+                groupSelect.innerHTML = "<option value=''>لا توجد مجموعات متاحة لهذا الصف</option>";
+            }
+        }
+
+        // 4. إرسال طلب الانضمام للوحة المدرس (زي شاشة الأونلاين بالظبط)
+        async function submitJoinRequest(e) {
+            e.preventDefault();
+            
+            let btn = document.getElementById("submitBtn");
+            let originalText = btn.innerText;
+            btn.innerText = "جاري الإرسال... ⏳";
+            btn.disabled = true;
+
+            let requestData = {
+                name: document.getElementById("regName").value.trim(),
+                phone: document.getElementById("regPhone").value.trim(),
+                parentPhone: document.getElementById("regParentPhone").value.trim(),
+                level: document.getElementById("regLevel").value,
+                groupPref: document.getElementById("regGroup").value, // المجموعة اللي اختارها
+                centerName: "تسجيل من الكود", // عشان تعرف إنه جاي منين في لوحة الإدارة
+                gender: "غير محدد",
+                status: "pending",
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                // الرفع المباشر للفايربيز في مسار طلبات الانضمام اللي عند المدرس
+                await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${TEACHER_ID}/join_requests/${Date.now()}.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestData)
+                });
+
+                showToast("تم إرسال طلبك للإدارة بنجاح! ✅");
+                document.getElementById("registerForm").reset();
+                setTimeout(() => resetToSearch(), 2000);
+
+            } catch (error) {
+                showToast("حدث خطأ أثناء الإرسال، حاول مجدداً!", "error");
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // --- دوال مساعدة للواجهة ---
+        function switchView(viewId) {
+            document.getElementById("step-search").style.display = "none";
+            document.getElementById("step-result").style.display = "none";
+            document.getElementById("step-register").style.display = "none";
+            
+            document.getElementById(viewId).style.display = "block";
+        }
+
+        function resetToSearch() {
+            document.getElementById("searchCode").value = "";
+            switchView("step-search");
+            document.getElementById("searchCode").focus();
+        }
+
+        let toastTimeout;
+        function showToast(msg, type = "success") {
+            let toast = document.getElementById("toast");
+            toast.innerText = msg;
+            toast.style.background = type === "error" ? "var(--danger)" : "var(--success)";
+            toast.style.bottom = "30px";
+            
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.style.bottom = "-100px";
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

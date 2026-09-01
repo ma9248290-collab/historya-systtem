@@ -2717,15 +2717,92 @@ document.getElementById('editBookForm')?.addEventListener('submit', function(e) 
 
 
 
-// فحص حالة السيرفر لعرض الـ QR Code في الإعدادات
-if (!document.getElementById('qrScript')) {
-    let script = document.createElement('script');
-    script.id = 'qrScript';
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
-    document.head.appendChild(script);
-}
+// ==========================================
+// ⚙️ فحص حالة السيرفر ونظام الربط برقم الهاتف
+// ==========================================
+setInterval(async () => {
+    const nodeStatus = document.getElementById("nodeStatus");
+    const waStatus = document.getElementById("waStatus");
+    const phonePairingContainer = document.getElementById("phonePairingContainer");
 
+    if(!nodeStatus) return; // لو المدرس مش فاتح الشاشة دي، ميعملش حاجة
 
+    try {
+        // فحص حالة السيرفر
+        const response = await fetch(`${WHATSAPP_SERVER_URL}/status?clientId=${getSafeUid()}`, {
+            headers: {
+                'ngrok-skip-browser-warning': 'true',
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await response.json();
+        
+        nodeStatus.innerHTML = '<span style="color: #10b981; font-weight: bold;">● يعمل (Online)</span>';
+        
+        if (data.status === 'connected') {
+            waStatus.innerHTML = '<span style="color: #10b981; font-weight: bold;">متصل ✅</span>';
+            if(phonePairingContainer) phonePairingContainer.style.display = "none";
+        } else if (data.status === 'need_scan') {
+            waStatus.innerHTML = '<span style="color: #ef4444; font-weight: bold;">بانتظار الربط 📱</span>';
+            // إظهار مربع إدخال رقم الهاتف لطلب الكود
+            if(phonePairingContainer) phonePairingContainer.style.display = "block";
+        } else {
+            waStatus.innerHTML = '<span style="color: #f59e0b; font-weight: bold;">جاري التهيئة... ⏳</span>';
+            if(phonePairingContainer) phonePairingContainer.style.display = "none";
+        }
+    } catch (e) {
+        nodeStatus.innerHTML = '<span style="color: #ef4444; font-weight: bold;">● متوقف (Offline)</span>';
+        waStatus.innerHTML = '---';
+        if(phonePairingContainer) phonePairingContainer.style.display = "none";
+    }
+}, 5000);
+
+// دالة طلب رمز الربط من السيرفر
+window.requestWaPairingCode = async function() {
+    let phone = document.getElementById("waPairPhone").value.trim();
+    let btn = document.getElementById("requestPairBtn");
+    let displayBox = document.getElementById("pairingCodeDisplay");
+    let codeLabel = document.getElementById("thePairingCode");
+
+    if (!phone) {
+        showToast("يرجى إدخال رقم الواتساب أولاً!", "error");
+        return;
+    }
+
+    btn.innerText = "جاري سحب الرمز... ⏳";
+    btn.disabled = true;
+
+    try {
+        let response = await fetch(`${WHATSAPP_SERVER_URL}/pair-phone`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'ngrok-skip-browser-warning': 'true'
+            },
+            body: JSON.stringify({ clientId: getSafeUid(), phone: phone })
+        });
+        
+        let data = await response.json();
+        
+        if (data.success && data.code) {
+            showToast("تم توليد الرمز بنجاح! أدخله في هاتفك الآن.", "success");
+            btn.style.display = "none"; // إخفاء الزر بعد النجاح
+            displayBox.style.display = "block";
+            
+            // تنسيق الكود عشان يظهر بشياكة (فصل الحروف)
+            let formattedCode = data.code.match(/.{1,4}/g).join('-');
+            codeLabel.innerText = formattedCode;
+        } else {
+            showToast(data.error || "فشل توليد الرمز، تأكد من الرقم وحاول مجدداً", "error");
+            btn.innerText = "طلب رمز الربط 📲";
+            btn.disabled = false;
+        }
+    } catch (e) {
+        showToast("حدث خطأ في الاتصال بسيرفر الواتساب!", "error");
+        btn.innerText = "طلب رمز الربط 📲";
+        btn.disabled = false;
+    }
+};
 
 
 // ==========================================
@@ -6439,7 +6516,7 @@ window.loadJoinRequests = async function() {
     let tbody = document.getElementById("join-requests-tbody");
     if(!tbody) return;
     try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${localStorage.getItem("licenseKey")}/join_requests.json`);
+        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests.json`);
         let data = await res.json() || {};
         window.currentJoinRequests = data;
         
@@ -6533,7 +6610,7 @@ window.confirmApproveRequest = async function() {
         localStorage.setItem("students", JSON.stringify(students));
         
         // مسح الطلب من الفايربيز
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${localStorage.getItem("licenseKey")}/join_requests/${id}.json`, { method: 'DELETE' });
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests/${id}.json`, { method: 'DELETE' });
 
         // إرسال رسالة واتساب للطالب (ولو مش كاتب رقمه هيبعت لولي الأمر احتياطي)
         let portalLink = `https://ma9248290-collab.github.io/historya-systtem/parent.html`;
@@ -6564,7 +6641,7 @@ window.confirmApproveRequest = async function() {
 window.rejectRequest = async function(id) {
     if(!confirm("هل أنت متأكد من رفض هذا الطلب وحذفه؟")) return;
     try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${localStorage.getItem("licenseKey")}/join_requests/${id}.json`, { method: 'DELETE' });
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests/${id}.json`, { method: 'DELETE' });
         showToast("تم حذف الطلب 🗑️");
         loadJoinRequests();
     } catch(e) { showToast("خطأ في الاتصال!", "error"); }
