@@ -6557,6 +6557,46 @@ window.loadJoinRequests = async function() {
     } catch(e) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">خطأ في الاتصال!</td></tr>`; }
 };
 
+// 🧠 دالة الفلترة الذكية (توحيد الحروف العربية)
+window.smartArabicNormalize = function(text) {
+    if (!text) return "";
+    return text.toString().toLowerCase()
+        .replace(/[أإآا]/g, 'ا') // توحيد الألف
+        .replace(/ة/g, 'ه')      // توحيد التاء المربوطة والهاء
+        .replace(/[يى]/g, 'ي')    // توحيد الياء والألف اللينة
+        .replace(/[ئءؤ]/g, 'ء')   // توحيد أشكال الهمزة
+        .replace(/\s+/g, ' ')     // إزالة المسافات الزائدة
+        .trim();
+};
+
+// 🔍 دالة البحث في جدول طلبات الانضمام
+window.searchJoinRequests = function() {
+    let input = document.getElementById("joinReqSearchInput").value;
+    // نمرر الكلمة اللي بتبحث بيها على الدالة الذكية
+    let filter = window.smartArabicNormalize(input); 
+    
+    let tbody = document.getElementById("join-requests-tbody");
+    if (!tbody) return;
+    
+    let rows = tbody.getElementsByTagName("tr");
+
+    for (let i = 0; i < rows.length; i++) {
+        // تخطي صف "لا توجد طلبات" أو "جاري التحميل" 
+        if (rows[i].getElementsByTagName("td").length < 4) continue;
+
+        // نسحب كل النص اللي جوه الصف (اسم، كود، رقم موبايل) ونمرره برضه على الدالة الذكية
+        let rowText = window.smartArabicNormalize(rows[i].textContent);
+        
+        // نقارن الاتنين ببعض
+        if (rowText.includes(filter)) {
+            rows[i].style.display = ""; // إظهار
+        } else {
+            rows[i].style.display = "none"; // إخفاء
+        }
+    }
+};
+
+
 // 3. فتح نافذة الموافقة وتعبئة المجموعات المناسبة للصف
 window.openApproveModal = function(id) {
     let req = window.currentJoinRequests[id];
