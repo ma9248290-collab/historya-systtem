@@ -71,20 +71,31 @@ window.smartArabicNormalize = function(text) {
         .trim();
 };
 
+// ==========================================
+// 1️⃣ دالة المعالجة الذكية للحروف والبحث (توحيد وتطابق جزئي)
+// ==========================================
+window.smartArabicNormalize = function(text) {
+    if (!text) return "";
+    return text.toString().toLowerCase()
+        .replace(/[أإآا]/g, 'ا')
+        .replace(/ة/g, 'ه')
+        .replace(/[يى]/g, 'ي')
+        .replace(/[ئءؤ]/g, 'ء')
+        .replace(/\s+/g, ' ')
+        .trim();
+};
+
 window.findStudentByCodeOrName = function(input) {
     const val = input.trim();
-    // البحث بالكود أولاً (لأنه أدق شيء)
     const studentByCode = students.find(s => String(s.code) === String(val));
     if (studentByCode) return studentByCode;
     
-    // البحث بالاسم (مطابقة ذكية للكلمات المتقطعة)
     const normalizedInput = window.smartArabicNormalize(val);
-    const inputWords = normalizedInput.split(' '); // تقسيم البحث لكلمات
+    const inputWords = normalizedInput.split(' '); 
     
     return students.find(s => {
         let dbName = window.smartArabicNormalize(s.name);
-        // لو الاسم متطابق بالكامل أو لو "كل كلمات البحث" موجودة في اسم الطالب
-        // (يعني لو بحث بـ "احمد محمود" والطالب اسمه "احمد سيد محمود" هيلاقيه)
+        // المطابقة الذكية: لو كتب "احمد محمود" والطالب اسمه "احمد سيد محمود" هيلاقيه
         return dbName === normalizedInput || inputWords.every(word => dbName.includes(word));
     });
 };
@@ -1331,7 +1342,7 @@ function backToSessions() { document.getElementById("sessions-overview").style.d
 
 
 // ==========================================
-// 🚀 رصد الباركود المطور (ربط ذكي وتجاهل أخطاء الاسم)
+// 4️⃣ رصد الباركود المطور (ربط ذكي وتجاهل أخطاء الاسم)
 // ==========================================
 document.getElementById('attendanceBarcode')?.addEventListener('keypress', function(e) { 
     if(e.key === 'Enter') { 
@@ -1344,10 +1355,9 @@ document.getElementById('attendanceBarcode')?.addEventListener('keypress', funct
         
         if(!student) {
             let normalizedVal = window.smartArabicNormalize(val); 
-            let inputWords = normalizedVal.split(' '); // تقسيم الاسم المكتوب لكلمات
+            let inputWords = normalizedVal.split(' '); 
             let foundReqId = null;
 
-            // البحث في طلبات الانضمام المعلقة
             if (window.currentJoinRequests) {
                 for (let id in window.currentJoinRequests) {
                     let reqName = window.smartArabicNormalize(window.currentJoinRequests[id].name);
@@ -1360,7 +1370,6 @@ document.getElementById('attendanceBarcode')?.addEventListener('keypress', funct
             }
 
             if (foundReqId) {
-                // الطالب موجود في طلبات الانضمام
                 showToast(`تم العثور عليه في طلبات الانضمام! جاري التسكين... ⏳`, "info");
                 openApproveModal(foundReqId);
                 
@@ -1372,7 +1381,6 @@ document.getElementById('attendanceBarcode')?.addEventListener('keypress', funct
                 window.pendingAttendanceAfterAction = true;
 
             } else {
-                // الطالب غير موجود تماماً، نفتح الإضافة السريعة
                 showToast(`طالب غير مسجل! جاري فتح الإضافة السريعة... ➕`, "warning");
                 openModal('addStudentModal');
                 
@@ -6681,7 +6689,9 @@ window.searchJoinRequests = function() {
 };
 
 
-// 3. فتح نافذة الموافقة وتعبئة المجموعات المناسبة للصف
+// ==========================================
+// 2️⃣ تحديث نافذة الموافقة (لتنبيهك بالطلبات المكررة)
+// ==========================================
 window.openApproveModal = function(id) {
     let req = window.currentJoinRequests[id];
     if(!req) return;
@@ -6690,8 +6700,39 @@ window.openApproveModal = function(id) {
     document.getElementById("approveStName").innerText = req.name;
     document.getElementById("approveStLevel").innerText = req.level;
 
-    // 🔥 التعديل هنا: هنحط الكود اللي الطالب كتبه في صفحة الفحص
-    // لو مفيش كود مبعوت (أو طلب قديم)، هيولد كود جديد أوتوماتيك
+    // 🔍 البحث عن طلبات مكررة لنفس الطالب
+    let reqNameNorm = window.smartArabicNormalize(req.name);
+    let reqWords = reqNameNorm.split(' ');
+    let duplicatesCount = 0;
+
+    for (let otherId in window.currentJoinRequests) {
+        if (otherId === id) continue;
+        let otherReq = window.currentJoinRequests[otherId];
+        let otherNameNorm = window.smartArabicNormalize(otherReq.name);
+        
+        let isDup = false;
+        if (req.phone && req.phone !== "0" && otherReq.phone === req.phone) isDup = true;
+        if (req.parentPhone && req.parentPhone !== "0" && otherReq.parentPhone === req.parentPhone) isDup = true;
+        // مطابقة ذكية للاسم
+        if (reqNameNorm === otherNameNorm || reqWords.every(w => otherNameNorm.includes(w)) || otherNameNorm.split(' ').every(w => reqNameNorm.includes(w))) isDup = true;
+
+        if (isDup) duplicatesCount++;
+    }
+
+    // إظهار تحذير المكررات
+    let dupWarningEl = document.getElementById("approveDupWarning");
+    if (!dupWarningEl) {
+        dupWarningEl = document.createElement("div");
+        dupWarningEl.id = "approveDupWarning";
+        document.getElementById("approveStName").parentElement.appendChild(dupWarningEl);
+    }
+    
+    if (duplicatesCount > 0) {
+        dupWarningEl.innerHTML = `<span style="display:inline-block; margin-top:10px; background:rgba(239,68,68,0.1); color:#ef4444; padding:5px 10px; border-radius:6px; font-size:12px; font-weight:bold;">⚠️ انتبه: هذا الطالب له (${duplicatesCount}) طلبات مكررة أخرى (سيتم حذفها تلقائياً عند القبول).</span>`;
+    } else {
+        dupWarningEl.innerHTML = "";
+    }
+
     let codeInput = document.getElementById("approveStCode");
     if(codeInput) {
         codeInput.value = req.code ? req.code : window.generateStudentCode(); 
@@ -6699,8 +6740,6 @@ window.openApproveModal = function(id) {
 
     let groupSelect = document.getElementById("approveStGroup");
     groupSelect.innerHTML = "<option value=''>اختر المجموعة...</option>";
-    
-    // فلترة المجموعات بناءً على صف الطالب
     groups.filter(g => g.level === req.level).forEach(g => {
         groupSelect.innerHTML += `<option value="${g.name}">${g.name}</option>`;
     });
@@ -6708,6 +6747,9 @@ window.openApproveModal = function(id) {
     openModal("approveRequestModal");
 };
 
+// ==========================================
+// 3️⃣ تأكيد القبول (حل مشكلة المسح بعد دقيقتين، وتنظيف المكررات)
+// ==========================================
 window.confirmApproveRequest = async function() {
     let id = document.getElementById("approveReqId").value;
     let selectedGroup = document.getElementById("approveStGroup").value;
@@ -6723,40 +6765,43 @@ window.confirmApproveRequest = async function() {
 
     let btn = document.querySelector("#approveRequestModal .save-btn");
     let origText = btn.innerText;
-    btn.innerText = "جاري التسكين... ⚡"; btn.disabled = true;
+    btn.innerText = "جاري التسكين والتنظيف... ⚡"; btn.disabled = true;
 
     try {
-        // ==================================================
-        // 1. التحديث المحلي الفوري (لجعل النظام سريع جداً كالصاروخ)
-        // ==================================================
         let newStudent = {
             code: newCode, name: req.name, phone: req.phone, parentPhone: req.parentPhone,
             level: req.level, gender: req.gender, group: selectedGroup, behaviorPoints: 0
         };
 
+        // 1. التحديث المحلي
         students.push(newStudent);
         localStorage.setItem("students", JSON.stringify(students));
+        
+        // 🚀 الرفع الفوري للسيرفر لمنع ضياع البيانات بعد دقيقتين 🚀
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/data/students.json`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(students)
+        });
 
-        // مسح الطلب محلياً عشان يختفي من الجدول فوراً بمجرد القبول
         delete window.currentJoinRequests[id];
 
-        // إغلاق النافذة فوراً وإظهار رسالة النجاح
         showToast(`تم التسكين بنجاح! كود الطالب هو: ${newCode}`);
         closeModal("approveRequestModal");
-        
-        // تحديث الواجهة أمام المدرس فوراً
         loadJoinRequests(); 
         renderTable(); 
 
-        // التحضير التلقائي لو المدرس كان واقف في شاشة الحضور
         if (window.pendingAttendanceAfterAction && currentActiveSessionId) {
             let isLate = document.getElementById('markAsLateCheckbox')?.checked;
             let attStatus = isLate ? 'late' : 'present';
             markAttendance(newCode, attStatus);
+            
+            // 🚀 الرفع الفوري للحضور عشان ميضيعش 🚀
+            await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/data/classSessions.json`, {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(classSessions)
+            });
+
             showToast(`تم تحضير الطالب المنضم حديثاً بنجاح! ✅`);
             window.pendingAttendanceAfterAction = false;
             
-            // لو الدفع السريع شغال، أظهره للمدرس فوراً
             let autoPaymentEnabled = document.getElementById('autoPaymentCheckbox')?.checked;
             if (autoPaymentEnabled) {
                 setTimeout(() => openQuickPaymentModal(newStudent), 500);
@@ -6765,35 +6810,31 @@ window.confirmApproveRequest = async function() {
             }
         }
 
-
-        // ==================================================
-        // 2. عمليات الخلفية (Background Tasks) 
-        // تعمل في الخفاء لكي لا تعطل المدرس عن عمله
-        // ==================================================
+        // 2. عمليات الخلفية (مسح المكررات والواتساب)
         (async () => {
             try {
-                // مسح الطلب الأساسي من السيرفر
                 await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests/${id}.json`, { method: 'DELETE' });
 
-                // 🧹 البحث عن الطلبات المكررة ومسحها
                 let reqNameNorm = window.smartArabicNormalize(req.name);
+                let reqWords = reqNameNorm.split(' ');
+
+                // 🧹 البحث ومسح المكررات من الداتابيز
                 for (let otherId in window.currentJoinRequests) {
+                    if (otherId === id) continue;
                     let otherReq = window.currentJoinRequests[otherId];
                     let otherNameNorm = window.smartArabicNormalize(otherReq.name);
                     
-                    let isDuplicate = false;
-                    if (req.phone && req.phone !== "0" && otherReq.phone === req.phone) isDuplicate = true;
-                    if (req.parentPhone && req.parentPhone !== "0" && otherReq.parentPhone === req.parentPhone) isDuplicate = true;
-                    if (reqNameNorm === otherNameNorm) isDuplicate = true;
+                    let isDup = false;
+                    if (req.phone && req.phone !== "0" && otherReq.phone === req.phone) isDup = true;
+                    if (req.parentPhone && req.parentPhone !== "0" && otherReq.parentPhone === req.parentPhone) isDup = true;
+                    if (reqNameNorm === otherNameNorm || reqWords.every(w => otherNameNorm.includes(w)) || otherNameNorm.split(' ').every(w => reqNameNorm.includes(w))) isDup = true;
 
-                    // لو مكرر، امسحه من السيرفر بدون ما تعمل await عشان ميعطلش اللوب
-                    if (isDuplicate) {
+                    if (isDup) {
                         delete window.currentJoinRequests[otherId];
                         fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests/${otherId}.json`, { method: 'DELETE' }); 
                     }
                 }
 
-                // إرسال رسالة الترحيب على الواتساب
                 let portalLink = `https://ma9248290-collab.github.io/historya-systtem/parent.html`;
                 let waMsg = `🎉 *تمت الموافقة على طلب الانضمام*\nأهلاً بك في نظام ${localStorage.getItem("teacherName") || "السنتر"}.\n\n👤 *اسم الطالب:* ${newStudent.name}\n📚 *المجموعة:* ${newStudent.group}\n🔑 *كود الدخول الخاص بك:* ${newCode}\n\n🔗 *رابط منصة الطالب:* ${portalLink}`;
                 
@@ -6801,21 +6842,13 @@ window.confirmApproveRequest = async function() {
                     let targetPhone = (newStudent.phone && newStudent.phone !== "0") ? newStudent.phone : newStudent.parentPhone;
                     await sendAutoWhatsApp(targetPhone, waMsg);
                 }
-
-                if(typeof addSystemLog === "function") addSystemLog("قبول طلب انضمام ✅", `تم قبول ${newStudent.name} بكود ${newCode} (اكتمل التنظيف والإرسال في الخلفية)`);
-                
-                if(typeof syncDataToBot === "function") syncDataToBot();
-                
-            } catch(bgError) {
-                console.log("خطأ في عمليات الخلفية: ", bgError);
-            }
+            } catch(bgError) { }
         })();
 
     } catch(e) {
         showToast("حدث خطأ أثناء المعالجة!", "error");
     }
     
-    // إرجاع الزر لوضعه الطبيعي (رغم إن الشاشة هتكون قفلت خلاص)
     btn.innerText = origText; btn.disabled = false;
 };
 
