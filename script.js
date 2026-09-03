@@ -6723,9 +6723,12 @@ window.confirmApproveRequest = async function() {
 
     let btn = document.querySelector("#approveRequestModal .save-btn");
     let origText = btn.innerText;
-    btn.innerText = "جاري المعالجة والتنظيف... ⏳"; btn.disabled = true;
+    btn.innerText = "جاري التسكين... ⚡"; btn.disabled = true;
 
     try {
+        // ==================================================
+        // 1. التحديث المحلي الفوري (لجعل النظام سريع جداً كالصاروخ)
+        // ==================================================
         let newStudent = {
             code: newCode, name: req.name, phone: req.phone, parentPhone: req.parentPhone,
             level: req.level, gender: req.gender, group: selectedGroup, behaviorPoints: 0
@@ -6733,46 +6736,19 @@ window.confirmApproveRequest = async function() {
 
         students.push(newStudent);
         localStorage.setItem("students", JSON.stringify(students));
-        
-        // 1. مسح الطلب اللي احنا وافقنا عليه
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests/${id}.json`, { method: 'DELETE' });
 
-        // 2. 🧹 السحر: البحث عن الطلبات المكررة لنفس الطالب وحذفها بصمت
-        let reqNameNorm = window.smartArabicNormalize(req.name);
-        for (let otherId in window.currentJoinRequests) {
-            if (otherId === id) continue; // تخطي الطلب الأساسي
-            
-            let otherReq = window.currentJoinRequests[otherId];
-            let otherNameNorm = window.smartArabicNormalize(otherReq.name);
-            
-            // هل هو مكرر؟ (نفس التليفون أو نفس الاسم)
-            let isDuplicate = false;
-            if (req.phone && req.phone !== "0" && otherReq.phone === req.phone) isDuplicate = true;
-            if (req.parentPhone && req.parentPhone !== "0" && otherReq.parentPhone === req.parentPhone) isDuplicate = true;
-            if (reqNameNorm === otherNameNorm) isDuplicate = true;
+        // مسح الطلب محلياً عشان يختفي من الجدول فوراً بمجرد القبول
+        delete window.currentJoinRequests[id];
 
-            // لو مكرر، امسحه من السيرفر فوراً
-            if (isDuplicate) {
-                await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests/${otherId}.json`, { method: 'DELETE' });
-            }
-        }
-
-        let portalLink = `https://ma9248290-collab.github.io/historya-systtem/parent.html`;
-        let waMsg = `🎉 *تمت الموافقة على طلب الانضمام*\nأهلاً بك في نظام ${localStorage.getItem("teacherName") || "السنتر"}.\n\n👤 *اسم الطالب:* ${newStudent.name}\n📚 *المجموعة:* ${newStudent.group}\n🔑 *كود الدخول الخاص بك:* ${newCode}\n\n🔗 *رابط منصة الطالب:* ${portalLink}`;
-        
-        if (typeof sendAutoWhatsApp === "function") {
-            let targetPhone = (newStudent.phone && newStudent.phone !== "0") ? newStudent.phone : newStudent.parentPhone;
-            await sendAutoWhatsApp(targetPhone, waMsg);
-        }
-
-        if(typeof addSystemLog === "function") addSystemLog("قبول طلب انضمام ✅", `تم قبول ${newStudent.name} وإعطائه كود ${newCode} وتسكينه في ${selectedGroup} ومسح مكرراته إن وجدت.`);
-
+        // إغلاق النافذة فوراً وإظهار رسالة النجاح
         showToast(`تم التسكين بنجاح! كود الطالب هو: ${newCode}`);
         closeModal("approveRequestModal");
-        loadJoinRequests();
+        
+        // تحديث الواجهة أمام المدرس فوراً
+        loadJoinRequests(); 
         renderTable(); 
-        if(typeof syncDataToBot === "function") syncDataToBot();
 
+        // التحضير التلقائي لو المدرس كان واقف في شاشة الحضور
         if (window.pendingAttendanceAfterAction && currentActiveSessionId) {
             let isLate = document.getElementById('markAsLateCheckbox')?.checked;
             let attStatus = isLate ? 'late' : 'present';
@@ -6780,6 +6756,7 @@ window.confirmApproveRequest = async function() {
             showToast(`تم تحضير الطالب المنضم حديثاً بنجاح! ✅`);
             window.pendingAttendanceAfterAction = false;
             
+            // لو الدفع السريع شغال، أظهره للمدرس فوراً
             let autoPaymentEnabled = document.getElementById('autoPaymentCheckbox')?.checked;
             if (autoPaymentEnabled) {
                 setTimeout(() => openQuickPaymentModal(newStudent), 500);
@@ -6788,10 +6765,57 @@ window.confirmApproveRequest = async function() {
             }
         }
 
+
+        // ==================================================
+        // 2. عمليات الخلفية (Background Tasks) 
+        // تعمل في الخفاء لكي لا تعطل المدرس عن عمله
+        // ==================================================
+        (async () => {
+            try {
+                // مسح الطلب الأساسي من السيرفر
+                await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests/${id}.json`, { method: 'DELETE' });
+
+                // 🧹 البحث عن الطلبات المكررة ومسحها
+                let reqNameNorm = window.smartArabicNormalize(req.name);
+                for (let otherId in window.currentJoinRequests) {
+                    let otherReq = window.currentJoinRequests[otherId];
+                    let otherNameNorm = window.smartArabicNormalize(otherReq.name);
+                    
+                    let isDuplicate = false;
+                    if (req.phone && req.phone !== "0" && otherReq.phone === req.phone) isDuplicate = true;
+                    if (req.parentPhone && req.parentPhone !== "0" && otherReq.parentPhone === req.parentPhone) isDuplicate = true;
+                    if (reqNameNorm === otherNameNorm) isDuplicate = true;
+
+                    // لو مكرر، امسحه من السيرفر بدون ما تعمل await عشان ميعطلش اللوب
+                    if (isDuplicate) {
+                        delete window.currentJoinRequests[otherId];
+                        fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests/${otherId}.json`, { method: 'DELETE' }); 
+                    }
+                }
+
+                // إرسال رسالة الترحيب على الواتساب
+                let portalLink = `https://ma9248290-collab.github.io/historya-systtem/parent.html`;
+                let waMsg = `🎉 *تمت الموافقة على طلب الانضمام*\nأهلاً بك في نظام ${localStorage.getItem("teacherName") || "السنتر"}.\n\n👤 *اسم الطالب:* ${newStudent.name}\n📚 *المجموعة:* ${newStudent.group}\n🔑 *كود الدخول الخاص بك:* ${newCode}\n\n🔗 *رابط منصة الطالب:* ${portalLink}`;
+                
+                if (typeof sendAutoWhatsApp === "function") {
+                    let targetPhone = (newStudent.phone && newStudent.phone !== "0") ? newStudent.phone : newStudent.parentPhone;
+                    await sendAutoWhatsApp(targetPhone, waMsg);
+                }
+
+                if(typeof addSystemLog === "function") addSystemLog("قبول طلب انضمام ✅", `تم قبول ${newStudent.name} بكود ${newCode} (اكتمل التنظيف والإرسال في الخلفية)`);
+                
+                if(typeof syncDataToBot === "function") syncDataToBot();
+                
+            } catch(bgError) {
+                console.log("خطأ في عمليات الخلفية: ", bgError);
+            }
+        })();
+
     } catch(e) {
         showToast("حدث خطأ أثناء المعالجة!", "error");
     }
     
+    // إرجاع الزر لوضعه الطبيعي (رغم إن الشاشة هتكون قفلت خلاص)
     btn.innerText = origText; btn.disabled = false;
 };
 
