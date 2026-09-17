@@ -4446,7 +4446,7 @@ window.openEditCourseModal = function(id) {
     let vContainer = document.getElementById("editCourseVideosContainer");
     vContainer.innerHTML = "";
     if(lec.videos && lec.videos.length > 0) {
-        lec.videos.forEach(v => addEditCourseVideoRow(v.title, v.url, v.linkedSession, v.requiredExam, v.type, v.price));
+        lec.videos.forEach(v => addEditCourseVideoRow(v.title, v.url, v.linkedSessions || v.linkedSession, v.requiredExam, v.type, v.price));
     } else if (lec.url) {
         addEditCourseVideoRow("المحاضرة كاملة", lec.url); 
     } else {
@@ -4539,7 +4539,7 @@ window.openEditCourseModal = function(id) {
     vContainer.innerHTML = "";
     
     if(lec.videos && lec.videos.length > 0) {
-        lec.videos.forEach(v => addEditCourseVideoRow(v.title, v.url, v.linkedSession, v.requiredExam, v.type, v.price));
+        lec.videos.forEach(v => addEditCourseVideoRow(v.title, v.url, v.linkedSessions || v.linkedSession, v.requiredExam, v.type, v.price));
     } else {
         addEditCourseVideoRow();
     }

@@ -2131,10 +2131,23 @@ window.openStudentCourseDetails = async function(courseId) {
         let hasPurchasedVideo = currentStudent.purchasedCourses && (currentStudent.purchasedCourses.includes(specificVideoId) || hasPurchasedWholeCourse);
 
         // فحص شرط الحضور (لو الفيديو مربوط بحصة)
+        // فحص شرط الحضور (لو الفيديو مربوط بحصة أو أكثر)
         let didAttend = false;
-        if (v.linkedSession) {
-            let sessionObj = window.allClassSessions.find(s => String(s.id) === String(v.linkedSession));
-            didAttend = sessionObj && sessionObj.attendance && (sessionObj.attendance[currentStudent.code] === 'present' || sessionObj.attendance[currentStudent.phone] === 'present');
+        let linkedArr = [];
+        if (v.linkedSessions && Array.isArray(v.linkedSessions)) linkedArr = linkedArr.concat(v.linkedSessions);
+        if (v.linkedSession && !linkedArr.includes(v.linkedSession)) linkedArr.push(v.linkedSession);
+
+        if (linkedArr.length > 0 && window.allClassSessions) {
+            for (let sessId of linkedArr) {
+                let sessionObj = window.allClassSessions.find(s => String(s.id) === String(sessId));
+                if (sessionObj && sessionObj.attendance) {
+                    let status = sessionObj.attendance[currentStudent.code] || sessionObj.attendance[currentStudent.phone];
+                    if (status === 'present' || status === 'late' || (typeof status === 'object' && status.status === 'makeup')) {
+                        didAttend = true;
+                        break; // لو حضر حصة واحدة منهم تكفي لفتح الفيديو مجاناً
+                    }
+                }
+            }
         }
 
         // فحص شرط الامتحان
