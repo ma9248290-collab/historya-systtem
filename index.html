@@ -2121,20 +2121,34 @@ window.playCourseVideo = async function(url, videoTitle, courseId, videoIndex, e
         window.addEventListener('focus', removeBlackout);
 
         // 1. عرض الكروت من بره (شيلنا زرار الشراء، خلينا الدخول مجاني عشان يشتري من جوه)
+        // --- 🎬 عرض الكورسات المفلترة (حسب صف ومسار الطالب) ---
 window.renderStudentLectures = function() {
     let list = document.getElementById("studentLecturesList");
-    if(!list) return; list.innerHTML = "";
+    if(!list) return; 
+    list.innerHTML = "";
     
-    if(window.allLectures.length === 0) {
-        list.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 40px; font-weight:bold; color:var(--text-muted); background: var(--card-bg); border-radius: 20px; border: 2px dashed var(--border);">لا توجد كورسات متاحة حالياً.</div>`;
+    // 💡 التعديل هنا: فلترة الكورسات الأول قبل رسمها
+    let filteredLectures = window.allLectures.filter(lec => {
+        if (!lec) return false;
+        // هل الكورس لكل الصفوف؟ أو مطابق لصف الطالب؟
+        let levelMatch = (lec.level === "all" || lec.level === currentStudent.level);
+        // هل الكورس لكل المسارات؟ أو مطابق لمسار الطالب؟
+        let trackMatch = (!lec.track || lec.track === 'all' || lec.track === (currentStudent.track || 'عام'));
+        
+        return levelMatch && trackMatch;
+    });
+
+    // لو مفيش كورسات لصف الطالب ده
+    if(filteredLectures.length === 0) {
+        list.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 40px; font-weight:bold; color:var(--text-muted); background: var(--card-bg); border-radius: 20px; border: 2px dashed var(--border);">لا توجد كورسات متاحة لصفك الدراسي حالياً.</div>`;
         return;
     }
 
-    window.allLectures.forEach(lec => {
+    // رسم الكروت للكورسات المفلترة فقط
+    filteredLectures.forEach(lec => {
         let maxViews = parseInt(lec.maxViews) || 0;
         let viewsInfo = maxViews > 0 ? ` 👁️ ${maxViews} مشاهدة` : ` 👁️ غير محدود`;
         
-        // إظهار بادج بيعرفه إن الكورس جواه محاضرات
         let badgeHtml = `<div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center; justify-content:flex-end;">
                             <span style="background: rgba(245, 158, 11, 0.95); color: white; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 900;">${viewsInfo}</span>
                             <span style="background: rgba(14, 165, 233, 0.95); color: white; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 900;">${(lec.videos||[]).length} محاضرات</span>
@@ -2156,6 +2170,7 @@ window.renderStudentLectures = function() {
         </div>`;
     });
 };
+
 
 // 2. النافذة المنبثقة للفيديوهات (هنا السحر كله: بيقيم كل فيديو لوحده)
 window.openStudentCourseDetails = async function(courseId) {
