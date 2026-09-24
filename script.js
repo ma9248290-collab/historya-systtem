@@ -6123,6 +6123,10 @@ window.switchPage = function(pageId) {
     }
 };
 
+
+// ==========================================
+// 📋 تسجيل الحضور المطور (مع تسجيل وقت الدخول بدقة)
+// ==========================================
 window.markAttendance = function(codeOrPhone, status) {
     const s = classSessions.find(s => s.id === currentActiveSessionId);
     if(s && s.status === 'open') {
@@ -6137,7 +6141,6 @@ window.markAttendance = function(codeOrPhone, status) {
             const pStat = prevSession.attendance[student.code] || prevSession.attendance[student.phone];
             
             let attendedOnline = false;
-            // فحص هل الطالب حضر على المنصة
             if (window.platformLectures && window.platformTracking) {
                 let linkedLecture = window.platformLectures.find(l => l.linkedSession === prevSession.id || (l.linkedSessions && l.linkedSessions.includes(prevSession.id)));
                 if (linkedLecture && window.platformTracking[linkedLecture.id] && (window.platformTracking[linkedLecture.id][student.phone] || window.platformTracking[linkedLecture.id][student.code])) {
@@ -6145,89 +6148,161 @@ window.markAttendance = function(codeOrPhone, status) {
                 }
             }
 
-            // لو كان غايب ومحضرش منصة، نظهرله الإشعار البرتقالي الشيك
             if (pStat === 'absent' && !attendedOnline) {
-                setTimeout(() => {
-                    showToast(`تنبيه: الطالب (${student.name}) كان غائباً الحصة السابقة!`, "warning");
-                }, 400); 
-            } 
-            // ✨ التعديل الجديد: لو حضر منصة نظهرله الإشعار الأزرق الفخم
-            else if (attendedOnline) {
-                setTimeout(() => {
-                    showToast(`ممتاز: الطالب (${student.name}) حضر الحصة السابقة أونلاين على المنصة!`, "info");
-                }, 400); 
+                setTimeout(() => showToast(`تنبيه: الطالب (${student.name}) كان غائباً الحصة السابقة!`, "warning"), 400); 
+            } else if (attendedOnline) {
+                setTimeout(() => showToast(`ممتاز: الطالب (${student.name}) حضر الحصة السابقة أونلاين على المنصة!`, "info"), 400); 
             }
         }
-        // ----------------------------------------------------
 
+        // 🌟 خصم/إضافة نقاط السلوك
         let oldStatus = s.attendance[student.code] || s.attendance[student.phone];
         if (oldStatus) {
             if (oldStatus === 'present') student.behaviorPoints = Math.max(0, (student.behaviorPoints || 0) - 5);
             if (oldStatus === 'late') student.behaviorPoints = Math.max(0, (student.behaviorPoints || 0) - 2);
         }
-        if (status === 'present') student.behaviorPoints = (student.behaviorPoints || 0) + 5;
-        if (status === 'late') student.behaviorPoints = (student.behaviorPoints || 0) + 2;
+        
+        // لو الحالة مش 'none' (يعني مش تصفير)، ضيف النقط
+        if (status !== 'none') {
+            if (status === 'present') student.behaviorPoints = (student.behaviorPoints || 0) + 5;
+            if (status === 'late') student.behaviorPoints = (student.behaviorPoints || 0) + 2;
+        }
 
-        s.attendance[student.code] = status; // الحفظ بالكود دايماً
+        // ⏰ حفظ الوقت (التعديل الجديد)
+        if (!s.attendanceLog) s.attendanceLog = {};
+        if (status === 'none') {
+            delete s.attendance[student.code]; // مسح الحالة تماماً لو ضغط على إلغاء
+            delete s.attendanceLog[student.code];
+        } else {
+            s.attendance[student.code] = status; 
+            
+            let now = new Date();
+            let timeStr = formatTime12(`${now.getHours()}:${now.getMinutes()}`);
+            s.attendanceLog[student.code] = {
+                time: timeStr,
+                ts: now.getTime() // ده اللي هنرتب بيه (ملي ثانية)
+            };
+        }
+
         localStorage.setItem("classSessions", JSON.stringify(classSessions));
         localStorage.setItem("students", JSON.stringify(students));
+        
+        // 🔄 تحديث الجدول فوراً بالترتيب الجديد
         renderAttendanceTable(s);
 
-        // 🚀 --- إرسال الإشعار اللحظي للتطبيق --- 🚀
-        let title = "تحديث حضور وانصراف 🏫";
-        let msg = "";
-        if(status === 'present') msg = `✅ وصل ${student.name} إلى السنتر لحضور حصة (${s.topic || 'اليوم'}).`;
-        else if(status === 'late') msg = `⏳ تأخر ${student.name} عن موعد بداية حصة (${s.topic || 'اليوم'}).`;
-        else if(status === 'absent') msg = `❌ تنبيه: ${student.name} غائب عن حصة (${s.topic || 'اليوم'}).`;
-        
-        if(typeof notifyParentApp === 'function') notifyParentApp(student.code, title, msg);
+        // 🚀 إرسال الإشعار اللحظي للتطبيق
+        if (status !== 'none') {
+            let title = "تحديث حضور وانصراف 🏫";
+            let msg = status === 'present' ? `✅ وصل ${student.name} إلى السنتر لحضور حصة (${s.topic || 'اليوم'}).` : 
+                      status === 'late' ? `⏳ تأخر ${student.name} عن موعد بداية حصة (${s.topic || 'اليوم'}).` : 
+                      `❌ تنبيه: ${student.name} غائب عن حصة (${s.topic || 'اليوم'}).`;
+            
+            if(typeof notifyParentApp === 'function') notifyParentApp(student.code, title, msg);
+        }
     }
 };
+
+// ==========================================
+// 📊 رسم جدول الحضور المطور (تصميم احترافي + LIFO + وقت)
+// ==========================================
 window.renderAttendanceTable = function(session) { 
-    const tbody = document.getElementById("attendance-list"); const gStudents = students.filter(s => s.group === session.group); 
-    if(gStudents.length===0) return tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;">لا يوجد طلاب</td></tr>`; 
+    const tbody = document.getElementById("attendance-list"); 
+    const gStudents = students.filter(s => s.group === session.group); 
+    
+    if(gStudents.length === 0) return tbody.innerHTML=`<tr><td colspan="6" style="text-align:center; padding: 30px; font-weight: bold; color: var(--text-muted);">لا يوجد طلاب مسجلين في هذه المجموعة</td></tr>`; 
     
     const groupS = classSessions.filter(s => s.group === session.group).sort((a,b)=>new Date(a.date)-new Date(b.date)); 
     const prevSession = groupS[groupS.findIndex(s => s.id === session.id) - 1]; 
     
-    let htmlContent = ""; 
-
-    gStudents.forEach(st => { 
-        const stat = session.attendance[st.code] || session.attendance[st.phone]; 
-        const statHtml = stat === 'present' ? '<span style="color:#10b981; font-weight:bold;">حاضر ✓</span>' : stat === 'late' ? '<span style="color:#f59e0b; font-weight:bold;">متأخر ⏳</span>' : stat === 'absent' ? '<span style="color:#ef4444; font-weight:bold;">غائب ❌</span>' : '<span style="color:#64748b;">لم يسجل</span>'; 
+    // ⏱️ الترتيب الذكي: آخر طالب ضرب الباركود يظهر أول واحد فوق
+    let sortedStudents = [...gStudents].sort((a, b) => {
+        let logA = session.attendanceLog ? session.attendanceLog[a.code] : null;
+        let logB = session.attendanceLog ? session.attendanceLog[b.code] : null;
         
-        let pHT = '--'; 
+        let tsA = logA ? logA.ts : 0;
+        let tsB = logB ? logB.ts : 0;
+        
+        if (tsA > 0 && tsB > 0) return tsB - tsA; 
+        if (tsA > 0) return -1;
+        if (tsB > 0) return 1;
+        
+        let statA = session.attendance[a.code];
+        let statB = session.attendance[b.code];
+        if (statA && !statB) return -1;
+        if (!statA && statB) return 1;
+        
+        return 0; 
+    });
+
+    let htmlContent = ""; 
+    let countPresent = 0, countLate = 0, countAbsent = 0;
+
+    sortedStudents.forEach(st => { 
+        const stat = session.attendance[st.code] || session.attendance[st.phone]; 
+        const log = session.attendanceLog ? session.attendanceLog[st.code] : null;
+        
+        // العدادات
+        if (stat === 'present') countPresent++;
+        if (stat === 'late') countLate++;
+        if (stat === 'absent') countAbsent++;
+
+        // تصميم شيك للوقت والحالة
+        let timeDisplay = log ? `<span style="font-size:11px; color:var(--text-muted); font-weight:bold; display:block; margin-top:3px;">🕒 ${log.time}</span>` : '';
+        const statHtml = stat === 'present' ? `<span style="color:#10b981; font-weight:900; font-size:14px;">حاضر ✅</span>${timeDisplay}` : 
+                         stat === 'late' ? `<span style="color:#f59e0b; font-weight:900; font-size:14px;">متأخر ⏳</span>${timeDisplay}` : 
+                         stat === 'absent' ? `<span style="color:#ef4444; font-weight:900; font-size:14px;">غائب ❌</span>${timeDisplay}` : 
+                         `<span style="color:var(--text-muted); font-size:13px; font-weight:bold;">--</span>`; 
+        
+        // حالة الحصة السابقة (بتصميم كبسولة صغيرة عشان متكبرش الجدول)
+        let pHT = '<span style="color:var(--text-muted); font-size:12px;">--</span>'; 
         if(prevSession) { 
             const p = prevSession.attendance[st.code] || prevSession.attendance[st.phone]; 
-            pHT = p==='present'?'<span style="color:#10b981; font-weight:bold;">حاضر</span>':p==='late'?'<span style="color:#f59e0b; font-weight:bold;">متأخر</span>':p==='absent'?'<span style="color:#ef4444; font-weight:bold;">غائب</span>':'--'; 
-            
-            if (window.platformLectures && window.platformTracking) {
-                let linkedLecture = window.platformLectures.find(l => l.linkedSession === prevSession.id || (l.linkedSessions && l.linkedSessions.includes(prevSession.id)));
-                if (linkedLecture) {
-                    let trackData = window.platformTracking[linkedLecture.id];
-                    if (trackData && (trackData[st.phone] || trackData[st.code])) {
-                        pHT = '<span style="color:#2563eb; font-weight:900; background:rgba(37,99,235,0.1); padding:4px 10px; border-radius:8px; border: 1px solid rgba(37,99,235,0.2);">💻 حاضر منصة</span>';
-                    }
-                }
-            }
+            pHT = p==='present'?'<span style="background:rgba(16,185,129,0.1); color:#10b981; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:bold;">حاضر</span>':
+                  p==='late'?'<span style="background:rgba(245,158,11,0.1); color:#f59e0b; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:bold;">متأخر</span>':
+                  p==='absent'?'<span style="background:rgba(239,68,68,0.1); color:#ef4444; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:bold;">غائب</span>':'--'; 
         } 
         
-        let noteIcon = st.note && st.note.trim() !== "" ? `<span style="cursor: pointer; margin-right: 8px; font-size: 16px; filter: drop-shadow(0 2px 4px rgba(139,92,246,0.4));" title="يوجد ملاحظة (اضغط للعرض)" onclick="openStudentNoteModal('${st.code}')">📝</span>` : `<span style="cursor: pointer; margin-right: 8px; font-size: 14px; opacity: 0.3;" title="إضافة ملاحظة" onclick="openStudentNoteModal('${st.code}')">📝</span>`;
+        let noteIcon = st.note && st.note.trim() !== "" ? `<span style="cursor: pointer; margin-right: 8px; font-size: 15px; filter: drop-shadow(0 2px 4px rgba(139,92,246,0.4));" title="يوجد ملاحظة (اضغط للعرض)" onclick="openStudentNoteModal('${st.code}')">📝</span>` : ``;
 
-        htmlContent += `<tr>
-            <td><strong>${st.code}</strong></td>
-            <td>${st.name} ${noteIcon}</td>
-            <td style="direction: ltr;">${st.phone}</td>
+        // 🔘 زر الإجراء: إما "بانتظار الرصد" (لو متسجلش) أو "إلغاء ✖" (لو متسجل)
+        let actionButtons = '';
+        if (stat) {
+            actionButtons = `<button onclick="markAttendance('${st.code}', 'none')" style="background: rgba(239, 68, 68, 0.05); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); padding: 4px 10px; border-radius: 6px; font-size:12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='#ef4444'; this.style.color='#fff';" onmouseout="this.style.background='rgba(239, 68, 68, 0.05)'; this.style.color='#ef4444';">إلغاء ✖</button>`;
+        } else {
+            actionButtons = `<span style="color: #94a3b8; font-size: 11px; font-weight: bold; background: var(--hover-bg); padding: 4px 8px; border-radius: 6px; border: 1px dashed var(--border-color);">بانتظار الرصد 📠</span>`;
+        }
+
+        // تأثير الفلاش الخفيف للصف اللي لسه مسجل حالاً
+        let rowBg = '';
+        if (log && (Date.now() - log.ts) < 5000) {
+             rowBg = 'animation: flashRow 2s ease-out;';
+        } else if (stat) {
+             rowBg = 'background: rgba(248, 250, 252, 0.5);'; // تمييز خفيف جداً
+        }
+
+        htmlContent += `<tr style="${rowBg}">
+            <td><strong style="color:var(--primary-color); font-size:14px;">${st.code}</strong></td>
+            <td><div style="font-weight:bold; font-size:14px; display:flex; align-items:center;">${st.name} ${noteIcon}</div></td>
+            <td style="direction: ltr; font-size:13px; color:var(--text-main);">${st.phone && st.phone !== "0" ? st.phone : "--"}</td>
             <td>${pHT}</td>
             <td>${statHtml}</td>
-            <td style="display:flex; gap:5px; justify-content:center;">
-                <button style="background-color:#10b981; color:white; border:none; padding:6px 15px; border-radius:8px; cursor:pointer; font-weight:bold; transition:0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'" onclick="markAttendance('${st.code}','present')">حاضر</button>
-                <button style="background-color:#f59e0b; color:white; border:none; padding:6px 15px; border-radius:8px; cursor:pointer; font-weight:bold; transition:0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'" onclick="markAttendance('${st.code}','late')">متأخر</button>
-                <button style="background-color:#ef4444; color:white; border:none; padding:6px 15px; border-radius:8px; cursor:pointer; font-weight:bold; transition:0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'" onclick="markAttendance('${st.code}','absent')">غائب</button>
-            </td>
+            <td style="text-align: center;">${actionButtons}</td>
         </tr>`; 
     }); 
     
+    // تحديث الإحصائيات
+    if(document.getElementById("att-count-total")) document.getElementById("att-count-total").innerText = gStudents.length;
+    if(document.getElementById("att-count-present")) document.getElementById("att-count-present").innerText = countPresent;
+    if(document.getElementById("att-count-late")) document.getElementById("att-count-late").innerText = countLate;
+    if(document.getElementById("att-count-absent")) document.getElementById("att-count-absent").innerText = countAbsent;
+
+    if (!document.getElementById('flash-row-style')) {
+        let style = document.createElement('style');
+        style.id = 'flash-row-style';
+        style.innerHTML = `@keyframes flashRow { 0% { background-color: rgba(16, 185, 129, 0.15); } 100% { background-color: transparent; } }`;
+        document.head.appendChild(style);
+    }
+
     tbody.innerHTML = htmlContent; 
 };
 
