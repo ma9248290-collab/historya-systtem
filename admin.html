@@ -276,35 +276,48 @@
                     <div class="stats-grid" id="groups-list"></div>
                 </section>
                 <section id="group-details-view" class="students-section" style="display: none;">
-                    <div class="header-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
-    <button class="theme-btn" onclick="exportGroupStudentsToExcel()" style="border-color: #3b82f6; color: #3b82f6; background: white; padding: 8px 12px; font-weight: bold; border-radius: 8px;">📤 تصدير المجموعة</button>
-    
-    <!-- الزراير الجديدة الخاصة برفع الإكسيل للمجموعة 👇 -->
-    <button class="theme-btn" onclick="downloadGroupExcelTemplate()" style="border-color: #10b981; color: #10b981; background: white; padding: 8px 12px; font-weight: bold; border-radius: 8px;">📄 نموذج الإكسيل</button>
-    <div style="position: relative; display: inline-block;">
-        <input type="file" id="importGroupExcelInput" accept=".xlsx, .xls" style="position: absolute; width: 100%; height: 100%; opacity: 0; cursor: pointer;" onchange="importStudentsToGroupFromExcel(event)">
-        <button class="add-btn" style="background-color: #10b981; padding: 8px 12px;">📥 استيراد للـمجموعة</button>
+    <!-- 1. الهيدر وزرار الرجوع -->
+    <div class="section-header" style="margin-bottom: 20px;">
+        <div>
+            <button class="theme-btn" onclick="backToGroups()" style="border-color: var(--primary-color); color: var(--primary-color); margin-bottom: 10px;">🔙 عودة للمجموعات</button>
+            <h2 id="current-group-title" style="color: var(--secondary-color); margin-top: 5px;"></h2>
+        </div>
     </div>
-    <!-- 👆 -->
 
-    <button class="add-btn exam-btn" onclick="quickExamForGroup()" style="padding: 8px 12px;">⚡ امتحان</button>
-    <button class="add-btn" onclick="openAddStudentToGroupModal()" style="padding: 8px 12px;">+ إضافة طالب</button>
-</div>
-                    <div class="table-container">
-                        <table class="students-table">
-    <thead>
-        <tr>
-            <th>الكود</th>
-            <th>اسم الطالب والمسار</th>
-            <th style="text-align: center;">آخر 4 حصص</th>
-            <th>رقم ولي الأمر</th>
-            <th>إجراء</th>
-        </tr>
-    </thead>
-    <tbody id="group-students-list"></tbody>
-</table>
-</div>
-                </section>
+    <!-- 2. لوحة التحكم والزراير (كنترول بانل شيك جداً) -->
+    <div style="background: var(--card-bg); padding: 20px; border-radius: 16px; border: 1px solid var(--border-color); box-shadow: 0 4px 10px rgba(0,0,0,0.03); margin-bottom: 25px; display: flex; gap: 15px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+        
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="save-btn" onclick="openAddStudentToGroupModal()" style="margin: 0; background: var(--primary-color); font-size: 14px; padding: 10px 20px; border-radius: 10px;">➕ إضافة طالب للمجموعة</button>
+            <button class="save-btn exam-btn" onclick="quickExamForGroup()" style="margin: 0; background: var(--exam-color); font-size: 14px; padding: 10px 20px; border-radius: 10px;">⚡ امتحان سريع</button>
+        </div>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <div style="position: relative; display: inline-block;">
+                <input type="file" id="importGroupExcelInput" accept=".xlsx, .xls" style="position: absolute; width: 100%; height: 100%; opacity: 0; cursor: pointer;" onchange="importStudentsToGroupFromExcel(event)">
+                <button class="theme-btn" style="margin: 0; background-color: #10b981; color: white; border: none; font-weight: bold; font-size: 14px; pointer-events: none; border-radius: 10px;">📥 استيراد من إكسيل</button>
+            </div>
+            <button class="theme-btn" onclick="downloadGroupExcelTemplate()" style="margin: 0; border-color: #10b981; color: #10b981; font-weight: bold; font-size: 14px; border-radius: 10px;">📄 نموذج الإكسيل</button>
+            <button class="theme-btn" onclick="exportGroupStudentsToExcel()" style="margin: 0; border-color: #3b82f6; color: #3b82f6; font-weight: bold; font-size: 14px; border-radius: 10px;">📤 تصدير المجموعة</button>
+        </div>
+    </div>
+
+    <!-- 3. الجدول المنظم -->
+    <div class="table-container card">
+        <table class="students-table" style="width: 100%;">
+            <thead>
+                <tr>
+                    <th style="width: 15%; cursor: pointer;" onclick="sortGroupStudentsTable('code')">الكود <span id="sort-gs-code">⇅</span></th>
+                    <th style="width: 30%; cursor: pointer;" onclick="sortGroupStudentsTable('name')">اسم الطالب والمسار <span id="sort-gs-name">⇅</span></th>
+                    <th style="width: 20%; text-align: center;">آخر 4 حصص</th>
+                    <th style="width: 20%; cursor: pointer;" onclick="sortGroupStudentsTable('parentPhone')">رقم ولي الأمر <span id="sort-gs-parentPhone">⇅</span></th>
+                    <th style="width: 15%; text-align: center;">إجراء</th>
+                </tr>
+            </thead>
+            <tbody id="group-students-list"></tbody>
+        </table>
+    </div>
+</section>
             </div>
 
             <div id="joinreq-view" class="view-section" style="display: none;">
