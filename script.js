@@ -1084,6 +1084,34 @@ function onScanFailure() {}
 
 
 // ==========================================
+// ⛔ نظام إيقاف وتفعيل الطلاب
+// ==========================================
+window.toggleStudentSuspension = function() {
+    if(!currentStudentProfileCode) return;
+    let student = students.find(s => s.code === currentStudentProfileCode);
+    if(student) {
+        let isCurrentlySuspended = student.isSuspended || false;
+        let msg = isCurrentlySuspended ? `هل أنت متأكد من إعادة تفعيل الطالب: ${student.name}؟` : `هل أنت متأكد من إيقاف الطالب: ${student.name}؟\n(لن يتمكن من تسجيل الحضور حتى يتم تفعيله)`;
+        
+        customConfirm(msg, () => {
+            student.isSuspended = !isCurrentlySuspended; // عكس الحالة
+            localStorage.setItem("students", JSON.stringify(students));
+            
+            if(typeof addSystemLog === "function") {
+                addSystemLog(student.isSuspended ? "إيقاف طالب ⛔" : "تفعيل طالب ✅", `تم ${student.isSuspended ? 'إيقاف' : 'إعادة تفعيل'} الطالب: ${student.name} (كود: ${student.code})`);
+            }
+            
+            showToast(student.isSuspended ? "تم إيقاف الطالب بنجاح ⛔" : "تم إعادة تفعيل الطالب ✅", student.isSuspended ? "warning" : "success");
+            
+            // تحديث الواجهة فوراً
+            openStudentProfile(currentStudentProfileCode); 
+            renderTable(); 
+            if(typeof syncDataToBot === "function") syncDataToBot();
+        });
+    }
+};
+
+// ==========================================
 // 10. تكملة ملف الطالب وتعديل بياناته
 // ==========================================
 function deleteStudentFromProfile() { 
@@ -1403,8 +1431,17 @@ document.getElementById('attendanceBarcode')?.addEventListener('keypress', funct
 
                 window.pendingAttendanceAfterAction = true;
             }
-
-        } else if(student.group !== session.group) {
+            } else if (student.isSuspended) {
+            // ⛔ صدادة الطلاب الموقوفين
+            showToast(`⛔ لا يمكن تحضير (${student.name}) لأنه موقوف من الإدارة!`, 'error');
+            try { if(typeof errorSound !== 'undefined') { errorSound.currentTime = 0; errorSound.play(); } } catch(e){}
+            this.value = ''; 
+            return;
+        } 
+        
+        
+        
+        else if(student.group !== session.group) {
             openWrongGroupModal(student, session);
         } else if(session.status === 'closed') {
             showToast(`الحصة مغلقة!`, 'error');
@@ -5807,7 +5844,27 @@ window.openStudentProfile = function(code) {
     document.getElementById("student-profile-view").style.display = "block";
     
     let specialBadge = student.isSpecialCase ? `<span style="font-size: 14px; margin-right: 5px;" title="حالة خاصة: ${student.specialAmount > 0 ? 'يدفع ' + student.specialAmount + ' ج.م' : 'إعفاء تام'}">⭐</span>` : '';
-    document.getElementById("profile-name").innerHTML = student.name + specialBadge; 
+    
+    // البادج الجديد بتاع الإيقاف
+    let suspendBadge = student.isSuspended ? `<span style="background:#ef4444; color:white; padding:4px 10px; border-radius:8px; font-size:12px; font-weight:bold; margin-right:10px; box-shadow:0 2px 5px rgba(239,68,68,0.3);">موقوف ⛔</span>` : '';
+    
+    document.getElementById("profile-name").innerHTML = student.name + specialBadge + suspendBadge; 
+
+    // تظبيط شكل زرار الإيقاف/التفعيل
+    let suspendBtn = document.getElementById("suspend-student-btn");
+    if(suspendBtn) {
+        if(student.isSuspended) {
+            suspendBtn.innerHTML = "✅ فك الإيقاف (تفعيل)";
+            suspendBtn.style.backgroundColor = "#10b981";
+            suspendBtn.style.color = "white";
+            suspendBtn.style.border = "none";
+        } else {
+            suspendBtn.innerHTML = "⛔ إيقاف الطالب";
+            suspendBtn.style.backgroundColor = "rgba(239, 68, 68, 0.1)";
+            suspendBtn.style.color = "#ef4444";
+            suspendBtn.style.border = "1px solid #ef4444";
+        }
+    }
     document.getElementById("profile-code-group").innerText = `${student.code} | المجموعة: ${student.group}`;
     
     // 💡 التحديث هنا لعرض الملاحظة
@@ -6132,6 +6189,12 @@ window.markAttendance = function(codeOrPhone, status) {
     if(s && s.status === 'open') {
         const student = students.find(st => st.code === codeOrPhone || st.phone === codeOrPhone);
         if(!student) return;
+
+        // منع التحضير اليدوي لو موقوف (نسمح بس بـ none عشان لو حبيت تلغي حضور متسجل بالغلط)
+        if(student.isSuspended && status !== 'none') {
+            showToast(`⛔ الطالب (${student.name}) موقوف، لا يمكن تحضيره!`, 'error');
+            return;
+        }
         
         // 🚨 التنبيه الذكي بالغياب أو حضور المنصة في الحصة السابقة
         const groupS = classSessions.filter(session => session.group === s.group).sort((a,b)=>new Date(a.date)-new Date(b.date)); 
