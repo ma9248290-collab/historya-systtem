@@ -581,7 +581,7 @@
         </button>
     </div>
 
-    
+
     <!-- 📠 لوحة التحكم والرصد الجديدة -->
     <div class="attendance-panel">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
@@ -2221,55 +2221,106 @@
     <div id="addStudentToGroupModal" class="modal"><div class="modal-content"><div style="display: flex; gap: 10px; margin-bottom: 20px;"><button class="theme-btn" onclick="switchAddStudentTab('existing')">طالب مسجل</button><button class="theme-btn" onclick="switchAddStudentTab('new')">طالب جديد</button></div><form id="addExistingStudentForm"><div class="input-group"><select id="existingStudentSelect" class="custom-input"></select></div><button type="submit" class="save-btn">إضافة للمجموعة</button></form><div id="newStudentTabContent" style="display: none;"><button type="button" class="save-btn" onclick="goToNewStudentForm()">انتقال لتسجيل طالب جديد</button></div></div></div>
 
 
-<!-- زرار فتح الشات -->
-<button id="shefo-assistant-btn" onclick="openShefoChat()" style="width: 75px; height: 75px; padding: 0; border-radius: 50%; display: flex; justify-content: center; align-items: center; opacity: 0.9; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(0,0,0,0.15); border: 2px solid #e2e8f0; background: white;" onmouseover="this.style.opacity='1'; this.style.transform='scale(1.1)';" onmouseout="this.style.opacity='0.9'; this.style.transform='scale(1)';">
-    <!-- اللوجو -->
-    <img src="logo.png" style="width: 55px; height: 55px; min-width: 55px; margin: 0;">
-</button>
+<!-- 🤖 زرار الروبوت التفاعلي المطور (Clean Premium) -->
+<div id="ai-assistant-container" style="position: fixed; bottom: 30px; left: 30px; z-index: 999999; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+    
+    <!-- التلميح -->
+    <div id="ai-tooltip" style="background: #1e293b; color: white; padding: 6px 14px; border-radius: 8px; font-weight: bold; font-size: 12px; box-shadow: 0 10px 15px rgba(0,0,0,0.1); opacity: 0; transform: translateY(10px); transition: 0.3s; pointer-events: none; position: absolute; bottom: 85px; white-space: nowrap;">
+        كيف أساعدك اليوم؟ 🤖
+        <div style="position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 6px solid #1e293b;"></div>
+    </div>
+    
+    <button id="shefo-assistant-btn" onclick="openShefoChat()" style="width: 65px; height: 65px; padding: 0; border-radius: 50%; display: flex; justify-content: center; align-items: center; transition: 0.3s; box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4); border: none; background: #3b82f6; cursor: pointer; position: relative;">
+        <span style="font-size: 32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">🤖</span>
+    </button>
+</div>
 
-<!-- نافذة شات ميرا (WhatsApp Style) -->
-<div id="shefo-chat-overlay" class="shefo-chat-overlay" style="display: none;">
-    <div class="shefo-chat-box" dir="rtl">
-        <!-- الهيدر -->
-        <div class="shefo-chat-header">
-            <div class="shefo-header-info">
-               <div class="shefo-avatar-chat" style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; display: flex; justify-content: center; align-items: center; border-radius: 50%; width: 45px; height: 45px; box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);">
-    <div class="shefo-avatar-chat" style="background: transparent; box-shadow: none; padding: 0;">
-    <!-- أخطبوط الدعم الفني مصغر -->
-    <img src="logo.png" style="width: 50px; height: 50px;">
-</div>
-        <path d="M12 8V4H8"></path>
-        <rect width="16" height="12" x="4" y="8" rx="2"></rect>
-        <path d="M2 14h2"></path>
-        <path d="M20 14h2"></path>
-        <path d="M15 13v2"></path>
-        <path d="M9 13v2"></path>
-    </svg>
-</div>
-                <div class="shefo-name-status">
-                    <h3>أوكتو</h3>
-                    <p id="shefo-status">متصل الآن ✅</p>
-                </div>
-            </div>
-            <button class="close-chat-btn" onclick="closeShefoChat()">✖</button>
-        </div>
-        
-        <!-- مساحة الرسايل -->
-        <div class="shefo-chat-messages" id="shefo-chat-messages">
-            <div class="shefo-message bot-message">
-                أهلاً بيك يا صاحبي! أنا ميرا.. أقدر أساعدك في إيه النهاردة؟ (تقدر تكتبلي أو تبعتلي فويس) 🎤✍️
+<!-- 💬 نافذة شات الذكاء الاصطناعي (أوكتو AI) - Clean UI -->
+<div id="shefo-chat-overlay" class="shefo-chat-overlay" style="display: none; z-index: 1000000; position: fixed; bottom: 105px; left: 30px; width: 380px; max-width: 90vw; background: #ffffff; border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.15); overflow: hidden; border: 1px solid #e2e8f0; flex-direction: column; animation: slideUpChat 0.3s ease-out;">
+    
+    <!-- الهيدر -->
+    <div style="background: #ffffff; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="background: #eff6ff; color: #3b82f6; width: 40px; height: 40px; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 22px;">🤖</div>
+            <div>
+                <h3 style="margin: 0; font-size: 16px; color: #0f172a; font-weight: 900;">أوكتو AI</h3>
+                <p style="margin: 0; font-size: 11px; color: #10b981; font-weight: bold;">● متصل ويقرأ بيانات السيستم</p>
             </div>
         </div>
+        <button id="close-ai-btn" onclick="closeShefoChat()" style="background: #f1f5f9; border: none; color: #64748b; width: 30px; height: 30px; border-radius: 8px; font-size: 14px; cursor: pointer; transition: 0.2s;">✖</button>
+    </div>
+    
+    <!-- مساحة الرسايل -->
+    <div id="shefo-chat-messages" style="flex: 1; padding: 20px; height: 400px; overflow-y: auto; background: #f8fafc; display: flex; flex-direction: column; gap: 15px; scroll-behavior: smooth;">
+        <div class="ai-message">
+            أهلاً بيك يا مستر! أنا <strong>أوكتو AI</strong> 🤖<br>أنا هنا لتنفيذ أوامرك فوراً. أقدر أفتحلك كشوفات الحضور، أنشئ حصص، احلل الغياب، أو افتح أي شاشة. كيف أساعدك؟
+        </div>
+    </div>
+
+    <!-- أزرار الاقتراحات -->
+    <div id="ai-suggestions-container" style="padding: 10px 15px; background: #ffffff; display: flex; gap: 8px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; border-top: 1px solid #f1f5f9;">
+        <!-- تملأ برمجياً -->
+    </div>
+    
+    <!-- منطقة الإدخال (مع زرار القائمة المنسدلة ⚡) -->
+    <div style="padding: 15px; background: #ffffff; display: flex; gap: 8px; align-items: center; position: relative;">
         
-        <!-- منطقة الإدخال (صوت وكتابة) -->
-        <div class="shefo-chat-input-area">
-            <button id="shefo-mic-btn" onclick="toggleShefoMic()" title="تحدث بالصوت">🎙️</button>
-            <input type="text" id="shefo-text-input" placeholder="اكتب رسالتك هنا..." onkeypress="handleShefoKeyPress(event)">
-            <button id="shefo-send-btn" onclick="sendShefoMessage()" title="إرسال">➤</button>
+        <!-- حقل الكتابة -->
+        <input type="text" id="shefo-text-input" placeholder="اكتب أمرك هنا..." onkeypress="handleAiKeyPress(event)" style="flex: 1; border: 1px solid #cbd5e1; background: #ffffff; padding: 12px 15px; border-radius: 12px; outline: none; font-family: 'Cairo'; font-weight: bold; font-size: 14px; color: #0f172a !important; transition: 0.3s;" onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.1)';" onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='none';">
+        
+        <!-- ⚡ زرار القائمة المنسدلة للأوامر السريعة -->
+        <button id="ai-menu-btn" onclick="toggleAiMenu()" style="background: #f1f5f9; color: #475569; border: none; width: 45px; height: 45px; border-radius: 12px; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 20px; transition: 0.3s;" title="الأوامر السريعة">⚡</button>
+        
+        <!-- زرار الإرسال -->
+        <button id="send-ai-btn" onclick="sendShefoMessage()" style="background: #3b82f6; color: white; border: none; width: 45px; height: 45px; border-radius: 12px; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 18px; transition: 0.3s;">➤</button>
+        
+        <!-- القائمة المنسدلة نفسها (تظهر فوق حقل الإدخال) -->
+        <div id="ai-dropdown-popup" style="display: none; position: absolute; bottom: 70px; left: 15px; right: 15px; background: white; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; padding: 10px; z-index: 10; max-height: 250px; overflow-y: auto; flex-direction: column; gap: 6px; animation: slideUpChat 0.2s ease-out;">
+            <!-- تملأ برمجياً -->
         </div>
     </div>
 </div>
 
+<style>
+    @keyframes slideUpChat { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+    
+    #ai-assistant-container:hover #ai-tooltip { opacity: 1 !important; transform: translateY(0) !important; }
+    
+    /* تأثيرات الـ Hover */
+    #shefo-assistant-btn:hover { transform: scale(1.08); }
+    #close-ai-btn:hover { background: #fee2e2 !important; color: #ef4444 !important; }
+    #send-ai-btn:hover { background: #2563eb !important; }
+    
+    /* ستايل كبسولات الاقتراحات */
+    .ai-quick-btn { background: #ffffff; color: #3b82f6; border: 1px solid #3b82f6; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 800; cursor: pointer; transition: 0.2s; font-family: 'Cairo'; display: inline-flex; align-items: center; gap: 5px; }
+    .ai-quick-btn:hover { background: #3b82f6; color: white !important; }
+    
+    /* ستايل رسالة المستخدم (يمين - أزرق) */
+    .user-message { background: #3b82f6; color: white; padding: 12px 16px; border-radius: 16px 16px 0 16px; align-self: flex-end; max-width: 85%; font-size: 14px; font-weight: bold; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2); animation: slideUpChat 0.2s ease; margin-left: auto; }
+    
+    /* ستايل رسالة الروبوت (يسار - أبيض) */
+    .ai-message { background: #ffffff; color: #0f172a; padding: 14px 18px; border-radius: 16px 16px 16px 0; border: 1px solid #e2e8f0; align-self: flex-start; max-width: 85%; font-size: 14px; line-height: 1.6; font-weight: 600; box-shadow: 0 4px 6px rgba(0,0,0,0.02); animation: slideUpChat 0.2s ease; margin-right: auto; }
+    
+    /* أنيميشن التفكير */
+    .ai-typing { display: flex; gap: 4px; align-items: center; padding: 5px; }
+    .ai-typing span { width: 8px; height: 8px; background: #94a3b8; border-radius: 50%; animation: typing 1.4s infinite ease-in-out both; }
+    .ai-typing span:nth-child(1) { animation-delay: -0.32s; }
+    .ai-typing span:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes typing { 0%, 80%, 100% { transform: scale(0); opacity: 0.5; } 40% { transform: scale(1); opacity: 1; background: #3b82f6; } }
+
+    #ai-suggestions-container::-webkit-scrollbar { display: none; }
+
+
+    .ai-dropdown-item {
+    background: white; border: none; padding: 10px 14px; border-radius: 10px; 
+    font-size: 13px; font-weight: 800; cursor: pointer; text-align: right; 
+    transition: 0.2s; font-family: 'Cairo'; display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+#ai-menu-btn:hover { background: #e2e8f0 !important; color: #1e293b !important; }
+#ai-dropdown-popup::-webkit-scrollbar { width: 5px; }
+#ai-dropdown-popup::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+</style>
 <!-- نافذة طلب كروت ID -->
     <div id="requestIdCardsModal" class="modal">
         <div class="modal-content" style="width: 450px;">

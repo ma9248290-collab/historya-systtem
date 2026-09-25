@@ -8160,3 +8160,448 @@ window.openQuickAddFromSession = function() {
     // 🌟 تفعيل التحضير اللحظي بعد الحفظ
     window.pendingAttendanceAfterAction = true;
 };
+
+
+
+window.closeShefoChat = function() {
+    document.getElementById("shefo-chat-overlay").style.display = "none";
+};
+
+window.sendAiCommand = function(text) {
+    document.getElementById("shefo-text-input").value = text;
+    sendShefoMessage();
+};
+
+window.handleAiKeyPress = function(e) {
+    if(e.key === 'Enter') sendShefoMessage();
+};
+
+
+
+window.sendShefoMessage = function() {
+    let input = document.getElementById("shefo-text-input");
+    let text = input.value.trim();
+    if (!text) return;
+    
+    let messagesContainer = document.getElementById("shefo-chat-messages");
+    document.getElementById("ai-suggestions-container").style.display = "none";
+    
+    let userMsgDiv = document.createElement("div");
+    userMsgDiv.className = "user-message";
+    userMsgDiv.innerText = text;
+    messagesContainer.appendChild(userMsgDiv);
+    input.value = "";
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    let typingDiv = document.createElement("div");
+    typingDiv.className = "ai-message";
+    typingDiv.innerHTML = `<div class="ai-typing"><span></span><span></span><span></span></div>`;
+    messagesContainer.appendChild(typingDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    setTimeout(() => {
+        typingDiv.remove();
+        let aiResult = processAiLogic(text); 
+        
+        let aiMsgDiv = document.createElement("div");
+        aiMsgDiv.className = "ai-message";
+        aiMsgDiv.innerHTML = aiResult.response;
+        messagesContainer.appendChild(aiMsgDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        renderAiSuggestions(aiResult.suggestions);
+
+    }, 600); // استجابة أسرع
+};
+
+// ==========================================
+// 🤖 عقل المساعد الذكي المُطور (القائمة الشاملة والألوان)
+// ==========================================
+
+// 1. القائمة الرئيسية الشاملة لكل السيستم (بألوان متناسقة)
+window.aiMasterMenu = [
+    { text: "🏫 المجموعات والحصص", cmd: "مجموعات", color: "#3b82f6" },
+    { text: "🎓 سجل الطلاب", cmd: "الطلاب", color: "#10b981" },
+    { text: "💰 الخزنة والماليات", cmd: "الخزنة", color: "#f59e0b" },
+    { text: "📝 الامتحانات الورقية", cmd: "الامتحانات", color: "#8b5cf6" },
+    { text: "💻 منصة الأونلاين", cmd: "المنصة", color: "#ec4899" },
+    { text: "📚 الواجبات", cmd: "الواجبات", color: "#0ea5e9" },
+    { text: "🏆 لوحة الشرف", cmd: "لوحة الشرف", color: "#eab308" },
+    { text: "🚨 تحت الملاحظة (خطر)", cmd: "خطر", color: "#ef4444" },
+    { text: "🙋‍♂️ طلبات الانضمام", cmd: "طلبات", color: "#14b8a6" },
+    { text: "📢 الإرسال الجماعي", cmd: "ارسال جماعي", color: "#f97316" },
+    { text: "📘 إدارة الكتب", cmd: "الكتب", color: "#6366f1" },
+    { text: "🛒 متجر الهدايا", cmd: "المتجر", color: "#84cc16" },
+    { text: "📊 إحصائيات السنتر", cmd: "احصائيات", color: "#64748b" }
+];
+
+window.openShefoChat = function() {
+    let chatOverlay = document.getElementById("shefo-chat-overlay");
+    if (chatOverlay.style.display === "none" || chatOverlay.style.display === "") {
+        chatOverlay.style.display = "flex";
+        // عرض القائمة الشاملة عند فتح الشات
+        renderAiSuggestions(window.aiMasterMenu);
+        document.getElementById("shefo-text-input").focus();
+    } else {
+        chatOverlay.style.display = "none";
+    }
+};
+
+window.closeShefoChat = function() {
+    document.getElementById("shefo-chat-overlay").style.display = "none";
+};
+
+window.sendAiCommand = function(text) {
+    document.getElementById("shefo-text-input").value = text;
+    sendShefoMessage();
+};
+
+window.handleAiKeyPress = function(e) {
+    if(e.key === 'Enter') sendShefoMessage();
+};
+
+// فتح وقفل القائمة المنسدلة للأوامر
+window.toggleAiMenu = function() {
+    let popup = document.getElementById("ai-dropdown-popup");
+    if (popup.style.display === "none" || popup.style.display === "") {
+        popup.style.display = "flex";
+    } else {
+        popup.style.display = "none";
+    }
+};
+
+// إغلاق القائمة عند النقر في أي مكان خارجها
+document.addEventListener('click', function(e) {
+    let popup = document.getElementById("ai-dropdown-popup");
+    let menuBtn = document.getElementById("ai-menu-btn");
+    if (popup && menuBtn && !popup.contains(e.target) && !menuBtn.contains(e.target)) {
+        popup.style.display = "none";
+    }
+});
+
+// رسم العناصر جوه القائمة المنسدلة بأسلوب بروفيشنال
+window.renderAiSuggestions = function(suggestionsArray) {
+    let container = document.getElementById("ai-dropdown-popup");
+    if(!container) return;
+    container.innerHTML = "";
+    
+    if (suggestionsArray.length === 0) {
+        container.style.display = "none";
+        return;
+    }
+
+    suggestionsArray.forEach(sug => {
+        let btn = document.createElement("button");
+        btn.className = "ai-dropdown-item";
+        btn.innerHTML = sug.text;
+        
+        let defaultColor = "#3b82f6";
+        let activeColor = sug.color ? sug.color : defaultColor;
+        
+        btn.style.borderRight = `4px solid ${activeColor}`;
+        btn.style.color = "#0f172a";
+        
+        btn.onmouseover = function() {
+            this.style.background = '#f8fafc';
+            this.style.color = activeColor;
+        };
+        btn.onmouseout = function() {
+            this.style.background = 'white';
+            this.style.color = '#0f172a';
+        };
+
+        btn.onclick = () => {
+            container.style.display = "none"; // قفل القائمة بعد الاختيار
+            if (sug.cmd.endsWith(" ")) {
+                let input = document.getElementById("shefo-text-input");
+                input.value = sug.cmd;
+                input.focus();
+            } else {
+                sendAiCommand(sug.cmd);
+            }
+        };
+        container.appendChild(btn);
+    });
+};
+
+window.sendShefoMessage = function() {
+    let input = document.getElementById("shefo-text-input");
+    let text = input.value.trim();
+    if (!text) return;
+    
+    let messagesContainer = document.getElementById("shefo-chat-messages");
+    document.getElementById("ai-suggestions-container").style.display = "none";
+    
+    let userMsgDiv = document.createElement("div");
+    userMsgDiv.className = "user-message";
+    userMsgDiv.innerText = text;
+    messagesContainer.appendChild(userMsgDiv);
+    input.value = "";
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    let typingDiv = document.createElement("div");
+    typingDiv.className = "ai-message";
+    typingDiv.innerHTML = `<div class="ai-typing"><span></span><span></span><span></span></div>`;
+    messagesContainer.appendChild(typingDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    setTimeout(() => {
+        typingDiv.remove();
+        let aiResult = processAiLogic(text); 
+        
+        let aiMsgDiv = document.createElement("div");
+        aiMsgDiv.className = "ai-message";
+        aiMsgDiv.innerHTML = aiResult.response;
+        messagesContainer.appendChild(aiMsgDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        renderAiSuggestions(aiResult.suggestions);
+
+    }, 600);
+};
+
+// 🧠 قلب التنفيذ (Auto Executor) المطور الشامل (أوامر تفاعلية كاملة + رفع الإكسيل)
+window.processAiLogic = function(text) {
+    let query = window.smartArabicNormalize(text); 
+    
+    let backToMenuSuggestion = [{ text: "🔄 القائمة الرئيسية", cmd: "القائمة", color: "#64748b" }];
+
+    // --- 0. إظهار القائمة الرئيسية ---
+    if (query === "القائمة" || query.includes("الرئيسية") || query.includes("رجوع")) {
+        return { response: "إليك القائمة الشاملة لأدوات السيستم يا مستر 👇", suggestions: window.aiMasterMenu };
+    }
+
+    // --- 1. التنقل السريع بين الشاشات الرئيسية ---
+    const pagesMap = {
+        "الخزنه": "finance", "الخزنة": "finance", "ماليات": "finance",
+        "امتحان": "exams", "الامتحانات": "exams",
+        "واجب": "homework", "الواجبات": "homework",
+        "لوحة الشرف": "leaderboard", "الاوائل": "leaderboard",
+        "المنصة": "platform", "اونلاين": "platform",
+        "الطلاب": "students", "بحث": "students",
+        "احصائيات": "dashboard", "الرئيسية": "dashboard",
+        "خطر": "atrisk", "ملاحظة": "atrisk",
+        "طلبات": "joinreq", "انضمام": "joinreq",
+        "ارسال جماعي": "broadcast", "رسائل": "broadcast",
+        "الكتب": "books", "كتب": "books"
+    };
+
+    for (const [key, value] of Object.entries(pagesMap)) {
+        if (query === key || query.includes(key) && query.length < key.length + 5) { 
+            switchPage(value);
+            return {
+                response: `تم يا مستر! فتحتلك صفحة <b>${key}</b> 🚀`,
+                suggestions: backToMenuSuggestion
+            };
+        }
+    }
+
+    if (query === "المتجر" || query.includes("متجر")) {
+        switchPage('platform'); setTimeout(() => switchPlatformTab('store'), 100);
+        return { response: "فتحتلك متجر السنتر 🛒 وتقدر تدير المنتجات دلوقتي.", suggestions: backToMenuSuggestion };
+    }
+    if (query === "الاسئلة" || query.includes("منتدى")) {
+        switchPage('platform'); setTimeout(() => switchPlatformTab('forum'), 100);
+        return { response: "فتحتلك منتدى الأسئلة 💬 لمتابعة استفسارات الطلاب.", suggestions: backToMenuSuggestion };
+    }
+
+    // --- 🌟 2. السحر الجديد: رفع واستيراد ملفات الإكسيل (طلاب أو حضور) ---
+    if (query.includes("ارفع") || query.includes("رفع") || query.includes("استيراد") || query.includes("ضيف شيت") || query.includes("تسجيل شيت") || query.includes("شيت حضور")) {
+        
+        let targetGroup = groups.find(g => query.includes(window.smartArabicNormalize(g.name)));
+
+        // لو ذكر كلمة حضور أو حصة (عايز يرفع شيت غياب وحضور)
+        if (query.includes("حضور") || query.includes("حصه") || query.includes("حصة") || query.includes("غياب")) {
+            if (targetGroup) {
+                 let activeSession = classSessions.find(s => s.group === targetGroup.name && s.status === 'open');
+                 if(activeSession) {
+                     switchPage('attendance'); openSessionDetails(activeSession.id);
+                     setTimeout(() => document.getElementById("importAttendanceExcel").click(), 800);
+                     return { response: `جاري التجهيز... 📁 اختر شيت الإكسيل من جهازك لتسجيل حضور مجموعة <b>(${targetGroup.name})</b>.`, suggestions: backToMenuSuggestion };
+                 } else {
+                     return { response: `مفيش حصة مفتوحة لمجموعة (${targetGroup.name}) عشان ارفع شيت حضورها. افتح حصة الأول.`, suggestions: [{ text: `📖 افتح حصة ${targetGroup.name}`, cmd: `افتح حصة ${targetGroup.name}`, color: "#3b82f6" }] };
+                 }
+            } else if (currentActiveSessionId && document.getElementById("session-details-view").style.display === "block") {
+                setTimeout(() => document.getElementById("importAttendanceExcel").click(), 500);
+                return { response: "حاضر يا مستر! 📁 اختر شيت الإكسيل من جهازك لتسجيل الحضور في الحصة الحالية.", suggestions: backToMenuSuggestion };
+            } else {
+                 return { response: "⚠️ أنت لست بداخل أي حصة! يرجى فتح حصة أولاً أو إخباري باسم المجموعة (مثال: ارفع شيت حضور مجموعة كذا).", suggestions: window.aiMasterMenu };
+            }
+        } 
+        // لو عايز يرفع شيت تسجيل طلاب لمجموعة أو للسيستم
+        else {
+            if (targetGroup) {
+                switchPage('groups'); openGroupDetails(targetGroup.name);
+                setTimeout(() => document.getElementById("importGroupExcelInput").click(), 800);
+                return { response: `جاري التجهيز... 📁 اختر شيت الإكسيل من جهازك لإضافة الطلاب لمجموعة <b>(${targetGroup.name})</b>.`, suggestions: backToMenuSuggestion };
+            } else if (currentActiveGroup && document.getElementById("group-details-view").style.display === "block") {
+                 setTimeout(() => document.getElementById("importGroupExcelInput").click(), 500);
+                 return { response: `تمام! 📁 اختر شيت الإكسيل من جهازك لإضافة الطلاب للمجموعة المفتوحة حالياً.`, suggestions: backToMenuSuggestion };
+            } else {
+                switchPage('students');
+                setTimeout(() => document.getElementById("importExcelInput").click(), 800);
+                return { response: "حاضر! 📁 اختر شيت الإكسيل من جهازك لرفع قائمة الطلاب للنظام بشكل عام.", suggestions: backToMenuSuggestion };
+            }
+        }
+    }
+
+    // --- 3. أمر "تحميل/استخراج" إكسيل الغياب (تم تعديل الكلمات لمنع التعارض) ---
+    if (query.includes("حمل") || query.includes("تنزيل") || query.includes("نزل") || query.includes("استخراج")) {
+        if (query.includes("اكسيل") || query.includes("شيت") || query.includes("غياب")) {
+            if (window.aiLastAbsentees && window.aiLastAbsentees.length > 0) {
+                exportAiAbsentees();
+                return { response: "تم استخراج ملف الإكسيل وتحميله على جهازك بنجاح! 📥", suggestions: backToMenuSuggestion };
+            } else {
+                return { response: "⚠️ لا توجد قائمة غياب مسجلة حالياً لتحميلها. اطلب مني أولاً (من غاب اليوم؟) داخل الحصة.", suggestions: backToMenuSuggestion };
+            }
+        }
+    }
+
+    // --- 4. التحضير المباشر من الشات (حضور، تأخير، غياب، إلغاء) ---
+    if (query.includes("حضر") || query.includes("سجل") || query.includes("حضور") || query.includes("تأخير") || query.includes("تاخير")) {
+        if (!currentActiveSessionId) {
+            return { response: "⚠️ إنت مش فاتح كشف حضور أي حصة دلوقتي! افتح الحصة الأول عشان أقدر أحضر الطالب.", suggestions: window.aiMasterMenu };
+        }
+
+        let searchTarget = query.replace(/(حضر|حضور|سجل|تأخير|تاخير|غياب|غايب|الطالب|الكود|رقم|لي)/g, '').trim();
+        if (!searchTarget) return { response: "يرجى كتابة كود أو اسم الطالب مع الأمر. (مثال: حضر الكود 1001)", suggestions: [] };
+
+        let student = findStudentByCodeOrName(searchTarget);
+        if (!student) return { response: `مش لاقي أي طالب بالاسم أو الكود "<b>${searchTarget}</b>" يا مستر. متأكد من البيانات؟ 🤔`, suggestions: [] };
+
+        const session = classSessions.find(s => s.id === currentActiveSessionId);
+        if (student.group !== session.group) {
+            return { response: `⚠️ الطالب <b>${student.name}</b> موجود في مجموعة (${student.group}) مش المجموعة الحالية (${session.group}). استخدم الباركود العادي لو عايز تنقله.`, suggestions: [] };
+        }
+
+        let status = 'present'; let statusText = 'حاضر ✅';
+        if (query.includes("تأخير") || query.includes("تاخير") || query.includes("متاخر")) { status = 'late'; statusText = 'متأخر ⏳'; }
+        else if (query.includes("غياب") || query.includes("غايب")) { status = 'absent'; statusText = 'غائب ❌'; }
+        else if (query.includes("الغاء") || query.includes("امسح")) { status = 'none'; statusText = 'ملغي (بانتظار الرصد) ✖'; }
+
+        markAttendance(student.code, status);
+        return {
+            response: `تم يا مستر! سجلت الطالب <b>${student.name}</b> (${statusText}) في حصة اليوم. 🫡`,
+            suggestions: [{ text: "📊 من غاب في الحصة؟", cmd: "من غاب اليوم؟", color: "#ef4444" }, ...backToMenuSuggestion]
+        };
+    }
+
+    // --- 5. إضافة وخصم النقاط السلوكية من الشات ---
+    if (query.includes("نقط") || query.includes("نقطه") || query.includes("نقاط") || query.includes("نقطة")) {
+        let isAdding = query.includes("ضيف") || query.includes("زود") || query.includes("اعطي") || query.includes("اضف");
+        let isSubtracting = query.includes("اخصم") || query.includes("نقص") || query.includes("اسحب");
+
+        if (isAdding || isSubtracting) {
+            let numMatch = query.match(/\d+/);
+            let points = numMatch ? parseInt(numMatch[0]) : (isAdding ? 5 : -5); 
+            if (isSubtracting) points = -Math.abs(points);
+
+            let searchTarget = query.replace(/(ضيف|زود|اعطي|اضف|اخصم|نقص|اسحب|نقط|نقطه|نقاط|نقطة|للطالب|للكود|من|الطالب|الكود|\d+)/g, '').trim();
+            let student = findStudentByCodeOrName(searchTarget);
+
+            if (student) {
+                student.behaviorPoints = Math.max(0, (student.behaviorPoints || 0) + points);
+                localStorage.setItem("students", JSON.stringify(students));
+                
+                if (typeof renderTable === "function") renderTable();
+                if (typeof renderGroupStudentsTable === "function") renderGroupStudentsTable();
+                if (currentStudentProfileCode === student.code && document.getElementById("profile-behavior-points")) {
+                    document.getElementById("profile-behavior-points").innerText = student.behaviorPoints;
+                }
+
+                let actionText = points >= 0 ? `تم إضافة ${points} نقطة ⭐` : `تم خصم ${Math.abs(points)} نقطة 🤫`;
+                return {
+                    response: `${actionText} بنجاح للطالب <b>${student.name}</b>. إجمالي نقاطه السلوكية الآن: <b>${student.behaviorPoints}</b>.`,
+                    suggestions: backToMenuSuggestion
+                };
+            }
+        }
+    }
+
+    // --- 6. البحث السريع عن ملف الطالب ---
+    if (query.includes("ملف") || query.includes("بيانات") || query.includes("ابحث عن") || query.includes("هات")) {
+        let searchTarget = query.replace(/(ملف|بيانات|ابحث|عن|هات|الطالب|الكود)/g, '').trim();
+        if (searchTarget) {
+            let student = findStudentByCodeOrName(searchTarget);
+            if (student) {
+                return {
+                    response: `لقيت بيانات الطالب!<br>👤 الاسم: <b>${student.name}</b><br>🔢 الكود: <b>${student.code}</b><br>📚 المجموعة: <b>${student.group}</b><br><br><button onclick="openStudentProfile('${student.code}'); closeShefoChat();" style="margin-top:10px; background:linear-gradient(135deg, #6366f1, #8b5cf6); color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:bold; width: 100%;">فتح ملف الطالب التفصيلي 📂</button>`,
+                    suggestions: backToMenuSuggestion
+                };
+            }
+        }
+    }
+
+    // --- 7. فتح حصة أو إنشاءها تلقائياً ---
+    if (query.includes("افتح حصه") || query.includes("عرض حصه") || query.includes("افتح حصة")) {
+        let rawSearchWord = query.replace(/(افتح|حصه|حصة|سجل|حضور|عرض|مجموعة|مجموعه|المجموعات|لـ|لمجموعة)/g, '').trim();
+        let cleanSearchWord = rawSearchWord.replace(/[\s\-\_\.\•\*\+\(\)\[\]]/g, ''); 
+        
+        if (!cleanSearchWord) {
+            return { response: "يرجى تحديد اسم المجموعة! (مثال: افتح حصة المنوات)", suggestions: [{ text: "📖 عرض الحصص المفتوحة", cmd: "مجموعات", color: "#3b82f6" }, ...backToMenuSuggestion] };
+        }
+
+        let targetGroupName = null;
+        let exactMatchGroup = groups.find(g => window.smartArabicNormalize(g.name).replace(/[\s\-\_\.\•\*\+\(\)\[\]]/g, '') === cleanSearchWord);
+        let matchedGroups = exactMatchGroup ? [exactMatchGroup] : groups.filter(g => window.smartArabicNormalize(g.name).replace(/[\s\-\_\.\•\*\+\(\)\[\]]/g, '').includes(cleanSearchWord));
+
+        if (matchedGroups.length === 1) {
+            targetGroupName = matchedGroups[0].name;
+            let activeSession = classSessions.find(s => s.group === targetGroupName && s.status === 'open');
+            
+            let inSessionSuggestions = [
+                { text: "📊 من غاب في الحصة؟", cmd: "من غاب اليوم؟", color: "#ef4444" }, 
+                { text: "🔒 قفل الحصة", cmd: "اقفل الحصة", color: "#f59e0b" },
+                ...backToMenuSuggestion
+            ];
+
+            if (activeSession) {
+                switchPage('attendance'); openSessionDetails(activeSession.id); 
+                return { response: `✅ فتحتلك كشف الحضور الحالي لمجموعة <b>(${targetGroupName})</b>. تقدر تقولي (حضر الكود كذا) دلوقتي.`, suggestions: inSessionSuggestions };
+            } else {
+                let newId = Date.now().toString();
+                let today = new Date().toISOString().split('T')[0];
+                classSessions.push({ id: newId, group: targetGroupName, date: today, topic: "حصة جديدة (تلقائي عبر أوكتو)", status: "open", attendance: {} });
+                localStorage.setItem("classSessions", JSON.stringify(classSessions));
+                if(typeof addSystemLog === "function") addSystemLog("إنشاء تلقائي 🤖", `قام أوكتو بفتح حصة جديدة لـ ${targetGroupName}`);
+                switchPage('attendance'); openSessionDetails(newId);
+                
+                return { response: `✨ مكنش في حصة مفتوحة لـ <b>(${targetGroupName})</b>، فأنشأتلك حصة جديدة بتاريخ اليوم ودخلتك عليها فوراً! ابدأ الرصد.`, suggestions: inSessionSuggestions };
+            }
+        } else if (matchedGroups.length > 1) {
+            let dynamicSuggestions = matchedGroups.map(g => ({ text: `📖 ${g.name}`, cmd: `افتح حصة ${g.name}`, color: "#3b82f6" }));
+            dynamicSuggestions.push(...backToMenuSuggestion);
+            return { response: `لقيت أكتر من مجموعة بالاسم ده، تقصد أي واحدة؟ 👇`, suggestions: dynamicSuggestions };
+        } else {
+            return { response: `مش لاقي أي مجموعة بالاسم ده يا مستر.`, suggestions: backToMenuSuggestion };
+        }
+    }
+
+    // --- 8. عرض كل الحصص المفتوحة ---
+    if (query === "مجموعات" || query.includes("الحصص المفتوحة")) {
+        let activeSessions = classSessions.filter(s => s.status === 'open');
+        if(activeSessions.length === 0) return { response: "مفيش حصص مفتوحة دلوقتي.", suggestions: [{ text: "➕ فتح حصة جديدة", cmd: "انشاء حصة", color: "#10b981" }, ...backToMenuSuggestion]};
+        
+        let dynamicSuggestions = activeSessions.map(s => ({ text: `📖 ${s.group}`, cmd: `افتح حصة ${s.group}`, color: "#3b82f6" }));
+        dynamicSuggestions.push(...backToMenuSuggestion);
+        return { response: "دي كل الحصص المفتوحة حالياً، تحب تدخل أي واحدة؟ 👇", suggestions: dynamicSuggestions };
+    }
+
+    // --- الرد الافتراضي ---
+    return {
+        response: "أنا جاهز لتنفيذ أوامرك. اضغط على أي زر من القائمة ⚡ أدناه أو اكتب أمرك مباشرة (مثال: حضر الكود 1001، ضيف 5 نقط لمحمود):",
+        suggestions: window.aiMasterMenu
+    };
+};
+// 🤖 أداة الروبوت لاستخراج شيت الغياب الفوري
+window.exportAiAbsentees = function() {
+    if (!window.aiLastAbsentees || window.aiLastAbsentees.length === 0) {
+        return showToast("لا يوجد طلاب غائبين لاستخراجهم!", "error");
+    }
+    let data = window.aiLastAbsentees.map(s => ({ "الكود": s.code, "الاسم": s.name, "تليفون ولي الأمر": s.parentPhone, "المجموعة": s.group }));
+    let ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [{wch: 15}, {wch: 30}, {wch: 20}, {wch: 20}]; 
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "الغياب");
+    XLSX.writeFile(wb, `غياب_الحصة_${new Date().toISOString().split('T')[0]}.xlsx`);
+};
