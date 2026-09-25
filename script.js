@@ -6276,7 +6276,19 @@ window.renderAttendanceTable = function(session) {
     
     const groupS = classSessions.filter(s => s.group === session.group).sort((a,b)=>new Date(a.date)-new Date(b.date)); 
     const prevSession = groupS[groupS.findIndex(s => s.id === session.id) - 1]; 
-    
+    // 💡 تحديث الشريط الذكي بمعلومات الصف
+    const groupObj = groups.find(g => g.name === session.group);
+    if(groupObj) {
+        document.getElementById('quick-info-level-name').innerText = `إضافة سريعة لطلاب (${groupObj.level})`;
+        let lastSt = window.getLastStudentInLevel(groupObj.level);
+        if (lastSt) {
+            document.getElementById('quick-info-last-code').innerText = lastSt.code;
+            document.getElementById('quick-info-last-name').innerText = `(${lastSt.name})`;
+        } else {
+            document.getElementById('quick-info-last-code').innerText = "لا يوجد طلاب بعد";
+            document.getElementById('quick-info-last-name').innerText = "";
+        }
+    }
     // ⏱️ الترتيب الذكي: آخر طالب ضرب الباركود يظهر أول واحد فوق
     let sortedStudents = [...gStudents].sort((a, b) => {
         let logA = session.attendanceLog ? session.attendanceLog[a.code] : null;
@@ -8068,4 +8080,83 @@ window.moveAllToCurrentGroup = function() {
     window.pendingMoveQueue = []; // تصفير القائمة
     showToast("تم نقل جميع الطلاب المحددين بنجاح! 🚀");
     if (typeof syncDataToBot === "function") syncDataToBot();
+};
+
+
+
+
+// ==========================================
+// 💡 نظام الكود الذكي والإضافة السريعة من الحصة
+// ==========================================
+
+// 1. دالة بتجيب آخر طالب متسجل في صف معين
+window.getLastStudentInLevel = function(level) {
+    let levelStudents = students.filter(s => s.level === level);
+    if (levelStudents.length === 0) return null;
+
+    // ترتيب الطلاب بناءً على الأرقام اللي في الكود عشان نجيب الأخير صح
+    levelStudents.sort((a, b) => {
+        let numA = parseInt(String(a.code).replace(/\D/g, '')) || 0;
+        let numB = parseInt(String(b.code).replace(/\D/g, '')) || 0;
+        return numA - numB;
+    });
+
+    return levelStudents[levelStudents.length - 1]; // إرجاع بيانات آخر طالب
+};
+
+// 2. دالة بتولد الكود الجديد بناءً على كود آخر طالب في الصف
+window.generateNextCodeForLevel = function(level) {
+    let lastStudent = window.getLastStudentInLevel(level);
+    if (!lastStudent) return "1"; // لو مفيش طلاب خالص في الصف ده
+
+    let codeStr = String(lastStudent.code).trim();
+    // البحث عن آخر رقم في الكود (عشان لو بتستخدم حروف زي G2-105)
+    let numMatch = codeStr.match(/\d+$/); 
+
+    if (numMatch) {
+        let numStr = numMatch[0];
+        let prefix = codeStr.substring(0, codeStr.length - numStr.length);
+        let nextNum = parseInt(numStr, 10) + 1;
+
+        // الحفاظ على الأصفار لو موجودة (مثال: 001 يبقى 002)
+        let paddedNum = nextNum.toString();
+        if (numStr.startsWith('0')) {
+            paddedNum = paddedNum.padStart(numStr.length, '0');
+        }
+
+        return prefix + paddedNum;
+    } else {
+        return codeStr + "1"; // لو الكود مفيهوش أرقام خالص
+    }
+};
+
+// 3. دالة الزرار السحري (إضافة وتسكين وتحضير)
+window.openQuickAddFromSession = function() {
+    const session = classSessions.find(s => s.id === currentActiveSessionId);
+    if(!session) return;
+
+    const groupObj = groups.find(g => g.name === session.group);
+    if(!groupObj) return;
+
+    const level = groupObj.level;
+    const nextCode = window.generateNextCodeForLevel(level); // توليد الكود الخاص بالصف ده بس
+
+    // فتح نافذة الإضافة
+    openModal('addStudentModal');
+
+    // تعبئة البيانات أوتوماتيك
+    document.getElementById('studentCode').value = nextCode;
+    document.getElementById('studentLevel').value = level;
+    filterGroupsByLevel('studentLevel', 'studentGroup');
+    
+    // تأخير بسيط عشان قائمة المجموعات تلحق تحمل
+    setTimeout(() => {
+        document.getElementById('studentGroup').value = session.group;
+    }, 50);
+
+    // التركيز على خانة الاسم عشان تكتب على طول
+    document.getElementById('studentName').focus();
+
+    // 🌟 تفعيل التحضير اللحظي بعد الحفظ
+    window.pendingAttendanceAfterAction = true;
 };
