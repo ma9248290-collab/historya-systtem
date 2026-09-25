@@ -8360,8 +8360,9 @@ window.sendShefoMessage = function() {
     }, 600);
 };
 
-// 🧠 قلب التنفيذ (Auto Executor) المطور الشامل (أوامر تفاعلية كاملة + رفع الإكسيل)
+// 🧠 قلب التنفيذ (Auto Executor) المطور الشامل (أوامر تفاعلية كاملة + التعديل المباشر)
 window.processAiLogic = function(text) {
+    let rawText = text.trim(); // النص الأصلي للحفاظ على الأرقام
     let query = window.smartArabicNormalize(text); 
     
     let backToMenuSuggestion = [{ text: "🔄 القائمة الرئيسية", cmd: "القائمة", color: "#64748b" }];
@@ -8396,21 +8397,78 @@ window.processAiLogic = function(text) {
         }
     }
 
-    if (query === "المتجر" || query.includes("متجر")) {
-        switchPage('platform'); setTimeout(() => switchPlatformTab('store'), 100);
-        return { response: "فتحتلك متجر السنتر 🛒 وتقدر تدير المنتجات دلوقتي.", suggestions: backToMenuSuggestion };
-    }
-    if (query === "الاسئلة" || query.includes("منتدى")) {
-        switchPage('platform'); setTimeout(() => switchPlatformTab('forum'), 100);
-        return { response: "فتحتلك منتدى الأسئلة 💬 لمتابعة استفسارات الطلاب.", suggestions: backToMenuSuggestion };
-    }
-
-    // --- 🌟 2. السحر الجديد: رفع واستيراد ملفات الإكسيل (طلاب أو حضور) ---
-    if (query.includes("ارفع") || query.includes("رفع") || query.includes("استيراد") || query.includes("ضيف شيت") || query.includes("تسجيل شيت") || query.includes("شيت حضور")) {
+    // --- 🌟 2. السحر الجديد: التعديل المباشر لبيانات الطالب من الشات ---
+    if (query.includes("عدل") || query.includes("غير") || query.includes("تعديل") || query.includes("انقل")) {
         
-        let targetGroup = groups.find(g => query.includes(window.smartArabicNormalize(g.name)));
+        let fieldToUpdate = null; 
+        let fieldNameAr = "";
+        
+        // تحديد الحقل المطلوب تعديله
+        if (query.includes("ولي") || query.includes("ولى") || query.includes("الاب")) { fieldToUpdate = "parentPhone"; fieldNameAr = "رقم ولي الأمر"; }
+        else if (query.includes("رقم") || query.includes("تليفون") || query.includes("هاتف")) { fieldToUpdate = "phone"; fieldNameAr = "رقم الطالب"; }
+        else if (query.includes("اسم")) { fieldToUpdate = "name"; fieldNameAr = "اسم الطالب"; }
+        else if (query.includes("مجموعه") || query.includes("مجموعة") || query.includes("انقل")) { fieldToUpdate = "group"; fieldNameAr = "المجموعة"; }
 
-        // لو ذكر كلمة حضور أو حصة (عايز يرفع شيت غياب وحضور)
+        if(fieldToUpdate) {
+            // استخراج القيمة الجديدة والكود المستهدف (بفصل الجملة من عند حروف الجر)
+            let parts = rawText.split(/\s(الى|إلى|لـ|يساوي|بـ|يخلي|ل)\s/);
+            let newValue = "";
+            let targetSearchPart = "";
+
+            if (parts.length >= 3) {
+                newValue = parts[parts.length - 1].trim(); 
+                targetSearchPart = parts[0].trim(); 
+            } else {
+                // لو المدرس مكاتبش حرف جر (مثال: عدل رقم 1001 010123456)
+                let nums = rawText.match(/\d+/g);
+                if (nums && nums.length >= 2) {
+                    targetSearchPart = nums[0]; 
+                    newValue = nums[nums.length - 1]; 
+                } else {
+                    return { response: "مش قادر أحدد القيمة الجديدة. يرجى كتابة الأمر بوضوح (مثال: عدل رقم ولي الامر للكود 1001 لـ 0)", suggestions: [] };
+                }
+            }
+
+            // تنظيف النص للبحث عن الطالب
+            let cleanTarget = targetSearchPart.replace(/(انقل|عدل|غير|تعديل|رقم|ولي|الامر|ولى|الاب|تليفون|هاتف|اسم|مجموعة|مجموعه|الطالب|اللى|كوده|للكود|الكود)/g, '').trim();
+            
+            let student = findStudentByCodeOrName(cleanTarget);
+            if (!student) {
+                // محاولة أخيرة بالبحث برقم الكود لو موجود في النص
+                let nums = targetSearchPart.match(/\d+/g);
+                if(nums) student = findStudentByCodeOrName(nums[0]);
+            }
+
+            if (!student) return { response: `مش قادر أتعرف على الطالب من الأمر بتاعك. متأكد من الكود أو الاسم؟ 🤔`, suggestions: [] };
+
+            // تحديث الداتا
+            student[fieldToUpdate] = newValue;
+            localStorage.setItem("students", JSON.stringify(students));
+            
+            // تحديث الواجهات الحية
+            if (typeof renderTable === "function") renderTable();
+            if (typeof renderGroupStudentsTable === "function") renderGroupStudentsTable();
+            
+            // لو إنت فاتح ملف الطالب ده حالياً، يتحدث قدامك لايف
+            if (window.currentStudentProfileCode === student.code) {
+                if (fieldToUpdate === "phone" && document.getElementById("profile-phone")) document.getElementById("profile-phone").innerText = newValue;
+                if (fieldToUpdate === "parentPhone" && document.getElementById("profile-parent")) document.getElementById("profile-parent").innerText = newValue;
+                if (fieldToUpdate === "name" && document.getElementById("profile-name")) document.getElementById("profile-name").innerHTML = newValue; 
+                if (fieldToUpdate === "group" && document.getElementById("profile-code-group")) document.getElementById("profile-code-group").innerText = `${student.code} | المجموعة: ${newValue}`;
+            }
+
+            if(typeof addSystemLog === "function") addSystemLog("تعديل عبر الروبوت 🤖", `تم تعديل ${fieldNameAr} للطالب ${student.name} إلى: ${newValue}`);
+
+            return {
+                response: `تم يا مستر! عدلت <b>${fieldNameAr}</b> للطالب <b>${student.name}</b> وبقى (<b>${newValue}</b>). 🫡`,
+                suggestions: [{ text: "👤 افتح ملف الطالب", cmd: `ملف ${student.code}`, color: "#8b5cf6" }, ...backToMenuSuggestion]
+            };
+        }
+    }
+
+    // --- 3. رفع واستيراد ملفات الإكسيل (طلاب أو حضور) ---
+    if (query.includes("ارفع") || query.includes("رفع") || query.includes("استيراد") || query.includes("ضيف شيت") || query.includes("تسجيل شيت") || query.includes("شيت حضور")) {
+        let targetGroup = groups.find(g => query.includes(window.smartArabicNormalize(g.name)));
         if (query.includes("حضور") || query.includes("حصه") || query.includes("حصة") || query.includes("غياب")) {
             if (targetGroup) {
                  let activeSession = classSessions.find(s => s.group === targetGroup.name && s.status === 'open');
@@ -8427,9 +8485,7 @@ window.processAiLogic = function(text) {
             } else {
                  return { response: "⚠️ أنت لست بداخل أي حصة! يرجى فتح حصة أولاً أو إخباري باسم المجموعة (مثال: ارفع شيت حضور مجموعة كذا).", suggestions: window.aiMasterMenu };
             }
-        } 
-        // لو عايز يرفع شيت تسجيل طلاب لمجموعة أو للسيستم
-        else {
+        } else {
             if (targetGroup) {
                 switchPage('groups'); openGroupDetails(targetGroup.name);
                 setTimeout(() => document.getElementById("importGroupExcelInput").click(), 800);
@@ -8445,7 +8501,7 @@ window.processAiLogic = function(text) {
         }
     }
 
-    // --- 3. أمر "تحميل/استخراج" إكسيل الغياب (تم تعديل الكلمات لمنع التعارض) ---
+    // --- 4. أمر "تحميل/استخراج" إكسيل الغياب ---
     if (query.includes("حمل") || query.includes("تنزيل") || query.includes("نزل") || query.includes("استخراج")) {
         if (query.includes("اكسيل") || query.includes("شيت") || query.includes("غياب")) {
             if (window.aiLastAbsentees && window.aiLastAbsentees.length > 0) {
@@ -8457,7 +8513,7 @@ window.processAiLogic = function(text) {
         }
     }
 
-    // --- 4. التحضير المباشر من الشات (حضور، تأخير، غياب، إلغاء) ---
+    // --- 5. التحضير المباشر من الشات ---
     if (query.includes("حضر") || query.includes("سجل") || query.includes("حضور") || query.includes("تأخير") || query.includes("تاخير")) {
         if (!currentActiveSessionId) {
             return { response: "⚠️ إنت مش فاتح كشف حضور أي حصة دلوقتي! افتح الحصة الأول عشان أقدر أحضر الطالب.", suggestions: window.aiMasterMenu };
@@ -8486,7 +8542,67 @@ window.processAiLogic = function(text) {
         };
     }
 
-    // --- 5. إضافة وخصم النقاط السلوكية من الشات ---
+
+
+    // --- 🌟 السحر الجديد: إيقاف وتفعيل الطلاب من الشات ---
+    if (query.includes("ايقاف") || query.includes("إيقاف") || query.includes("وقف") || query.includes("تفعيل") || query.includes("فعل") || query.includes("فك")) {
+        
+        let isSuspending = query.includes("ايقاف") || query.includes("إيقاف") || query.includes("وقف");
+        
+        // استخراج الكود أو الاسم بتجريد الجملة من كلمات الأمر
+        let searchTarget = query.replace(/(اعمل|ايقاف|إيقاف|وقف|تفعيل|فعل|فك|الطالب|للطالب|الكود|رقم|عن)/g, '').trim();
+
+        if (!searchTarget) {
+            return { response: "يرجى كتابة كود أو اسم الطالب مع الأمر. (مثال: اعمل إيقاف للطالب 1001)", suggestions: [] };
+        }
+
+        let student = findStudentByCodeOrName(searchTarget);
+
+        if (student) {
+            // تحديث الداتا في السيستم
+            student.isSuspended = isSuspending;
+            localStorage.setItem("students", JSON.stringify(students));
+
+            // تسجيل الحركة في السجل
+            if(typeof addSystemLog === "function") {
+                addSystemLog(isSuspending ? "إيقاف عبر الروبوت 🤖⛔" : "تفعيل عبر الروبوت 🤖✅", `تم ${isSuspending ? 'إيقاف' : 'إعادة تفعيل'} الطالب: ${student.name}`);
+            }
+
+            // تحديث الجداول في الخلفية
+            if (typeof renderTable === "function") renderTable();
+            if (typeof renderGroupStudentsTable === "function") renderGroupStudentsTable();
+
+            // 🚀 التحديث اللايف: لو المدرس فاتح بروفايل الطالب ده دلوقتي، البروفايل هيعمل ريفريش لنفسه والبادج الأحمر هيظهر أو يختفي!
+            if (window.currentStudentProfileCode === student.code) {
+                openStudentProfile(student.code); 
+            }
+
+            let actionText = isSuspending ? "إيقاف ⛔" : "تفعيل ✅";
+            return {
+                response: `تم يا مستر! عملت <b>${actionText}</b> للطالب <b>${student.name}</b> بنجاح.`,
+                suggestions: [{ text: "👤 افتح ملف الطالب", cmd: `ملف ${student.code}`, color: "#8b5cf6" }, ...backToMenuSuggestion]
+            };
+        } else {
+            // لو ملقاش الطالب، نجرب ندور على أي أرقام في الجملة
+            let nums = rawText.match(/\d+/g);
+            if(nums) {
+                student = findStudentByCodeOrName(nums[0]);
+                if(student) {
+                    student.isSuspended = isSuspending;
+                    localStorage.setItem("students", JSON.stringify(students));
+                    if (window.currentStudentProfileCode === student.code) openStudentProfile(student.code);
+                    return {
+                        response: `تم يا مستر! عملت <b>${isSuspending ? "إيقاف ⛔" : "تفعيل ✅"}</b> للطالب <b>${student.name}</b> بنجاح.`,
+                        suggestions: [{ text: "👤 افتح ملف الطالب", cmd: `ملف ${student.code}`, color: "#8b5cf6" }, ...backToMenuSuggestion]
+                    };
+                }
+            }
+            return { response: `مش قادر أتعرف على الطالب من الأمر بتاعك. متأكد من الكود أو الاسم؟ 🤔`, suggestions: [] };
+        }
+    }
+
+    
+    // --- 6. إضافة وخصم النقاط السلوكية ---
     if (query.includes("نقط") || query.includes("نقطه") || query.includes("نقاط") || query.includes("نقطة")) {
         let isAdding = query.includes("ضيف") || query.includes("زود") || query.includes("اعطي") || query.includes("اضف");
         let isSubtracting = query.includes("اخصم") || query.includes("نقص") || query.includes("اسحب");
@@ -8518,7 +8634,7 @@ window.processAiLogic = function(text) {
         }
     }
 
-    // --- 6. البحث السريع عن ملف الطالب ---
+    // --- 7. البحث السريع عن ملف الطالب ---
     if (query.includes("ملف") || query.includes("بيانات") || query.includes("ابحث عن") || query.includes("هات")) {
         let searchTarget = query.replace(/(ملف|بيانات|ابحث|عن|هات|الطالب|الكود)/g, '').trim();
         if (searchTarget) {
@@ -8532,13 +8648,16 @@ window.processAiLogic = function(text) {
         }
     }
 
-    // --- 7. فتح حصة أو إنشاءها تلقائياً ---
-    if (query.includes("افتح حصه") || query.includes("عرض حصه") || query.includes("افتح حصة")) {
-        let rawSearchWord = query.replace(/(افتح|حصه|حصة|سجل|حضور|عرض|مجموعة|مجموعه|المجموعات|لـ|لمجموعة)/g, '').trim();
+    // --- 8. فتح حصة أو إنشاءها تلقائياً ---
+    if (query.includes("افتح حصه") || query.includes("عرض حصه") || query.includes("افتح حصة") || query.includes("انشاء حصه") || query.includes("انشاء حصة") || query.includes("عمل حصة")) {
+        let rawSearchWord = query.replace(/(افتح|انشاء|عمل|حصه|حصة|سجل|حضور|عرض|مجموعة|مجموعه|المجموعات|لـ|لمجموعة)/g, '').trim();
         let cleanSearchWord = rawSearchWord.replace(/[\s\-\_\.\•\*\+\(\)\[\]]/g, ''); 
         
         if (!cleanSearchWord) {
-            return { response: "يرجى تحديد اسم المجموعة! (مثال: افتح حصة المنوات)", suggestions: [{ text: "📖 عرض الحصص المفتوحة", cmd: "مجموعات", color: "#3b82f6" }, ...backToMenuSuggestion] };
+            if (groups.length === 0) return { response: "مفيش أي مجموعات متسجلة في السيستم يا مستر. ضيف مجموعة من صفحة المجموعات الأول.", suggestions: backToMenuSuggestion };
+            let allGroupsSuggestions = groups.map(g => ({ text: `📖 ${g.name}`, cmd: `افتح حصة ${g.name}`, color: "#3b82f6" }));
+            allGroupsSuggestions.push(...backToMenuSuggestion);
+            return { response: "تحب نفتح حصة لأي مجموعة في دول يا مستر؟ (اضغط على المجموعة) 👇", suggestions: allGroupsSuggestions };
         }
 
         let targetGroupName = null;
@@ -8557,13 +8676,12 @@ window.processAiLogic = function(text) {
 
             if (activeSession) {
                 switchPage('attendance'); openSessionDetails(activeSession.id); 
-                return { response: `✅ فتحتلك كشف الحضور الحالي لمجموعة <b>(${targetGroupName})</b>. تقدر تقولي (حضر الكود كذا) دلوقتي.`, suggestions: inSessionSuggestions };
+                return { response: `✅ فتحتلك كشف الحضور الحالي لمجموعة <b>(${targetGroupName})</b>. وتقدر تقولي (حضر الكود كذا) دلوقتي.`, suggestions: inSessionSuggestions };
             } else {
                 let newId = Date.now().toString();
                 let today = new Date().toISOString().split('T')[0];
                 classSessions.push({ id: newId, group: targetGroupName, date: today, topic: "حصة جديدة (تلقائي عبر أوكتو)", status: "open", attendance: {} });
                 localStorage.setItem("classSessions", JSON.stringify(classSessions));
-                if(typeof addSystemLog === "function") addSystemLog("إنشاء تلقائي 🤖", `قام أوكتو بفتح حصة جديدة لـ ${targetGroupName}`);
                 switchPage('attendance'); openSessionDetails(newId);
                 
                 return { response: `✨ مكنش في حصة مفتوحة لـ <b>(${targetGroupName})</b>، فأنشأتلك حصة جديدة بتاريخ اليوم ودخلتك عليها فوراً! ابدأ الرصد.`, suggestions: inSessionSuggestions };
@@ -8577,10 +8695,10 @@ window.processAiLogic = function(text) {
         }
     }
 
-    // --- 8. عرض كل الحصص المفتوحة ---
+    // --- 9. عرض كل الحصص المفتوحة ---
     if (query === "مجموعات" || query.includes("الحصص المفتوحة")) {
         let activeSessions = classSessions.filter(s => s.status === 'open');
-        if(activeSessions.length === 0) return { response: "مفيش حصص مفتوحة دلوقتي.", suggestions: [{ text: "➕ فتح حصة جديدة", cmd: "انشاء حصة", color: "#10b981" }, ...backToMenuSuggestion]};
+        if(activeSessions.length === 0) return { response: "مفيش حصص مفتوحة دلوقتي.", suggestions: [{ text: "➕ إنشاء حصة جديدة", cmd: "انشاء حصة", color: "#10b981" }, ...backToMenuSuggestion]};
         
         let dynamicSuggestions = activeSessions.map(s => ({ text: `📖 ${s.group}`, cmd: `افتح حصة ${s.group}`, color: "#3b82f6" }));
         dynamicSuggestions.push(...backToMenuSuggestion);
@@ -8589,7 +8707,7 @@ window.processAiLogic = function(text) {
 
     // --- الرد الافتراضي ---
     return {
-        response: "أنا جاهز لتنفيذ أوامرك. اضغط على أي زر من القائمة ⚡ أدناه أو اكتب أمرك مباشرة (مثال: حضر الكود 1001، ضيف 5 نقط لمحمود):",
+        response: "أنا جاهز لتنفيذ أوامرك. اضغط على أي زر من القائمة ⚡ أدناه أو اكتب أمرك مباشرة (مثال: حضر الكود 1001، عدل رقم ولي الامر للطالب 1001 لـ 0):",
         suggestions: window.aiMasterMenu
     };
 };
