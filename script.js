@@ -8360,150 +8360,19 @@ window.sendShefoMessage = function() {
     }, 600);
 };
 
-// 🧠 قلب التنفيذ (Auto Executor) المطور الشامل (أوامر + تعديل + شرح السيستم بذكاء)
+// 🧠 قلب التنفيذ (Auto Executor) المطور الشامل
 window.processAiLogic = function(text) {
     let rawText = text.trim(); 
     let query = window.smartArabicNormalize(text); 
     
     let backToMenuSuggestion = [{ text: "🔄 القائمة الرئيسية", cmd: "القائمة", color: "#64748b" }];
 
-    // --- 0. إظهار القائمة الرئيسية ---
+    // ==========================================
+    // 1️⃣ التنقل الأساسي وإظهار القائمة
+    // ==========================================
     if (query === "القائمة" || query.includes("الرئيسية") || query.includes("رجوع")) {
         return { response: "إليك القائمة الشاملة لأدوات السيستم يا مستر 👇", suggestions: window.aiMasterMenu };
     }
-
-    // --- 🌟 1. محرك الشرح والمساعدة (النسخة الذكية باللهجة المصرية) ---
-    // ضفنا كلمات زي "اضيف، اعمل، انشئ، بضيف" عشان يلقط السؤال فوراً
-    if (query.includes("اشرح") || query.includes("شرح") || query.includes("كيف") || query.includes("ازاي") || query.includes("ازاى") || query.includes("طريقة") || query.includes("مساعدة") || query.includes("اضيف") || query.includes("اعمل") || query.includes("انشاء") || query.includes("انشئ") || query.includes("بضيف")) {
-        
-        // 1. شرح المجموعات (دي اللي إنت سألت عليها)
-        if (query.includes("مجموعة") || query.includes("مجموعه") || query.includes("مجموعات")) {
-            return {
-                response: `<b>📌 طريقة إضافة وإدارة المجموعات:</b><br><br>
-                1. ادخل على <b>"إدارة المجموعات"</b> من القائمة الجانبية.<br>
-                2. اضغط على زر <b>(+ إضافة مجموعة جديدة)</b>.<br>
-                3. اكتب اسم المجموعة، واختار الصف الدراسي، وحدد نظام الدفع (بالحصة ولا بالشهر) وسعرها.<br>
-                4. اضغط حفظ، والمجموعة هتنزل قدامك وتقدر تضيف جواها طلاب.<br>
-                5. <b>نصيحة أوكتو 🤖:</b> تقدر تقولي هنا "مجموعات" وهفتحلك شاشة المجموعات فوراً!`,
-                suggestions: [{ text: "📚 افتح المجموعات", cmd: "مجموعات", color: "#3b82f6" }, ...backToMenuSuggestion]
-            };
-        }
-
-        // 2. شرح السيستم بالكامل
-        if (query.includes("السيستم") || query.includes("النظام") || query.includes("كل حاجه") || query === "اشرح") {
-            return {
-                response: `<b>أهلاً بك في نظام هيستوريا المتكامل! 🚀</b><br><br>
-                النظام مصمم ليكون مركز الإدارة الشامل، وينقسم لعدة أقسام:<br>
-                1️⃣ <b>الطلاب والمجموعات:</b> لإضافة الطلاب وتسجيل الغياب والحضور بالباركود.<br>
-                2️⃣ <b>التقييم:</b> لرصد درجات الامتحانات والواجبات.<br>
-                3️⃣ <b>المنصة الأونلاين:</b> لرفع الكورسات، والامتحانات الإلكترونية، والمتجر.<br>
-                4️⃣ <b>الماليات:</b> لحساب الإيرادات والمصروفات لكل حصة.<br>
-                5️⃣ <b>أوكتو AI (أنا 🤖):</b> مساعدك لتنفيذ الأوامر من الشات مباشرة.<br><br>
-                <b>عايزني أشرحلك أي قسم فيهم بالتفصيل؟ (اختار من تحت 👇)</b>`,
-                suggestions: [
-                    { text: "📝 شرح الحضور والغياب", cmd: "اشرح الحضور", color: "#10b981" },
-                    { text: "💻 شرح المنصة والأونلاين", cmd: "اشرح المنصة", color: "#ec4899" },
-                    { text: "💰 شرح الماليات والخزنة", cmd: "اشرح الماليات", color: "#f59e0b" },
-                    ...backToMenuSuggestion
-                ]
-            };
-        }
-
-        // 3. شرح الحضور والغياب (Sessions)
-        if (query.includes("حضور") || query.includes("حصة") || query.includes("غياب") || query.includes("تسجيل")) {
-            return {
-                response: `<b>📌 طريقة تسجيل الحضور والغياب:</b><br><br>
-                1. ادخل على <b>"سجل الحضور"</b>.<br>
-                2. اضغط على <b>(+ فتح حصة)</b>، اختار الصف والمجموعة واكتب موضوع الحصة.<br>
-                3. اضغط على <b>"تسجيل"</b> جوه كارت الحصة.<br>
-                4. هتفتحلك شاشة الرصد.. استخدم الباركود 🎯، أو ابحث برقم الكود.<br>
-                5. <b>نصيحة أوكتو 🤖:</b> قولي (افتح حصة كذا) وهكريتها وأدخلك على شاشة الباركود فوراً!`,
-                suggestions: [{ text: "📖 افتح حصة مجموعة...", cmd: "مجموعات", color: "#3b82f6" }, ...backToMenuSuggestion]
-            };
-        }
-
-        // 4. شرح الامتحانات والواجبات
-        if (query.includes("امتحان") || query.includes("واجب") || query.includes("درجات") || query.includes("رصد")) {
-            return {
-                response: `<b>📌 طريقة عمل امتحان ورصد الدرجات:</b><br><br>
-                1. ادخل على <b>"الامتحانات"</b> أو <b>"الواجبات"</b>.<br>
-                2. اضغط <b>(+ إنشاء)</b> وحدد الدرجة النهائية والمجموعة.<br>
-                3. ادخل على كارت الامتحان واستخدم الباركود لضرب كود الطالب ثم اكتب الدرجة واضغط Enter.<br>
-                4. <b>نصيحة أوكتو 🤖:</b> لو عايز امتحان أونلاين بيصحح نفسه، ده بيتعمل من قسم "المنصة".`,
-                suggestions: [
-                    { text: "📝 افتح الامتحانات", cmd: "الامتحانات", color: "#8b5cf6" }, 
-                    { text: "💻 اشرح الامتحان الأونلاين", cmd: "اشرح الاونلاين", color: "#ec4899" }
-                ]
-            };
-        }
-
-        // 5. شرح المنصة (الأونلاين) والكورسات
-        if (query.includes("منصة") || query.includes("اونلاين") || query.includes("كورس") || query.includes("فيديو")) {
-            return {
-                response: `<b>📌 طريقة استخدام المنصة الأونلاين:</b><br><br>
-                ادخل على <b>"إدارة المنصة"</b> هتلاقي تابات فوق:<br>
-                • <b>المحاضرات:</b> ترفع صور وكورسات ولينكات يوتيوب/درايف، وتحدد تفتح مجاناً للي حضر السنتر ولا بفلوس.<br>
-                • <b>أكواد الشحن:</b> لتوليد كروت شحن يشتريها الطالب.<br>
-                • <b>الامتحانات الإلكترونية:</b> بتعمل امتحان MCQ، والطالب بيمتحنه على موبايله والدرجة بتترصد تلقائي.<br>
-                • <b>المتجر:</b> تعرض فيه مذكرات، والطالب يشتريها بنقاط السلوك.`,
-                suggestions: [{ text: "💻 افتح المنصة", cmd: "المنصة", color: "#ec4899" }, ...backToMenuSuggestion]
-            };
-        }
-
-        // 6. شرح إضافة الطلاب أو الإكسيل
-        if (query.includes("طالب") || query.includes("اضافة") || query.includes("اكسيل") || query.includes("شيت")) {
-            return {
-                response: `<b>📌 طريقة إضافة الطلاب:</b><br><br>
-                عندك 3 طرق:<br>
-                1. <b>يدوي:</b> من صفحة (إدارة الطلاب) اضغط (+ تسجيل طالب).<br>
-                2. <b>شيت إكسيل:</b> من نفس الصفحة، اضغط (تحميل نموذج الإكسيل)، املاه، وارفع الملف من زرار (استيراد).<br>
-                3. <b>عن طريقي 🤖:</b> قولي (اضافة طالب) وهفتحلك الشاشة. أو قولي (ارفع شيت طلاب) وهفتحلك الكمبيوتر تختار الملف!`,
-                suggestions: [
-                    { text: "➕ إضافة طالب جديد", cmd: "طالب جديد", color: "#10b981" },
-                    { text: "📥 ارفع شيت طلاب", cmd: "ارفع شيت طلاب", color: "#3b82f6" }
-                ]
-            };
-        }
-
-        // 7. شرح الماليات والخزنة
-        if (query.includes("فلوس") || query.includes("خزنة") || query.includes("ماليات") || query.includes("دفع") || query.includes("اشتراك")) {
-            return {
-                response: `<b>📌 طريقة إدارة الماليات:</b><br><br>
-                1. وإنت بتسجل أي "مجموعة"، بتحدد هل دفعها بالشهر ولا بالحصة وبكام.<br>
-                2. وإنت بتسجل الغياب جوا الحصة، بيظهر زرار (الدفع السريع 💰) بتحصل منه الفلوس.<br>
-                3. ادخل على صفحة <b>"الخزنة والماليات"</b>، اختار الحصة، هيجيبلك إجمالي التحصيل، ومين دافع ومين لأ، وتقدر تضيف مصاريف السنتر أو المذكرات ليحسب (صافي الربح).`,
-                suggestions: [{ text: "💰 افتح الخزنة", cmd: "الخزنة", color: "#f59e0b" }, ...backToMenuSuggestion]
-            };
-        }
-
-        // 8. قدرات أوكتو نفسه
-        if (query.includes("قدراتك") || query.includes("بتعمل ايه") || query.includes("روبوت") || query.includes("أنت مين")) {
-            return {
-                response: `<b>أنا أوكتو AI 🐙، مساعدك الشخصي اللي متوصل بدماغ السيستم!</b><br><br>
-                أقدر أعملك الآتي وإنت في مكانك هنا:<br>
-                • <b>تنفيذ أوامر:</b> "افتح حصة المنوات"، "الخزنة"، "المنصة".<br>
-                • <b>التعديل المباشر:</b> "عدل رقم ولي الأمر للطالب 1001 لـ 0".<br>
-                • <b>إيقاف وتفعيل:</b> "اعمل إيقاف للطالب 120".<br>
-                • <b>الرصد:</b> "سجل الكود 55 غياب".<br>
-                • <b>البحث:</b> "ملف الكود 100".<br><br>
-                أؤمرني يا مستر! 🫡`,
-                suggestions: window.aiMasterMenu
-            };
-        }
-        
-        // رد عام لو مفهمش هو عايز شرح إيه بالظبط
-        return {
-            response: `تحت أمرك يا مستر! عايزني أشرحلك إيه بالظبط في السيستم؟ (مثلاً: ازاي اضيف مجموعة، اشرح الحضور، اشرح المنصة)`,
-            suggestions: [
-                { text: "🚀 اشرح السيستم بالكامل", cmd: "اشرح السيستم", color: "#3b82f6" },
-                { text: "🤖 إيه هي قدرات أوكتو؟", cmd: "اشرح قدراتك", color: "#8b5cf6" }
-            ]
-        };
-    }
-
-    // ==========================================================
-    // بقية الأوامر التنفيذية الأصلية
-    // ==========================================================
 
     const pagesMap = {
         "الخزنه": "finance", "الخزنة": "finance", "ماليات": "finance",
@@ -8535,236 +8404,100 @@ window.processAiLogic = function(text) {
         return { response: "فتحتلك منتدى الأسئلة 💬 لمتابعة استفسارات الطلاب.", suggestions: backToMenuSuggestion };
     }
 
-    // --- إيقاف وتفعيل الطلاب من الشات ---
-    if (query.includes("ايقاف") || query.includes("إيقاف") || query.includes("وقف") || query.includes("تفعيل") || query.includes("فعل") || query.includes("فك")) {
-        let isSuspending = query.includes("ايقاف") || query.includes("إيقاف") || query.includes("وقف");
-        let searchTarget = query.replace(/(اعمل|ايقاف|إيقاف|وقف|تفعيل|فعل|فك|الطالب|للطالب|الكود|رقم|عن)/g, '').trim();
+    // ==========================================
+    // 2️⃣ الأوامر التشغيلية المباشرة
+    // ==========================================
 
-        if (!searchTarget) return { response: "يرجى كتابة كود أو اسم الطالب مع الأمر. (مثال: اعمل إيقاف للطالب 1001)", suggestions: [] };
+    // --- أ) إنشاء امتحان أو واجب (مع التقاط الاسم بذكاء) ---
+    let isCreateTask = query.includes("انشاء") || query.includes("انشئ") || query.includes("اعمل") || query.includes("عمل") || query.includes("اضف");
+    let isTaskType = query.includes("امتحان") || query.includes("واجب");
 
-        let student = findStudentByCodeOrName(searchTarget);
-
-        if (student) {
-            student.isSuspended = isSuspending;
-            localStorage.setItem("students", JSON.stringify(students));
-
-            if(typeof addSystemLog === "function") {
-                addSystemLog(isSuspending ? "إيقاف عبر الروبوت 🤖⛔" : "تفعيل عبر الروبوت 🤖✅", `تم ${isSuspending ? 'إيقاف' : 'إعادة تفعيل'} الطالب: ${student.name}`);
-            }
-
-            if (typeof renderTable === "function") renderTable();
-            if (typeof renderGroupStudentsTable === "function") renderGroupStudentsTable();
-
-            if (window.currentStudentProfileCode === student.code) {
-                openStudentProfile(student.code); 
-            }
-
-            let actionText = isSuspending ? "إيقاف ⛔" : "تفعيل ✅";
-            return {
-                response: `تم يا مستر! عملت <b>${actionText}</b> للطالب <b>${student.name}</b> بنجاح.`,
-                suggestions: [{ text: "👤 افتح ملف الطالب", cmd: `ملف ${student.code}`, color: "#8b5cf6" }, ...backToMenuSuggestion]
-            };
-        } else {
-            let nums = rawText.match(/\d+/g);
-            if(nums) {
-                student = findStudentByCodeOrName(nums[0]);
-                if(student) {
-                    student.isSuspended = isSuspending;
-                    localStorage.setItem("students", JSON.stringify(students));
-                    if (window.currentStudentProfileCode === student.code) openStudentProfile(student.code);
-                    return {
-                        response: `تم يا مستر! عملت <b>${isSuspending ? "إيقاف ⛔" : "تفعيل ✅"}</b> للطالب <b>${student.name}</b> بنجاح.`,
-                        suggestions: [{ text: "👤 افتح ملف الطالب", cmd: `ملف ${student.code}`, color: "#8b5cf6" }, ...backToMenuSuggestion]
-                    };
-                }
-            }
-            return { response: `مش قادر أتعرف على الطالب من الأمر بتاعك. متأكد من الكود أو الاسم؟ 🤔`, suggestions: [] };
-        }
-    }
-
-    // --- التعديل المباشر لبيانات الطالب ---
-    if (query.includes("عدل") || query.includes("غير") || query.includes("تعديل") || query.includes("انقل")) {
-        let fieldToUpdate = null; let fieldNameAr = "";
+    if (isCreateTask && isTaskType && !query.includes("اونلاين") && !query.includes("الكتروني")) {
         
-        if (query.includes("ولي") || query.includes("ولى") || query.includes("الاب")) { fieldToUpdate = "parentPhone"; fieldNameAr = "رقم ولي الأمر"; }
-        else if (query.includes("رقم") || query.includes("تليفون") || query.includes("هاتف")) { fieldToUpdate = "phone"; fieldNameAr = "رقم الطالب"; }
-        else if (query.includes("اسم")) { fieldToUpdate = "name"; fieldNameAr = "اسم الطالب"; }
-        else if (query.includes("مجموعه") || query.includes("مجموعة") || query.includes("انقل")) { fieldToUpdate = "group"; fieldNameAr = "المجموعة"; }
+        let isExam = query.includes("امتحان");
+        let typeName = isExam ? "امتحان" : "واجب";
 
-        if(fieldToUpdate) {
-            let parts = rawText.split(/\s(الى|إلى|لـ|يساوي|بـ|يخلي|ل)\s/);
-            let newValue = ""; let targetSearchPart = "";
+        let maxScore = 50; 
+        let textWithoutScore = rawText;
+        
+        let scoreMatch = rawText.match(/(?:بدرجة|درجة|درجه|من)\s*(\d+)/);
+        if (scoreMatch) {
+            maxScore = parseInt(scoreMatch[1]);
+            textWithoutScore = rawText.replace(scoreMatch[0], ''); 
+        } else {
+            let endNumMatch = rawText.match(/\s+(\d+)$/);
+            if (endNumMatch) {
+                maxScore = parseInt(endNumMatch[1]);
+                textWithoutScore = rawText.replace(new RegExp('\\s+' + maxScore + '$'), '');
+            }
+        }
 
-            if (parts.length >= 3) {
-                newValue = parts[parts.length - 1].trim(); 
-                targetSearchPart = parts[0].trim(); 
+        let customTitle = null;
+        let textForGroupSearch = textWithoutScore;
+        let titleMatch = textWithoutScore.match(/(?:باسم|اسمه|موضوع|موضوعها|عن)\s+(.+)/);
+        
+        if (titleMatch && titleMatch[1]) {
+            customTitle = titleMatch[1].split(/(بدرجة|درجة|درجه|من\s*\d+|لمجموعة|لمجموعه|لـ|ل)/)[0].trim();
+            textForGroupSearch = textWithoutScore.replace(titleMatch[0], '');
+        }
+        let finalTitle = customTitle ? customTitle : `${typeName} جديد (عبر أوكتو)`;
+
+        let rawSearchWord = textForGroupSearch.replace(/(انشاء|انشئ|اعمل|عمل|اضف|امتحان|واجب|لمجموعة|لمجموعه|لـ|ل|مجموعة|مجموعه)/g, '').trim();
+        let cleanSearchWord = window.smartArabicNormalize(rawSearchWord).replace(/[\s\-\_\.\•\*\+\(\)\[\]]/g, '').replace(/^(ل|لل|ب|ف)/, '');
+
+        if (!cleanSearchWord) return { response: `يرجى تحديد اسم المجموعة! (مثال: اعمل ${typeName} لمجموعة المنوات باسم الدرس الأول بدرجة 20)`, suggestions: [] };
+
+        let exactMatchGroup = groups.find(g => window.smartArabicNormalize(g.name).replace(/[\s\-\_\.\•\*\+\(\)\[\]]/g, '') === cleanSearchWord);
+        let matchedGroups = exactMatchGroup ? [exactMatchGroup] : groups.filter(g => {
+            let cleanGName = window.smartArabicNormalize(g.name).replace(/[\s\-\_\.\•\*\+\(\)\[\]]/g, '');
+            return cleanGName.includes(cleanSearchWord) || cleanSearchWord.includes(cleanGName);
+        });
+
+        if (matchedGroups.length === 1) {
+            let targetGroupName = matchedGroups[0].name;
+            let newId = Date.now().toString() + (isExam ? "_e" : "_h");
+            let today = new Date().toISOString().split('T')[0];
+
+            if (isExam) {
+                exams.push({ id: newId, group: targetGroupName, name: finalTitle, maxScore: maxScore, date: today, status: "open", grades: {} });
+                localStorage.setItem("exams", JSON.stringify(exams));
+                switchPage('exams');
+                if(typeof renderExamCards === 'function') renderExamCards();
             } else {
-                let nums = rawText.match(/\d+/g);
-                if (nums && nums.length >= 2) {
-                    targetSearchPart = nums[0]; newValue = nums[nums.length - 1]; 
-                } else {
-                    return { response: "مش قادر أحدد القيمة الجديدة. يرجى كتابة الأمر بوضوح (مثال: عدل رقم ولي الامر للكود 1001 لـ 0)", suggestions: [] };
-                }
+                homeworks.push({ id: newId, group: targetGroupName, name: finalTitle, maxScore: maxScore, date: today, status: "open", grades: {} });
+                localStorage.setItem("homeworks", JSON.stringify(homeworks));
+                switchPage('homework');
+                if(typeof renderHwCards === 'function') renderHwCards();
             }
 
-            let cleanTarget = targetSearchPart.replace(/(انقل|عدل|غير|تعديل|رقم|ولي|الامر|ولى|الاب|تليفون|هاتف|اسم|مجموعة|مجموعه|الطالب|اللى|كوده|للكود|الكود)/g, '').trim();
-            
-            let student = findStudentByCodeOrName(cleanTarget);
-            if (!student) {
-                let nums = targetSearchPart.match(/\d+/g);
-                if(nums) student = findStudentByCodeOrName(nums[0]);
-            }
-
-            if (!student) return { response: `مش قادر أتعرف على الطالب من الأمر بتاعك. متأكد من الكود أو الاسم؟ 🤔`, suggestions: [] };
-
-            student[fieldToUpdate] = newValue;
-            localStorage.setItem("students", JSON.stringify(students));
-            
-            if (typeof renderTable === "function") renderTable();
-            if (typeof renderGroupStudentsTable === "function") renderGroupStudentsTable();
-            
-            if (window.currentStudentProfileCode === student.code) {
-                if (fieldToUpdate === "phone" && document.getElementById("profile-phone")) document.getElementById("profile-phone").innerText = newValue;
-                if (fieldToUpdate === "parentPhone" && document.getElementById("profile-parent")) document.getElementById("profile-parent").innerText = newValue;
-                if (fieldToUpdate === "name" && document.getElementById("profile-name")) document.getElementById("profile-name").innerHTML = newValue; 
-                if (fieldToUpdate === "group" && document.getElementById("profile-code-group")) document.getElementById("profile-code-group").innerText = `${student.code} | المجموعة: ${newValue}`;
-            }
-
-            if(typeof addSystemLog === "function") addSystemLog("تعديل عبر الروبوت 🤖", `تم تعديل ${fieldNameAr} للطالب ${student.name} إلى: ${newValue}`);
+            if(typeof addSystemLog === "function") addSystemLog(`إنشاء تلقائي 🤖`, `قام أوكتو بإنشاء ${typeName} (${finalTitle}) لـ ${targetGroupName} من ${maxScore} درجة`);
 
             return {
-                response: `تم يا مستر! عدلت <b>${fieldNameAr}</b> للطالب <b>${student.name}</b> وبقى (<b>${newValue}</b>). 🫡`,
-                suggestions: [{ text: "👤 افتح ملف الطالب", cmd: `ملف ${student.code}`, color: "#8b5cf6" }, ...backToMenuSuggestion]
+                response: `✅ تم يا مستر! أنشأتلك <b>${typeName}</b> جديد لمجموعة <b>(${targetGroupName})</b> باسم <b>(${finalTitle})</b> بدرجة <b>${maxScore}</b>.<br>فتحتلك الصفحة عشان ترصد فوراً! 🚀`,
+                suggestions: backToMenuSuggestion
             };
-        }
-    }
-
-    // --- رفع واستيراد الإكسيل ---
-    if (query.includes("ارفع") || query.includes("رفع") || query.includes("استيراد") || query.includes("ضيف شيت") || query.includes("تسجيل شيت") || query.includes("شيت حضور")) {
-        let targetGroup = groups.find(g => query.includes(window.smartArabicNormalize(g.name)));
-        if (query.includes("حضور") || query.includes("حصه") || query.includes("حصة") || query.includes("غياب")) {
-            if (targetGroup) {
-                 let activeSession = classSessions.find(s => s.group === targetGroup.name && s.status === 'open');
-                 if(activeSession) {
-                     switchPage('attendance'); openSessionDetails(activeSession.id);
-                     setTimeout(() => document.getElementById("importAttendanceExcel").click(), 800);
-                     return { response: `جاري التجهيز... 📁 اختر شيت الإكسيل من جهازك لتسجيل حضور مجموعة <b>(${targetGroup.name})</b>.`, suggestions: backToMenuSuggestion };
-                 } else {
-                     return { response: `مفيش حصة مفتوحة لمجموعة (${targetGroup.name}) عشان ارفع شيت حضورها. افتح حصة الأول.`, suggestions: [{ text: `📖 افتح حصة ${targetGroup.name}`, cmd: `افتح حصة ${targetGroup.name}`, color: "#3b82f6" }] };
-                 }
-            } else if (currentActiveSessionId && document.getElementById("session-details-view").style.display === "block") {
-                setTimeout(() => document.getElementById("importAttendanceExcel").click(), 500);
-                return { response: "حاضر يا مستر! 📁 اختر شيت الإكسيل من جهازك لتسجيل الحضور في الحصة الحالية.", suggestions: backToMenuSuggestion };
-            } else {
-                 return { response: "⚠️ أنت لست بداخل أي حصة! يرجى فتح حصة أولاً أو إخباري باسم المجموعة (مثال: ارفع شيت حضور مجموعة كذا).", suggestions: window.aiMasterMenu };
-            }
+        } else if (matchedGroups.length > 1) {
+             return { response: `لقيت أكتر من مجموعة، تقصد أي واحدة؟`, suggestions: matchedGroups.map(g => ({ text: `📖 ${g.name}`, cmd: `انشاء ${typeName} لمجموعة ${g.name} باسم ${finalTitle} بدرجة ${maxScore}` })) };
         } else {
-            if (targetGroup) {
-                switchPage('groups'); openGroupDetails(targetGroup.name);
-                setTimeout(() => document.getElementById("importGroupExcelInput").click(), 800);
-                return { response: `جاري التجهيز... 📁 اختر شيت الإكسيل من جهازك لإضافة الطلاب لمجموعة <b>(${targetGroup.name})</b>.`, suggestions: backToMenuSuggestion };
-            } else if (currentActiveGroup && document.getElementById("group-details-view").style.display === "block") {
-                 setTimeout(() => document.getElementById("importGroupExcelInput").click(), 500);
-                 return { response: `تمام! 📁 اختر شيت الإكسيل من جهازك لإضافة الطلاب للمجموعة المفتوحة حالياً.`, suggestions: backToMenuSuggestion };
-            } else {
-                switchPage('students');
-                setTimeout(() => document.getElementById("importExcelInput").click(), 800);
-                return { response: "حاضر! 📁 اختر شيت الإكسيل من جهازك لرفع قائمة الطلاب للنظام بشكل عام.", suggestions: backToMenuSuggestion };
-            }
+             return { response: `مش لاقي أي مجموعة بالاسم ده يا مستر. متأكد من الاسم؟ 🤔`, suggestions: backToMenuSuggestion };
         }
     }
-
-    // --- تحميل إكسيل الغياب ---
-    if (query.includes("حمل") || query.includes("تنزيل") || query.includes("نزل") || query.includes("استخراج")) {
-        if (query.includes("اكسيل") || query.includes("شيت") || query.includes("غياب")) {
-            if (window.aiLastAbsentees && window.aiLastAbsentees.length > 0) {
-                exportAiAbsentees();
-                return { response: "تم استخراج ملف الإكسيل وتحميله على جهازك بنجاح! 📥", suggestions: backToMenuSuggestion };
-            } else {
-                return { response: "⚠️ لا توجد قائمة غياب مسجلة حالياً لتحميلها. اطلب مني أولاً (من غاب اليوم؟) داخل الحصة.", suggestions: backToMenuSuggestion };
-            }
-        }
-    }
-
-    // --- التحضير المباشر من الشات ---
-    if (query.includes("حضر") || query.includes("سجل") || query.includes("حضور") || query.includes("تأخير") || query.includes("تاخير")) {
-        if (!currentActiveSessionId) {
-            return { response: "⚠️ إنت مش فاتح كشف حضور أي حصة دلوقتي! افتح الحصة الأول عشان أقدر أحضر الطالب.", suggestions: window.aiMasterMenu };
-        }
-
-        let searchTarget = query.replace(/(حضر|حضور|سجل|تأخير|تاخير|غياب|غايب|الطالب|الكود|رقم|لي)/g, '').trim();
-        if (!searchTarget) return { response: "يرجى كتابة كود أو اسم الطالب مع الأمر. (مثال: حضر الكود 1001)", suggestions: [] };
-
-        let student = findStudentByCodeOrName(searchTarget);
-        if (!student) return { response: `مش لاقي أي طالب بالاسم أو الكود "<b>${searchTarget}</b>" يا مستر. متأكد من البيانات؟ 🤔`, suggestions: [] };
-
-        const session = classSessions.find(s => s.id === currentActiveSessionId);
-        if (student.group !== session.group) {
-            return { response: `⚠️ الطالب <b>${student.name}</b> موجود في مجموعة (${student.group}) مش المجموعة الحالية (${session.group}). استخدم الباركود العادي لو عايز تنقله.`, suggestions: [] };
-        }
-
-        let status = 'present'; let statusText = 'حاضر ✅';
-        if (query.includes("تأخير") || query.includes("تاخير") || query.includes("متاخر")) { status = 'late'; statusText = 'متأخر ⏳'; }
-        else if (query.includes("غياب") || query.includes("غايب")) { status = 'absent'; statusText = 'غائب ❌'; }
-        else if (query.includes("الغاء") || query.includes("امسح")) { status = 'none'; statusText = 'ملغي (بانتظار الرصد) ✖'; }
-
-        markAttendance(student.code, status);
-        return {
-            response: `تم يا مستر! سجلت الطالب <b>${student.name}</b> (${statusText}) في حصة اليوم. 🫡`,
-            suggestions: [{ text: "📊 من غاب في الحصة؟", cmd: "من غاب اليوم؟", color: "#ef4444" }, ...backToMenuSuggestion]
-        };
-    }
-
-    // --- إضافة وخصم النقاط السلوكية ---
-    if (query.includes("نقط") || query.includes("نقطه") || query.includes("نقاط") || query.includes("نقطة")) {
-        let isAdding = query.includes("ضيف") || query.includes("زود") || query.includes("اعطي") || query.includes("اضف");
-        let isSubtracting = query.includes("اخصم") || query.includes("نقص") || query.includes("اسحب");
-
-        if (isAdding || isSubtracting) {
-            let numMatch = query.match(/\d+/);
-            let points = numMatch ? parseInt(numMatch[0]) : (isAdding ? 5 : -5); 
-            if (isSubtracting) points = -Math.abs(points);
-
-            let searchTarget = query.replace(/(ضيف|زود|اعطي|اضف|اخصم|نقص|اسحب|نقط|نقطه|نقاط|نقطة|للطالب|للكود|من|الطالب|الكود|\d+)/g, '').trim();
-            let student = findStudentByCodeOrName(searchTarget);
-
-            if (student) {
-                student.behaviorPoints = Math.max(0, (student.behaviorPoints || 0) + points);
-                localStorage.setItem("students", JSON.stringify(students));
-                
-                if (typeof renderTable === "function") renderTable();
-                if (typeof renderGroupStudentsTable === "function") renderGroupStudentsTable();
-                if (currentStudentProfileCode === student.code && document.getElementById("profile-behavior-points")) {
-                    document.getElementById("profile-behavior-points").innerText = student.behaviorPoints;
-                }
-
-                let actionText = points >= 0 ? `تم إضافة ${points} نقطة ⭐` : `تم خصم ${Math.abs(points)} نقطة 🤫`;
-                return {
-                    response: `${actionText} بنجاح للطالب <b>${student.name}</b>. إجمالي نقاطه السلوكية الآن: <b>${student.behaviorPoints}</b>.`,
-                    suggestions: backToMenuSuggestion
-                };
-            }
-        }
-    }
-
-    // --- البحث السريع عن ملف الطالب ---
-    if (query.includes("ملف") || query.includes("بيانات") || query.includes("ابحث عن") || query.includes("هات")) {
-        let searchTarget = query.replace(/(ملف|بيانات|ابحث|عن|هات|الطالب|الكود)/g, '').trim();
-        if (searchTarget) {
-            let student = findStudentByCodeOrName(searchTarget);
-            if (student) {
-                return {
-                    response: `لقيت بيانات الطالب!<br>👤 الاسم: <b>${student.name}</b><br>🔢 الكود: <b>${student.code}</b><br>📚 المجموعة: <b>${student.group}</b><br><br><button onclick="openStudentProfile('${student.code}'); closeShefoChat();" style="margin-top:10px; background:linear-gradient(135deg, #6366f1, #8b5cf6); color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:bold; width: 100%;">فتح ملف الطالب التفصيلي 📂</button>`,
-                    suggestions: backToMenuSuggestion
-                };
-            }
-        }
-    }
-
-    // --- فتح حصة أو إنشاءها تلقائياً ---
+    
+    // --- ب) فتح وإنشاء الحصص (مع التقاط موضوع الحصة) ---
     if (query.includes("افتح حصه") || query.includes("عرض حصه") || query.includes("افتح حصة") || query.includes("انشاء حصه") || query.includes("انشاء حصة") || query.includes("عمل حصة")) {
-        let rawSearchWord = query.replace(/(افتح|انشاء|عمل|حصه|حصة|سجل|حضور|عرض|مجموعة|مجموعه|المجموعات|لـ|لمجموعة)/g, '').trim();
-        let cleanSearchWord = rawSearchWord.replace(/[\s\-\_\.\•\*\+\(\)\[\]]/g, ''); 
+        
+        let customTopic = null;
+        let textForGroupSearch = rawText;
+        let topicMatch = rawText.match(/(?:باسم|اسمه|موضوع|موضوعها|عن)\s+(.+)/);
+        
+        if (topicMatch && topicMatch[1]) {
+            customTopic = topicMatch[1].split(/(لمجموعة|لمجموعه|لـ|ل)/)[0].trim();
+            textForGroupSearch = rawText.replace(topicMatch[0], '');
+        }
+        let finalTopic = customTopic ? customTopic : "حصة جديدة (عبر أوكتو)";
+
+        let rawSearchWord = textForGroupSearch.replace(/(افتح|انشاء|عمل|حصه|حصة|سجل|حضور|عرض|مجموعة|مجموعه|المجموعات|لـ|لمجموعة)/g, '').trim();
+        let cleanSearchWord = window.smartArabicNormalize(rawSearchWord).replace(/[\s\-\_\.\•\*\+\(\)\[\]]/g, '').replace(/^(ل|لل|ب|ف)/, ''); 
         
         if (!cleanSearchWord) {
             if (groups.length === 0) return { response: "مفيش أي مجموعات متسجلة في السيستم يا مستر. ضيف مجموعة من صفحة المجموعات الأول.", suggestions: backToMenuSuggestion };
@@ -8775,7 +8508,10 @@ window.processAiLogic = function(text) {
 
         let targetGroupName = null;
         let exactMatchGroup = groups.find(g => window.smartArabicNormalize(g.name).replace(/[\s\-\_\.\•\*\+\(\)\[\]]/g, '') === cleanSearchWord);
-        let matchedGroups = exactMatchGroup ? [exactMatchGroup] : groups.filter(g => window.smartArabicNormalize(g.name).replace(/[\s\-\_\.\•\*\+\(\)\[\]]/g, '').includes(cleanSearchWord));
+        let matchedGroups = exactMatchGroup ? [exactMatchGroup] : groups.filter(g => {
+            let cleanGName = window.smartArabicNormalize(g.name).replace(/[\s\-\_\.\•\*\+\(\)\[\]]/g, '');
+            return cleanGName.includes(cleanSearchWord) || cleanSearchWord.includes(cleanGName);
+        });
 
         if (matchedGroups.length === 1) {
             targetGroupName = matchedGroups[0].name;
@@ -8793,14 +8529,15 @@ window.processAiLogic = function(text) {
             } else {
                 let newId = Date.now().toString();
                 let today = new Date().toISOString().split('T')[0];
-                classSessions.push({ id: newId, group: targetGroupName, date: today, topic: "حصة جديدة (تلقائي عبر أوكتو)", status: "open", attendance: {} });
+                classSessions.push({ id: newId, group: targetGroupName, date: today, topic: finalTopic, status: "open", attendance: {} });
                 localStorage.setItem("classSessions", JSON.stringify(classSessions));
+                if(typeof addSystemLog === "function") addSystemLog("إنشاء تلقائي 🤖", `قام أوكتو بفتح حصة جديدة لـ ${targetGroupName} بموضوع ${finalTopic}`);
                 switchPage('attendance'); openSessionDetails(newId);
                 
-                return { response: `✨ مكنش في حصة مفتوحة لـ <b>(${targetGroupName})</b>، فأنشأتلك حصة جديدة بتاريخ اليوم ودخلتك عليها فوراً! ابدأ الرصد.`, suggestions: inSessionSuggestions };
+                return { response: `✨ مكنش في حصة مفتوحة لـ <b>(${targetGroupName})</b>، فأنشأتلك حصة جديدة بتاريخ اليوم بموضوع <b>(${finalTopic})</b> ودخلتك عليها فوراً! ابدأ الرصد.`, suggestions: inSessionSuggestions };
             }
         } else if (matchedGroups.length > 1) {
-            let dynamicSuggestions = matchedGroups.map(g => ({ text: `📖 ${g.name}`, cmd: `افتح حصة ${g.name}`, color: "#3b82f6" }));
+            let dynamicSuggestions = matchedGroups.map(g => ({ text: `📖 ${g.name}`, cmd: `افتح حصة ${g.name} موضوع ${finalTopic}`, color: "#3b82f6" }));
             dynamicSuggestions.push(...backToMenuSuggestion);
             return { response: `لقيت أكتر من مجموعة بالاسم ده، تقصد أي واحدة؟ 👇`, suggestions: dynamicSuggestions };
         } else {
@@ -8808,7 +8545,6 @@ window.processAiLogic = function(text) {
         }
     }
 
-    // --- عرض كل الحصص المفتوحة ---
     if (query === "مجموعات" || query.includes("الحصص المفتوحة")) {
         let activeSessions = classSessions.filter(s => s.status === 'open');
         if(activeSessions.length === 0) return { response: "مفيش حصص مفتوحة دلوقتي.", suggestions: [{ text: "➕ إنشاء حصة جديدة", cmd: "انشاء حصة", color: "#10b981" }, ...backToMenuSuggestion]};
@@ -8818,9 +8554,272 @@ window.processAiLogic = function(text) {
         return { response: "دي كل الحصص المفتوحة حالياً، تحب تدخل أي واحدة؟ 👇", suggestions: dynamicSuggestions };
     }
 
+    // --- ج) محرك التقارير الذكية ---
+    if ((query.includes("تقرير") || query.includes("شيت") || query.includes("كشف") || query.includes("استخرج") || query.includes("هات") || query.includes("عايز")) && !query.includes("ارفع") && !query.includes("استيراد")) {
+        
+        if (query.includes("كل") || query.includes("صف") || query.includes("اسبوع") || query.includes("شهر") || query.includes("فائت") || query.includes("ماضي") || query.includes("حصه") || query.includes("حصة") || query.includes("امتحانات") || query.includes("واجبات")) {
+            
+            let rType = 'attendance'; let rTypeName = "الغياب والحضور";
+            if (query.includes("امتحان") || query.includes("درجات")) { rType = 'exams'; rTypeName = "الامتحانات"; }
+            else if (query.includes("واجب")) { rType = 'homework'; rTypeName = "الواجبات"; }
+
+            let rLevel = null;
+            if (query.includes("اولى") || query.includes("الاول") || query.includes("1ث")) rLevel = "الصف الأول الثانوي";
+            else if (query.includes("تانيه") || query.includes("الثاني") || query.includes("2ث")) rLevel = "الصف الثاني الثانوي";
+            else if (query.includes("تالته") || query.includes("الثالث") || query.includes("3ث")) rLevel = "الصف الثالث الثانوي";
+
+            let today = new Date(); let dFrom = null, dTo = null, dName = "كل الأوقات"; let isLastSessionOnly = false;
+
+            if (query.includes("اخر حصه") || query.includes("اخر حصة") || query.includes("أخر حصة")) {
+                isLastSessionOnly = true; dName = "آخر حصة فقط لكل مجموعة";
+            } else if (query.includes("اليوم") || query.includes("النهارده")) {
+                dFrom = new Date(); dTo = new Date(); dName = "اليوم";
+            } else if (query.includes("امبارح") || query.includes("امس")) {
+                dFrom = new Date(); dFrom.setDate(today.getDate() - 1); dTo = new Date(dFrom); dName = "الأمس";
+            } else if (query.includes("اسبوع") || query.includes("الاسبوع")) {
+                if (query.includes("فاءت") || query.includes("فايت") || query.includes("ماضي") || query.includes("فات")) {
+                    dTo = new Date(); dTo.setDate(today.getDate() - 7); dFrom = new Date(); dFrom.setDate(today.getDate() - 14); dName = "الأسبوع الفائت";
+                } else {
+                    dFrom = new Date(); dFrom.setDate(today.getDate() - 7); dTo = new Date(); dName = "هذا الأسبوع";
+                }
+            } else if (query.includes("شهر") || query.includes("الشهر")) {
+                dFrom = new Date(today.getFullYear(), today.getMonth(), 1); dTo = new Date(today.getFullYear(), today.getMonth() + 1, 0); dName = "هذا الشهر";
+            }
+
+            let strFrom = dFrom ? dFrom.toISOString().split('T')[0] : null;
+            let strTo = dTo ? dTo.toISOString().split('T')[0] : null;
+
+            let sourceDb = rType === 'attendance' ? classSessions : (rType === 'exams' ? exams : homeworks);
+            let validGroupsForLevel = rLevel ? groups.filter(g => g.level === rLevel).map(g => g.name) : groups.map(g => g.name);
+            let filteredItems = [];
+
+            if (isLastSessionOnly) {
+                validGroupsForLevel.forEach(gName => {
+                    let groupSessions = sourceDb.filter(s => s.group === gName).sort((a,b) => new Date(b.date) - new Date(a.date));
+                    if (groupSessions.length > 0) filteredItems.push(groupSessions[0]);
+                });
+            } else {
+                filteredItems = sourceDb.filter(item => {
+                    let matchDate = true;
+                    if (strFrom && strTo) matchDate = (item.date >= strFrom && item.date <= strTo);
+                    let matchLevel = validGroupsForLevel.includes(item.group);
+                    return matchDate && matchLevel;
+                });
+            }
+
+            if (filteredItems.length === 0) return { response: `⚠️ لم أجد أي بيانات تخص (<b>${rTypeName}</b>) لـ (<b>${rLevel || 'كل الصفوف'}</b>) في فترة (<b>${dName}</b>).`, suggestions: backToMenuSuggestion };
+
+            let excelData = [];
+            let targetGroups = [...new Set(filteredItems.map(i => i.group))];
+            let targetStudents = students.filter(s => targetGroups.includes(s.group));
+
+            targetStudents.forEach(st => {
+                let row = { "الكود": st.code, "اسم الطالب": st.name, "المجموعة": st.group, "رقم الطالب": st.phone, "رقم ولي الأمر": st.parentPhone };
+                filteredItems.forEach(item => {
+                    let colName = `${item.topic || item.name} (${item.date})`; let val = "---";
+                    if (rType === 'attendance') {
+                        let stat = item.attendance[st.code] || item.attendance[st.phone];
+                        if (stat === 'present') val = "حاضر"; else if (stat === 'late') val = "متأخر"; else if (stat === 'absent') val = "غائب";
+                    } else {
+                        let g = item.grades[st.code] !== undefined ? item.grades[st.code] : item.grades[st.phone];
+                        if (g !== undefined) val = `${g} / ${item.maxScore}`; else val = "لم يُمتحن/يسلم";
+                    }
+                    row[colName] = val;
+                });
+                excelData.push(row);
+            });
+
+            let ws = XLSX.utils.json_to_sheet(excelData);
+            ws['!cols'] = [{wch: 10}, {wch: 25}, {wch: 15}, {wch: 15}, {wch: 15}];
+            let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "التقرير الذكي");
+            XLSX.writeFile(wb, `تقرير_${rTypeName}_${rLevel || 'شامل'}_${dName.replace(/\s+/g, '_')}.xlsx`);
+
+            return { response: `تم يا مستر! 🫡<br>جمعتلك تقرير <b>${rTypeName}</b> لـ <b>${rLevel || 'كل الصفوف'}</b> لـ (<b>${dName}</b>).<br>وتم إنشاء ملف الإكسيل 📊 وتحميله على جهازك فوراً!`, suggestions: backToMenuSuggestion };
+        }
+    }
+
+    // --- د) التحضير المباشر من الشات وتعديل البيانات ---
+    if (query.includes("حضر") || query.includes("سجل") || query.includes("تأخير") || query.includes("غياب")) {
+        if (!currentActiveSessionId) return { response: "⚠️ إنت مش فاتح كشف حضور أي حصة دلوقتي! افتح الحصة الأول.", suggestions: window.aiMasterMenu };
+        let searchTarget = query.replace(/(حضر|حضور|سجل|تأخير|تاخير|غياب|غايب|الطالب|الكود|رقم|لي)/g, '').trim();
+        if (!searchTarget) return { response: "يرجى كتابة كود أو اسم الطالب مع الأمر.", suggestions: [] };
+        
+        let student = findStudentByCodeOrName(searchTarget);
+        if (!student) return { response: `مش لاقي أي طالب بالاسم أو الكود "<b>${searchTarget}</b>" يا مستر.`, suggestions: [] };
+
+        const session = classSessions.find(s => s.id === currentActiveSessionId);
+        if (student.group !== session.group) return { response: `⚠️ الطالب <b>${student.name}</b> مش في المجموعة الحالية (${session.group}).`, suggestions: [] };
+
+        let status = 'present'; let statusText = 'حاضر ✅';
+        if (query.includes("تأخير") || query.includes("تاخير") || query.includes("متاخر")) { status = 'late'; statusText = 'متأخر ⏳'; }
+        else if (query.includes("غياب") || query.includes("غايب")) { status = 'absent'; statusText = 'غائب ❌'; }
+        else if (query.includes("الغاء") || query.includes("امسح")) { status = 'none'; statusText = 'ملغي ✖'; }
+
+        markAttendance(student.code, status);
+        return { response: `تم يا مستر! سجلت الطالب <b>${student.name}</b> (${statusText}) في حصة اليوم. 🫡`, suggestions: [{ text: "📊 من غاب في الحصة؟", cmd: "من غاب اليوم؟", color: "#ef4444" }, ...backToMenuSuggestion] };
+    }
+
+    if (query.includes("ايقاف") || query.includes("إيقاف") || query.includes("وقف") || query.includes("تفعيل") || query.includes("فعل") || query.includes("فك")) {
+        let isSuspending = query.includes("ايقاف") || query.includes("إيقاف") || query.includes("وقف");
+        let searchTarget = query.replace(/(اعمل|ايقاف|إيقاف|وقف|تفعيل|فعل|فك|الطالب|للطالب|الكود|رقم|عن)/g, '').trim();
+        if (!searchTarget) return { response: "يرجى كتابة كود أو اسم الطالب مع الأمر.", suggestions: [] };
+
+        let student = findStudentByCodeOrName(searchTarget);
+        if (student) {
+            student.isSuspended = isSuspending; localStorage.setItem("students", JSON.stringify(students));
+            if (typeof renderTable === "function") renderTable();
+            if (window.currentStudentProfileCode === student.code) openStudentProfile(student.code); 
+            return { response: `تم يا مستر! عملت <b>${isSuspending ? "إيقاف ⛔" : "تفعيل ✅"}</b> للطالب <b>${student.name}</b>.`, suggestions: backToMenuSuggestion };
+        }
+    }
+
+    if (query.includes("عدل") || query.includes("غير") || query.includes("تعديل") || query.includes("انقل")) {
+        let fieldToUpdate = null; let fieldNameAr = "";
+        if (query.includes("ولي") || query.includes("ولى") || query.includes("الاب")) { fieldToUpdate = "parentPhone"; fieldNameAr = "رقم ولي الأمر"; }
+        else if (query.includes("رقم") || query.includes("تليفون") || query.includes("هاتف")) { fieldToUpdate = "phone"; fieldNameAr = "رقم الطالب"; }
+        else if (query.includes("اسم")) { fieldToUpdate = "name"; fieldNameAr = "اسم الطالب"; }
+        else if (query.includes("مجموعه") || query.includes("مجموعة") || query.includes("انقل")) { fieldToUpdate = "group"; fieldNameAr = "المجموعة"; }
+
+        if(fieldToUpdate) {
+            let parts = rawText.split(/\s(الى|إلى|لـ|يساوي|بـ|يخلي|ل)\s/);
+            let newValue = ""; let targetSearchPart = "";
+
+            if (parts.length >= 3) {
+                newValue = parts[parts.length - 1].trim(); 
+                targetSearchPart = parts[0].trim(); 
+            } else {
+                let nums = rawText.match(/\d+/g);
+                if (nums && nums.length >= 2) { targetSearchPart = nums[0]; newValue = nums[nums.length - 1]; } 
+                else return { response: "يرجى كتابة الأمر بوضوح.", suggestions: [] };
+            }
+
+            let cleanTarget = targetSearchPart.replace(/(انقل|عدل|غير|تعديل|رقم|ولي|الامر|ولى|الاب|تليفون|هاتف|اسم|مجموعة|مجموعه|الطالب|اللى|كوده|للكود|الكود)/g, '').trim();
+            let student = findStudentByCodeOrName(cleanTarget);
+            if (!student) { let nums = targetSearchPart.match(/\d+/g); if(nums) student = findStudentByCodeOrName(nums[0]); }
+
+            if (student) {
+                student[fieldToUpdate] = newValue; localStorage.setItem("students", JSON.stringify(students));
+                if (typeof renderTable === "function") renderTable();
+                if (window.currentStudentProfileCode === student.code) openStudentProfile(student.code);
+                return { response: `تم يا مستر! عدلت <b>${fieldNameAr}</b> للطالب <b>${student.name}</b> وبقى (<b>${newValue}</b>). 🫡`, suggestions: backToMenuSuggestion };
+            }
+        }
+    }
+
+    if (query.includes("نقط") || query.includes("نقطه") || query.includes("نقاط") || query.includes("نقطة")) {
+        let isAdding = query.includes("ضيف") || query.includes("زود") || query.includes("اعطي") || query.includes("اضف");
+        let isSubtracting = query.includes("اخصم") || query.includes("نقص") || query.includes("اسحب");
+
+        if (isAdding || isSubtracting) {
+            let numMatch = query.match(/\d+/); let points = numMatch ? parseInt(numMatch[0]) : (isAdding ? 5 : -5); 
+            if (isSubtracting) points = -Math.abs(points);
+            let searchTarget = query.replace(/(ضيف|زود|اعطي|اضف|اخصم|نقص|اسحب|نقط|نقطه|نقاط|نقطة|للطالب|للكود|من|الطالب|الكود|\d+)/g, '').trim();
+            let student = findStudentByCodeOrName(searchTarget);
+
+            if (student) {
+                student.behaviorPoints = Math.max(0, (student.behaviorPoints || 0) + points); localStorage.setItem("students", JSON.stringify(students));
+                if (typeof renderTable === "function") renderTable();
+                if (window.currentStudentProfileCode === student.code && document.getElementById("profile-behavior-points")) document.getElementById("profile-behavior-points").innerText = student.behaviorPoints;
+                return { response: `تم! إجمالي نقاط <b>${student.name}</b> السلوكية الآن: <b>${student.behaviorPoints}</b>.`, suggestions: backToMenuSuggestion };
+            }
+        }
+    }
+
+    // --- هـ) رفع واستيراد وتحميل الإكسيل ---
+    if (query.includes("ارفع") || query.includes("رفع") || query.includes("استيراد") || query.includes("ضيف شيت") || query.includes("تسجيل شيت") || query.includes("شيت حضور")) {
+        let targetGroup = groups.find(g => query.includes(window.smartArabicNormalize(g.name)));
+        if (query.includes("حضور") || query.includes("حصه") || query.includes("حصة") || query.includes("غياب")) {
+            if (targetGroup) {
+                 let activeSession = classSessions.find(s => s.group === targetGroup.name && s.status === 'open');
+                 if(activeSession) { switchPage('attendance'); openSessionDetails(activeSession.id); setTimeout(() => document.getElementById("importAttendanceExcel").click(), 800); return { response: `جاري التجهيز... 📁 اختر الشيت لتسجيل حضور (${targetGroup.name}).`, suggestions: backToMenuSuggestion }; }
+            } else if (currentActiveSessionId && document.getElementById("session-details-view").style.display === "block") {
+                setTimeout(() => document.getElementById("importAttendanceExcel").click(), 500); return { response: "اختر شيت الإكسيل لتسجيل الحضور في الحصة الحالية.", suggestions: backToMenuSuggestion };
+            }
+        } else {
+            if (targetGroup) { switchPage('groups'); openGroupDetails(targetGroup.name); setTimeout(() => document.getElementById("importGroupExcelInput").click(), 800); return { response: `اختر الشيت لإضافة الطلاب لمجموعة (${targetGroup.name}).`, suggestions: backToMenuSuggestion }; }
+            else { switchPage('students'); setTimeout(() => document.getElementById("importExcelInput").click(), 800); return { response: "اختر الشيت لرفع قائمة الطلاب للنظام بشكل عام.", suggestions: backToMenuSuggestion }; }
+        }
+    }
+
+    if (query.includes("حمل") || query.includes("تنزيل") || query.includes("نزل") || query.includes("استخراج")) {
+        if (query.includes("اكسيل") || query.includes("شيت") || query.includes("غياب")) {
+            if (window.aiLastAbsentees && window.aiLastAbsentees.length > 0) {
+                exportAiAbsentees(); return { response: "تم استخراج ملف الإكسيل وتحميله على جهازك بنجاح! 📥", suggestions: backToMenuSuggestion };
+            }
+        }
+    }
+
+    if (query.includes("ملف") || query.includes("بيانات") || query.includes("ابحث عن") || query.includes("هات")) {
+        let searchTarget = query.replace(/(ملف|بيانات|ابحث|عن|هات|الطالب|الكود)/g, '').trim();
+        if (searchTarget) {
+            let student = findStudentByCodeOrName(searchTarget);
+            if (student) {
+                return { response: `لقيت بيانات الطالب!<br>👤 الاسم: <b>${student.name}</b><br>🔢 الكود: <b>${student.code}</b><br>📚 المجموعة: <b>${student.group}</b><br><br><button onclick="openStudentProfile('${student.code}'); closeShefoChat();" style="margin-top:10px; background:linear-gradient(135deg, #6366f1, #8b5cf6); color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:bold; width: 100%;">فتح ملف الطالب التفصيلي 📂</button>`, suggestions: backToMenuSuggestion };
+            }
+        }
+    }
+
+
+    // ==========================================
+    // 3️⃣ الشرح والمساعدة والتفاصيل (الدليل الشامل لأوكتو)
+    // ==========================================
+    if (query.includes("اشرح") || query.includes("شرح") || query.includes("كيف") || query.includes("ازاي") || query.includes("طريقة") || query.includes("مساعدة") || query.includes("اضيف") || query.includes("اعمل") || query.includes("انشاء") || query.includes("انشئ") || query.includes("بضيف") || query.includes("قدراتك") || query.includes("بتعمل ايه") || query.includes("روبوت") || query.includes("أنت مين") || query.includes("بتعمل اى") || query.includes("بتساعدني") || query.includes("بتساعدنى") || query.includes("وظيفتك")) {
+        
+        // --- 🐙 الدليل الشامل لوظائف أوكتو ---
+        if (query.includes("قدراتك") || query.includes("بتعمل") || query.includes("روبوت") || query.includes("مين") || query.includes("بتساعدني") || query.includes("بتساعدنى") || query.includes("وظيفتك") || query.includes("السيستم") || query.includes("النظام") || query.includes("كل حاجه") || query === "اشرح") {
+            return {
+                response: `<b>أنا أوكتو AI 🐙، المساعد الذكي الخاص بيك المدمج في نظام هيستوريا. أنا هنا عشان أوفر عليك وقت ومجهود، وأنفذ أوامرك وأنت في مكانك من غير ما تلف في الشاشات!</b><br><br>
+                أقدر أعملك الحاجات دي بكلمة واحدة:<br><br>
+                <b>1. إدارة الحصص والتقييمات 📚:</b><br>
+                أقدر أفتحلك حصص جديدة أو أكريت امتحانات وواجبات بذكاء.<br>
+                (مثال: "افتح حصة للمنوات باسم مراجعة"، "اعمل امتحان لمجموعة المنيل 1ث باسم الدرس الأول من 20").<br><br>
+                <b>2. رصد الغياب والحضور 📋:</b><br>
+                أقدر أسجل حضور أو غياب للطلاب فوراً وإنت فاتح الحصة.<br>
+                (مثال: "حضر الكود 1001"، "سجل محمد أحمد تأخير"، "اعمل الكود 50 غياب").<br><br>
+                <b>3. تعديل بيانات الطلاب 👤:</b><br>
+                أقدر أغير بيانات أي طالب في ثانية.<br>
+                (مثال: "عدل رقم ولي الأمر للكود 1001 لـ 010123456"، "انقل الكود 20 لمجموعة المنوات").<br><br>
+                <b>4. التقييم السلوكي ⭐:</b><br>
+                أقدر أضيف أو أخصم نقاط من الطلاب.<br>
+                (مثال: "ضيف 10 نقط للكود 1001"، "اخصم 5 نقط من محمود").<br><br>
+                <b>5. التقارير الذكية والإكسيل 📊:</b><br>
+                أقدر أحلل البيانات وأطلعلك شيتات إكسيل جاهزة أوتوماتيك.<br>
+                (مثال: "عايز تقرير غياب لكل مجموعات 1ث الأسبوع اللي فات"، "نزل شيت الغياب"، "ارفع شيت طلاب").<br><br>
+                <b>6. البحث والإيقاف 🔍:</b><br>
+                أقدر أجيبلك ملف أي طالب، أو أوقفه عن السيستم.<br>
+                (مثال: "ملف الكود 1001"، "اعمل إيقاف للطالب 120").<br><br>
+                <b>7. التنقل السريع 🚀:</b><br>
+                أقدر أوديك لأي شاشة في السيستم فوراً.<br>
+                (مثال: "افتح الخزنة"، "المنصة"، "الامتحانات").<br><br>
+                <b>أؤمرني يا مستر.. عايزني أعملك إيه دلوقتي؟ 🫡</b>`,
+                suggestions: window.aiMasterMenu
+            };
+        }
+
+        // --- أدلة مصغرة ---
+        if (query.includes("مجموعة") || query.includes("مجموعه") || query.includes("مجموعات")) {
+            return {
+                response: `<b>📌 طريقة إضافة وإدارة المجموعات:</b><br><br>1. ادخل على <b>"إدارة المجموعات"</b> من القائمة الجانبية.<br>2. اضغط على زر <b>(+ إضافة مجموعة جديدة)</b>.<br>3. اكتب اسم المجموعة، واختار الصف الدراسي، وحدد نظام الدفع وسعرها.<br>4. اضغط حفظ.`,
+                suggestions: [{ text: "📚 افتح المجموعات", cmd: "مجموعات", color: "#3b82f6" }, ...backToMenuSuggestion]
+            };
+        }
+
+        if (query.includes("طالب") || query.includes("اضافة") || query.includes("اكسيل") || query.includes("شيت")) {
+            return {
+                response: `<b>📌 طريقة إضافة الطلاب:</b><br><br>عندك 3 طرق:<br>1. <b>يدوي:</b> من صفحة (إدارة الطلاب) اضغط (+ تسجيل طالب).<br>2. <b>شيت إكسيل:</b> حمل النموذج واملاه وارفعه.<br>3. <b>عن طريقي 🤖:</b> قولي (ارفع شيت طلاب) وهفتحلك الكمبيوتر تختار الملف!`,
+                suggestions: [{ text: "📥 ارفع شيت طلاب", cmd: "ارفع شيت طلاب", color: "#3b82f6" }, ...backToMenuSuggestion]
+            };
+        }
+
+        return {
+            response: `تحت أمرك يا مستر! عايزني أشرحلك إيه بالظبط في السيستم؟`,
+            suggestions: [{ text: "🚀 اشرح قدراتك كاملة", cmd: "اشرح قدراتك", color: "#3b82f6" }, ...backToMenuSuggestion]
+        };
+    }
+
     // --- الرد الافتراضي ---
     return {
-        response: "أنا جاهز لتنفيذ أوامرك. اضغط على أي زر من القائمة ⚡ أدناه، أو اطلب مني المساعدة (مثال: اشرحلي المنصة، اشرح إضافة الطلاب، حضر الكود 1001).",
+        response: "أنا جاهز لتنفيذ أوامرك. يمكنك أن تطلب مني إنشاء امتحانات باسم معين (مثال: اعمل امتحان لمجموعة المنيل باسم الدرس الأول بدرجة 20) أو استخراج تقارير ذكية ⚡",
         suggestions: window.aiMasterMenu
     };
 };
