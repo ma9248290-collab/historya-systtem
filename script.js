@@ -8360,9 +8360,9 @@ window.sendShefoMessage = function() {
     }, 600);
 };
 
-// 🧠 قلب التنفيذ (Auto Executor) المطور الشامل (أوامر تفاعلية كاملة + التعديل المباشر)
+// 🧠 قلب التنفيذ (Auto Executor) المطور الشامل (أوامر + تعديل + شرح السيستم بذكاء)
 window.processAiLogic = function(text) {
-    let rawText = text.trim(); // النص الأصلي للحفاظ على الأرقام
+    let rawText = text.trim(); 
     let query = window.smartArabicNormalize(text); 
     
     let backToMenuSuggestion = [{ text: "🔄 القائمة الرئيسية", cmd: "القائمة", color: "#64748b" }];
@@ -8372,7 +8372,139 @@ window.processAiLogic = function(text) {
         return { response: "إليك القائمة الشاملة لأدوات السيستم يا مستر 👇", suggestions: window.aiMasterMenu };
     }
 
-    // --- 1. التنقل السريع بين الشاشات الرئيسية ---
+    // --- 🌟 1. محرك الشرح والمساعدة (النسخة الذكية باللهجة المصرية) ---
+    // ضفنا كلمات زي "اضيف، اعمل، انشئ، بضيف" عشان يلقط السؤال فوراً
+    if (query.includes("اشرح") || query.includes("شرح") || query.includes("كيف") || query.includes("ازاي") || query.includes("ازاى") || query.includes("طريقة") || query.includes("مساعدة") || query.includes("اضيف") || query.includes("اعمل") || query.includes("انشاء") || query.includes("انشئ") || query.includes("بضيف")) {
+        
+        // 1. شرح المجموعات (دي اللي إنت سألت عليها)
+        if (query.includes("مجموعة") || query.includes("مجموعه") || query.includes("مجموعات")) {
+            return {
+                response: `<b>📌 طريقة إضافة وإدارة المجموعات:</b><br><br>
+                1. ادخل على <b>"إدارة المجموعات"</b> من القائمة الجانبية.<br>
+                2. اضغط على زر <b>(+ إضافة مجموعة جديدة)</b>.<br>
+                3. اكتب اسم المجموعة، واختار الصف الدراسي، وحدد نظام الدفع (بالحصة ولا بالشهر) وسعرها.<br>
+                4. اضغط حفظ، والمجموعة هتنزل قدامك وتقدر تضيف جواها طلاب.<br>
+                5. <b>نصيحة أوكتو 🤖:</b> تقدر تقولي هنا "مجموعات" وهفتحلك شاشة المجموعات فوراً!`,
+                suggestions: [{ text: "📚 افتح المجموعات", cmd: "مجموعات", color: "#3b82f6" }, ...backToMenuSuggestion]
+            };
+        }
+
+        // 2. شرح السيستم بالكامل
+        if (query.includes("السيستم") || query.includes("النظام") || query.includes("كل حاجه") || query === "اشرح") {
+            return {
+                response: `<b>أهلاً بك في نظام هيستوريا المتكامل! 🚀</b><br><br>
+                النظام مصمم ليكون مركز الإدارة الشامل، وينقسم لعدة أقسام:<br>
+                1️⃣ <b>الطلاب والمجموعات:</b> لإضافة الطلاب وتسجيل الغياب والحضور بالباركود.<br>
+                2️⃣ <b>التقييم:</b> لرصد درجات الامتحانات والواجبات.<br>
+                3️⃣ <b>المنصة الأونلاين:</b> لرفع الكورسات، والامتحانات الإلكترونية، والمتجر.<br>
+                4️⃣ <b>الماليات:</b> لحساب الإيرادات والمصروفات لكل حصة.<br>
+                5️⃣ <b>أوكتو AI (أنا 🤖):</b> مساعدك لتنفيذ الأوامر من الشات مباشرة.<br><br>
+                <b>عايزني أشرحلك أي قسم فيهم بالتفصيل؟ (اختار من تحت 👇)</b>`,
+                suggestions: [
+                    { text: "📝 شرح الحضور والغياب", cmd: "اشرح الحضور", color: "#10b981" },
+                    { text: "💻 شرح المنصة والأونلاين", cmd: "اشرح المنصة", color: "#ec4899" },
+                    { text: "💰 شرح الماليات والخزنة", cmd: "اشرح الماليات", color: "#f59e0b" },
+                    ...backToMenuSuggestion
+                ]
+            };
+        }
+
+        // 3. شرح الحضور والغياب (Sessions)
+        if (query.includes("حضور") || query.includes("حصة") || query.includes("غياب") || query.includes("تسجيل")) {
+            return {
+                response: `<b>📌 طريقة تسجيل الحضور والغياب:</b><br><br>
+                1. ادخل على <b>"سجل الحضور"</b>.<br>
+                2. اضغط على <b>(+ فتح حصة)</b>، اختار الصف والمجموعة واكتب موضوع الحصة.<br>
+                3. اضغط على <b>"تسجيل"</b> جوه كارت الحصة.<br>
+                4. هتفتحلك شاشة الرصد.. استخدم الباركود 🎯، أو ابحث برقم الكود.<br>
+                5. <b>نصيحة أوكتو 🤖:</b> قولي (افتح حصة كذا) وهكريتها وأدخلك على شاشة الباركود فوراً!`,
+                suggestions: [{ text: "📖 افتح حصة مجموعة...", cmd: "مجموعات", color: "#3b82f6" }, ...backToMenuSuggestion]
+            };
+        }
+
+        // 4. شرح الامتحانات والواجبات
+        if (query.includes("امتحان") || query.includes("واجب") || query.includes("درجات") || query.includes("رصد")) {
+            return {
+                response: `<b>📌 طريقة عمل امتحان ورصد الدرجات:</b><br><br>
+                1. ادخل على <b>"الامتحانات"</b> أو <b>"الواجبات"</b>.<br>
+                2. اضغط <b>(+ إنشاء)</b> وحدد الدرجة النهائية والمجموعة.<br>
+                3. ادخل على كارت الامتحان واستخدم الباركود لضرب كود الطالب ثم اكتب الدرجة واضغط Enter.<br>
+                4. <b>نصيحة أوكتو 🤖:</b> لو عايز امتحان أونلاين بيصحح نفسه، ده بيتعمل من قسم "المنصة".`,
+                suggestions: [
+                    { text: "📝 افتح الامتحانات", cmd: "الامتحانات", color: "#8b5cf6" }, 
+                    { text: "💻 اشرح الامتحان الأونلاين", cmd: "اشرح الاونلاين", color: "#ec4899" }
+                ]
+            };
+        }
+
+        // 5. شرح المنصة (الأونلاين) والكورسات
+        if (query.includes("منصة") || query.includes("اونلاين") || query.includes("كورس") || query.includes("فيديو")) {
+            return {
+                response: `<b>📌 طريقة استخدام المنصة الأونلاين:</b><br><br>
+                ادخل على <b>"إدارة المنصة"</b> هتلاقي تابات فوق:<br>
+                • <b>المحاضرات:</b> ترفع صور وكورسات ولينكات يوتيوب/درايف، وتحدد تفتح مجاناً للي حضر السنتر ولا بفلوس.<br>
+                • <b>أكواد الشحن:</b> لتوليد كروت شحن يشتريها الطالب.<br>
+                • <b>الامتحانات الإلكترونية:</b> بتعمل امتحان MCQ، والطالب بيمتحنه على موبايله والدرجة بتترصد تلقائي.<br>
+                • <b>المتجر:</b> تعرض فيه مذكرات، والطالب يشتريها بنقاط السلوك.`,
+                suggestions: [{ text: "💻 افتح المنصة", cmd: "المنصة", color: "#ec4899" }, ...backToMenuSuggestion]
+            };
+        }
+
+        // 6. شرح إضافة الطلاب أو الإكسيل
+        if (query.includes("طالب") || query.includes("اضافة") || query.includes("اكسيل") || query.includes("شيت")) {
+            return {
+                response: `<b>📌 طريقة إضافة الطلاب:</b><br><br>
+                عندك 3 طرق:<br>
+                1. <b>يدوي:</b> من صفحة (إدارة الطلاب) اضغط (+ تسجيل طالب).<br>
+                2. <b>شيت إكسيل:</b> من نفس الصفحة، اضغط (تحميل نموذج الإكسيل)، املاه، وارفع الملف من زرار (استيراد).<br>
+                3. <b>عن طريقي 🤖:</b> قولي (اضافة طالب) وهفتحلك الشاشة. أو قولي (ارفع شيت طلاب) وهفتحلك الكمبيوتر تختار الملف!`,
+                suggestions: [
+                    { text: "➕ إضافة طالب جديد", cmd: "طالب جديد", color: "#10b981" },
+                    { text: "📥 ارفع شيت طلاب", cmd: "ارفع شيت طلاب", color: "#3b82f6" }
+                ]
+            };
+        }
+
+        // 7. شرح الماليات والخزنة
+        if (query.includes("فلوس") || query.includes("خزنة") || query.includes("ماليات") || query.includes("دفع") || query.includes("اشتراك")) {
+            return {
+                response: `<b>📌 طريقة إدارة الماليات:</b><br><br>
+                1. وإنت بتسجل أي "مجموعة"، بتحدد هل دفعها بالشهر ولا بالحصة وبكام.<br>
+                2. وإنت بتسجل الغياب جوا الحصة، بيظهر زرار (الدفع السريع 💰) بتحصل منه الفلوس.<br>
+                3. ادخل على صفحة <b>"الخزنة والماليات"</b>، اختار الحصة، هيجيبلك إجمالي التحصيل، ومين دافع ومين لأ، وتقدر تضيف مصاريف السنتر أو المذكرات ليحسب (صافي الربح).`,
+                suggestions: [{ text: "💰 افتح الخزنة", cmd: "الخزنة", color: "#f59e0b" }, ...backToMenuSuggestion]
+            };
+        }
+
+        // 8. قدرات أوكتو نفسه
+        if (query.includes("قدراتك") || query.includes("بتعمل ايه") || query.includes("روبوت") || query.includes("أنت مين")) {
+            return {
+                response: `<b>أنا أوكتو AI 🐙، مساعدك الشخصي اللي متوصل بدماغ السيستم!</b><br><br>
+                أقدر أعملك الآتي وإنت في مكانك هنا:<br>
+                • <b>تنفيذ أوامر:</b> "افتح حصة المنوات"، "الخزنة"، "المنصة".<br>
+                • <b>التعديل المباشر:</b> "عدل رقم ولي الأمر للطالب 1001 لـ 0".<br>
+                • <b>إيقاف وتفعيل:</b> "اعمل إيقاف للطالب 120".<br>
+                • <b>الرصد:</b> "سجل الكود 55 غياب".<br>
+                • <b>البحث:</b> "ملف الكود 100".<br><br>
+                أؤمرني يا مستر! 🫡`,
+                suggestions: window.aiMasterMenu
+            };
+        }
+        
+        // رد عام لو مفهمش هو عايز شرح إيه بالظبط
+        return {
+            response: `تحت أمرك يا مستر! عايزني أشرحلك إيه بالظبط في السيستم؟ (مثلاً: ازاي اضيف مجموعة، اشرح الحضور، اشرح المنصة)`,
+            suggestions: [
+                { text: "🚀 اشرح السيستم بالكامل", cmd: "اشرح السيستم", color: "#3b82f6" },
+                { text: "🤖 إيه هي قدرات أوكتو؟", cmd: "اشرح قدراتك", color: "#8b5cf6" }
+            ]
+        };
+    }
+
+    // ==========================================================
+    // بقية الأوامر التنفيذية الأصلية
+    // ==========================================================
+
     const pagesMap = {
         "الخزنه": "finance", "الخزنة": "finance", "ماليات": "finance",
         "امتحان": "exams", "الامتحانات": "exams",
@@ -8390,66 +8522,107 @@ window.processAiLogic = function(text) {
     for (const [key, value] of Object.entries(pagesMap)) {
         if (query === key || query.includes(key) && query.length < key.length + 5) { 
             switchPage(value);
-            return {
-                response: `تم يا مستر! فتحتلك صفحة <b>${key}</b> 🚀`,
-                suggestions: backToMenuSuggestion
-            };
+            return { response: `تم يا مستر! فتحتلك صفحة <b>${key}</b> 🚀`, suggestions: backToMenuSuggestion };
         }
     }
 
-    // --- 🌟 2. السحر الجديد: التعديل المباشر لبيانات الطالب من الشات ---
+    if (query === "المتجر" || query.includes("متجر")) {
+        switchPage('platform'); setTimeout(() => switchPlatformTab('store'), 100);
+        return { response: "فتحتلك متجر السنتر 🛒 وتقدر تدير المنتجات دلوقتي.", suggestions: backToMenuSuggestion };
+    }
+    if (query === "الاسئلة" || query.includes("منتدى")) {
+        switchPage('platform'); setTimeout(() => switchPlatformTab('forum'), 100);
+        return { response: "فتحتلك منتدى الأسئلة 💬 لمتابعة استفسارات الطلاب.", suggestions: backToMenuSuggestion };
+    }
+
+    // --- إيقاف وتفعيل الطلاب من الشات ---
+    if (query.includes("ايقاف") || query.includes("إيقاف") || query.includes("وقف") || query.includes("تفعيل") || query.includes("فعل") || query.includes("فك")) {
+        let isSuspending = query.includes("ايقاف") || query.includes("إيقاف") || query.includes("وقف");
+        let searchTarget = query.replace(/(اعمل|ايقاف|إيقاف|وقف|تفعيل|فعل|فك|الطالب|للطالب|الكود|رقم|عن)/g, '').trim();
+
+        if (!searchTarget) return { response: "يرجى كتابة كود أو اسم الطالب مع الأمر. (مثال: اعمل إيقاف للطالب 1001)", suggestions: [] };
+
+        let student = findStudentByCodeOrName(searchTarget);
+
+        if (student) {
+            student.isSuspended = isSuspending;
+            localStorage.setItem("students", JSON.stringify(students));
+
+            if(typeof addSystemLog === "function") {
+                addSystemLog(isSuspending ? "إيقاف عبر الروبوت 🤖⛔" : "تفعيل عبر الروبوت 🤖✅", `تم ${isSuspending ? 'إيقاف' : 'إعادة تفعيل'} الطالب: ${student.name}`);
+            }
+
+            if (typeof renderTable === "function") renderTable();
+            if (typeof renderGroupStudentsTable === "function") renderGroupStudentsTable();
+
+            if (window.currentStudentProfileCode === student.code) {
+                openStudentProfile(student.code); 
+            }
+
+            let actionText = isSuspending ? "إيقاف ⛔" : "تفعيل ✅";
+            return {
+                response: `تم يا مستر! عملت <b>${actionText}</b> للطالب <b>${student.name}</b> بنجاح.`,
+                suggestions: [{ text: "👤 افتح ملف الطالب", cmd: `ملف ${student.code}`, color: "#8b5cf6" }, ...backToMenuSuggestion]
+            };
+        } else {
+            let nums = rawText.match(/\d+/g);
+            if(nums) {
+                student = findStudentByCodeOrName(nums[0]);
+                if(student) {
+                    student.isSuspended = isSuspending;
+                    localStorage.setItem("students", JSON.stringify(students));
+                    if (window.currentStudentProfileCode === student.code) openStudentProfile(student.code);
+                    return {
+                        response: `تم يا مستر! عملت <b>${isSuspending ? "إيقاف ⛔" : "تفعيل ✅"}</b> للطالب <b>${student.name}</b> بنجاح.`,
+                        suggestions: [{ text: "👤 افتح ملف الطالب", cmd: `ملف ${student.code}`, color: "#8b5cf6" }, ...backToMenuSuggestion]
+                    };
+                }
+            }
+            return { response: `مش قادر أتعرف على الطالب من الأمر بتاعك. متأكد من الكود أو الاسم؟ 🤔`, suggestions: [] };
+        }
+    }
+
+    // --- التعديل المباشر لبيانات الطالب ---
     if (query.includes("عدل") || query.includes("غير") || query.includes("تعديل") || query.includes("انقل")) {
+        let fieldToUpdate = null; let fieldNameAr = "";
         
-        let fieldToUpdate = null; 
-        let fieldNameAr = "";
-        
-        // تحديد الحقل المطلوب تعديله
         if (query.includes("ولي") || query.includes("ولى") || query.includes("الاب")) { fieldToUpdate = "parentPhone"; fieldNameAr = "رقم ولي الأمر"; }
         else if (query.includes("رقم") || query.includes("تليفون") || query.includes("هاتف")) { fieldToUpdate = "phone"; fieldNameAr = "رقم الطالب"; }
         else if (query.includes("اسم")) { fieldToUpdate = "name"; fieldNameAr = "اسم الطالب"; }
         else if (query.includes("مجموعه") || query.includes("مجموعة") || query.includes("انقل")) { fieldToUpdate = "group"; fieldNameAr = "المجموعة"; }
 
         if(fieldToUpdate) {
-            // استخراج القيمة الجديدة والكود المستهدف (بفصل الجملة من عند حروف الجر)
             let parts = rawText.split(/\s(الى|إلى|لـ|يساوي|بـ|يخلي|ل)\s/);
-            let newValue = "";
-            let targetSearchPart = "";
+            let newValue = ""; let targetSearchPart = "";
 
             if (parts.length >= 3) {
                 newValue = parts[parts.length - 1].trim(); 
                 targetSearchPart = parts[0].trim(); 
             } else {
-                // لو المدرس مكاتبش حرف جر (مثال: عدل رقم 1001 010123456)
                 let nums = rawText.match(/\d+/g);
                 if (nums && nums.length >= 2) {
-                    targetSearchPart = nums[0]; 
-                    newValue = nums[nums.length - 1]; 
+                    targetSearchPart = nums[0]; newValue = nums[nums.length - 1]; 
                 } else {
                     return { response: "مش قادر أحدد القيمة الجديدة. يرجى كتابة الأمر بوضوح (مثال: عدل رقم ولي الامر للكود 1001 لـ 0)", suggestions: [] };
                 }
             }
 
-            // تنظيف النص للبحث عن الطالب
             let cleanTarget = targetSearchPart.replace(/(انقل|عدل|غير|تعديل|رقم|ولي|الامر|ولى|الاب|تليفون|هاتف|اسم|مجموعة|مجموعه|الطالب|اللى|كوده|للكود|الكود)/g, '').trim();
             
             let student = findStudentByCodeOrName(cleanTarget);
             if (!student) {
-                // محاولة أخيرة بالبحث برقم الكود لو موجود في النص
                 let nums = targetSearchPart.match(/\d+/g);
                 if(nums) student = findStudentByCodeOrName(nums[0]);
             }
 
             if (!student) return { response: `مش قادر أتعرف على الطالب من الأمر بتاعك. متأكد من الكود أو الاسم؟ 🤔`, suggestions: [] };
 
-            // تحديث الداتا
             student[fieldToUpdate] = newValue;
             localStorage.setItem("students", JSON.stringify(students));
             
-            // تحديث الواجهات الحية
             if (typeof renderTable === "function") renderTable();
             if (typeof renderGroupStudentsTable === "function") renderGroupStudentsTable();
             
-            // لو إنت فاتح ملف الطالب ده حالياً، يتحدث قدامك لايف
             if (window.currentStudentProfileCode === student.code) {
                 if (fieldToUpdate === "phone" && document.getElementById("profile-phone")) document.getElementById("profile-phone").innerText = newValue;
                 if (fieldToUpdate === "parentPhone" && document.getElementById("profile-parent")) document.getElementById("profile-parent").innerText = newValue;
@@ -8466,7 +8639,7 @@ window.processAiLogic = function(text) {
         }
     }
 
-    // --- 3. رفع واستيراد ملفات الإكسيل (طلاب أو حضور) ---
+    // --- رفع واستيراد الإكسيل ---
     if (query.includes("ارفع") || query.includes("رفع") || query.includes("استيراد") || query.includes("ضيف شيت") || query.includes("تسجيل شيت") || query.includes("شيت حضور")) {
         let targetGroup = groups.find(g => query.includes(window.smartArabicNormalize(g.name)));
         if (query.includes("حضور") || query.includes("حصه") || query.includes("حصة") || query.includes("غياب")) {
@@ -8501,7 +8674,7 @@ window.processAiLogic = function(text) {
         }
     }
 
-    // --- 4. أمر "تحميل/استخراج" إكسيل الغياب ---
+    // --- تحميل إكسيل الغياب ---
     if (query.includes("حمل") || query.includes("تنزيل") || query.includes("نزل") || query.includes("استخراج")) {
         if (query.includes("اكسيل") || query.includes("شيت") || query.includes("غياب")) {
             if (window.aiLastAbsentees && window.aiLastAbsentees.length > 0) {
@@ -8513,7 +8686,7 @@ window.processAiLogic = function(text) {
         }
     }
 
-    // --- 5. التحضير المباشر من الشات ---
+    // --- التحضير المباشر من الشات ---
     if (query.includes("حضر") || query.includes("سجل") || query.includes("حضور") || query.includes("تأخير") || query.includes("تاخير")) {
         if (!currentActiveSessionId) {
             return { response: "⚠️ إنت مش فاتح كشف حضور أي حصة دلوقتي! افتح الحصة الأول عشان أقدر أحضر الطالب.", suggestions: window.aiMasterMenu };
@@ -8542,67 +8715,7 @@ window.processAiLogic = function(text) {
         };
     }
 
-
-
-    // --- 🌟 السحر الجديد: إيقاف وتفعيل الطلاب من الشات ---
-    if (query.includes("ايقاف") || query.includes("إيقاف") || query.includes("وقف") || query.includes("تفعيل") || query.includes("فعل") || query.includes("فك")) {
-        
-        let isSuspending = query.includes("ايقاف") || query.includes("إيقاف") || query.includes("وقف");
-        
-        // استخراج الكود أو الاسم بتجريد الجملة من كلمات الأمر
-        let searchTarget = query.replace(/(اعمل|ايقاف|إيقاف|وقف|تفعيل|فعل|فك|الطالب|للطالب|الكود|رقم|عن)/g, '').trim();
-
-        if (!searchTarget) {
-            return { response: "يرجى كتابة كود أو اسم الطالب مع الأمر. (مثال: اعمل إيقاف للطالب 1001)", suggestions: [] };
-        }
-
-        let student = findStudentByCodeOrName(searchTarget);
-
-        if (student) {
-            // تحديث الداتا في السيستم
-            student.isSuspended = isSuspending;
-            localStorage.setItem("students", JSON.stringify(students));
-
-            // تسجيل الحركة في السجل
-            if(typeof addSystemLog === "function") {
-                addSystemLog(isSuspending ? "إيقاف عبر الروبوت 🤖⛔" : "تفعيل عبر الروبوت 🤖✅", `تم ${isSuspending ? 'إيقاف' : 'إعادة تفعيل'} الطالب: ${student.name}`);
-            }
-
-            // تحديث الجداول في الخلفية
-            if (typeof renderTable === "function") renderTable();
-            if (typeof renderGroupStudentsTable === "function") renderGroupStudentsTable();
-
-            // 🚀 التحديث اللايف: لو المدرس فاتح بروفايل الطالب ده دلوقتي، البروفايل هيعمل ريفريش لنفسه والبادج الأحمر هيظهر أو يختفي!
-            if (window.currentStudentProfileCode === student.code) {
-                openStudentProfile(student.code); 
-            }
-
-            let actionText = isSuspending ? "إيقاف ⛔" : "تفعيل ✅";
-            return {
-                response: `تم يا مستر! عملت <b>${actionText}</b> للطالب <b>${student.name}</b> بنجاح.`,
-                suggestions: [{ text: "👤 افتح ملف الطالب", cmd: `ملف ${student.code}`, color: "#8b5cf6" }, ...backToMenuSuggestion]
-            };
-        } else {
-            // لو ملقاش الطالب، نجرب ندور على أي أرقام في الجملة
-            let nums = rawText.match(/\d+/g);
-            if(nums) {
-                student = findStudentByCodeOrName(nums[0]);
-                if(student) {
-                    student.isSuspended = isSuspending;
-                    localStorage.setItem("students", JSON.stringify(students));
-                    if (window.currentStudentProfileCode === student.code) openStudentProfile(student.code);
-                    return {
-                        response: `تم يا مستر! عملت <b>${isSuspending ? "إيقاف ⛔" : "تفعيل ✅"}</b> للطالب <b>${student.name}</b> بنجاح.`,
-                        suggestions: [{ text: "👤 افتح ملف الطالب", cmd: `ملف ${student.code}`, color: "#8b5cf6" }, ...backToMenuSuggestion]
-                    };
-                }
-            }
-            return { response: `مش قادر أتعرف على الطالب من الأمر بتاعك. متأكد من الكود أو الاسم؟ 🤔`, suggestions: [] };
-        }
-    }
-
-    
-    // --- 6. إضافة وخصم النقاط السلوكية ---
+    // --- إضافة وخصم النقاط السلوكية ---
     if (query.includes("نقط") || query.includes("نقطه") || query.includes("نقاط") || query.includes("نقطة")) {
         let isAdding = query.includes("ضيف") || query.includes("زود") || query.includes("اعطي") || query.includes("اضف");
         let isSubtracting = query.includes("اخصم") || query.includes("نقص") || query.includes("اسحب");
@@ -8634,7 +8747,7 @@ window.processAiLogic = function(text) {
         }
     }
 
-    // --- 7. البحث السريع عن ملف الطالب ---
+    // --- البحث السريع عن ملف الطالب ---
     if (query.includes("ملف") || query.includes("بيانات") || query.includes("ابحث عن") || query.includes("هات")) {
         let searchTarget = query.replace(/(ملف|بيانات|ابحث|عن|هات|الطالب|الكود)/g, '').trim();
         if (searchTarget) {
@@ -8648,7 +8761,7 @@ window.processAiLogic = function(text) {
         }
     }
 
-    // --- 8. فتح حصة أو إنشاءها تلقائياً ---
+    // --- فتح حصة أو إنشاءها تلقائياً ---
     if (query.includes("افتح حصه") || query.includes("عرض حصه") || query.includes("افتح حصة") || query.includes("انشاء حصه") || query.includes("انشاء حصة") || query.includes("عمل حصة")) {
         let rawSearchWord = query.replace(/(افتح|انشاء|عمل|حصه|حصة|سجل|حضور|عرض|مجموعة|مجموعه|المجموعات|لـ|لمجموعة)/g, '').trim();
         let cleanSearchWord = rawSearchWord.replace(/[\s\-\_\.\•\*\+\(\)\[\]]/g, ''); 
@@ -8695,7 +8808,7 @@ window.processAiLogic = function(text) {
         }
     }
 
-    // --- 9. عرض كل الحصص المفتوحة ---
+    // --- عرض كل الحصص المفتوحة ---
     if (query === "مجموعات" || query.includes("الحصص المفتوحة")) {
         let activeSessions = classSessions.filter(s => s.status === 'open');
         if(activeSessions.length === 0) return { response: "مفيش حصص مفتوحة دلوقتي.", suggestions: [{ text: "➕ إنشاء حصة جديدة", cmd: "انشاء حصة", color: "#10b981" }, ...backToMenuSuggestion]};
@@ -8707,7 +8820,7 @@ window.processAiLogic = function(text) {
 
     // --- الرد الافتراضي ---
     return {
-        response: "أنا جاهز لتنفيذ أوامرك. اضغط على أي زر من القائمة ⚡ أدناه أو اكتب أمرك مباشرة (مثال: حضر الكود 1001، عدل رقم ولي الامر للطالب 1001 لـ 0):",
+        response: "أنا جاهز لتنفيذ أوامرك. اضغط على أي زر من القائمة ⚡ أدناه، أو اطلب مني المساعدة (مثال: اشرحلي المنصة، اشرح إضافة الطلاب، حضر الكود 1001).",
         suggestions: window.aiMasterMenu
     };
 };
