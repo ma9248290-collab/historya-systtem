@@ -87,15 +87,21 @@ window.smartArabicNormalize = function(text) {
 
 window.findStudentByCodeOrName = function(input) {
     const val = input.trim();
-    const studentByCode = students.find(s => String(s.code) === String(val));
-    if (studentByCode) return studentByCode;
     
+    // 1. البحث بالكود أو رقم الهاتف (الطالب أو ولي الأمر) كأولوية قصوى
+    const studentByExactMatch = students.find(s => 
+        String(s.code) === String(val) || 
+        String(s.phone) === String(val) || 
+        String(s.parentPhone) === String(val)
+    );
+    if (studentByExactMatch) return studentByExactMatch;
+    
+    // 2. البحث بالاسم (تطابق ذكي) كخطة بديلة
     const normalizedInput = window.smartArabicNormalize(val);
     const inputWords = normalizedInput.split(' '); 
     
     return students.find(s => {
         let dbName = window.smartArabicNormalize(s.name);
-        // المطابقة الذكية: لو كتب "احمد محمود" والطالب اسمه "احمد سيد محمود" هيلاقيه
         return dbName === normalizedInput || inputWords.every(word => dbName.includes(word));
     });
 };
@@ -8834,4 +8840,55 @@ window.exportAiAbsentees = function() {
     let wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "الغياب");
     XLSX.writeFile(wb, `غياب_الحصة_${new Date().toISOString().split('T')[0]}.xlsx`);
+};
+
+
+window.downloadCurrentSessionReport = function() {
+    if (!currentActiveSessionId) {
+        showToast("يرجى فتح حصة أولاً!", "error");
+        return;
+    }
+
+    const session = classSessions.find(s => s.id === currentActiveSessionId);
+    if (!session) return;
+
+    const groupStudents = students.filter(s => s.group === session.group);
+    if (groupStudents.length === 0) {
+        showToast("لا يوجد طلاب في هذه المجموعة", "error");
+        return;
+    }
+
+    let reportData = [];
+
+    groupStudents.forEach(st => {
+        // فحص حالة الطالب في الحصة الحالية
+        let stat = session.attendance[st.code] || session.attendance[st.phone];
+        let statusText = "غائب (لم يُرصد)"; // الحالة الافتراضية لمن لم يتم رصده
+
+        if (stat === 'present') statusText = "حاضر";
+        else if (stat === 'late') statusText = "متأخر";
+        else if (stat === 'absent') statusText = "غائب (مسجل غياب يدوي)";
+
+        reportData.push({
+            "كود الطالب": st.code,
+            "اسم الطالب": st.name,
+            "رقم الطالب": st.phone && st.phone !== "0" ? st.phone : "غير مسجل",
+            "رقم ولي الأمر": st.parentPhone && st.parentPhone !== "0" ? st.parentPhone : "غير مسجل",
+            "الحالة": statusText
+        });
+    });
+
+    // ترتيب الشيت بحيث يظهر الغائبين في الأعلى لسهولة التواصل معهم
+    reportData.sort((a, b) => a["الحالة"].localeCompare(b["الحالة"], 'ar'));
+
+    // إنشاء وتصدير ملف الإكسيل
+    const ws = XLSX.utils.json_to_sheet(reportData);
+    ws['!cols'] = [{wch: 15}, {wch: 30}, {wch: 15}, {wch: 15}, {wch: 18}]; 
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "تقرير الحصة");
+
+    const dateStr = session.date || new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `تقرير_غياب_وحضور_${session.group}_${dateStr}.xlsx`);
+
+    showToast("تم تحميل تقرير الحصة بنجاح! 📥");
 };

@@ -588,7 +588,13 @@
             <h4 style="color: var(--secondary-color); margin: 0; font-size: 18px; display: flex; align-items: center; gap: 8px;">
                 <span>📠</span> لوحة الرصد السريع
             </h4>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                <!-- الزر الجديد لاستخراج الإكسيل -->
+                <button class="save-btn" style="background: #10b981; margin: 0; padding: 8px 15px; font-size: 14px; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);" onclick="downloadCurrentSessionReport()">
+                    📥 استخراج تقرير الحصة (إكسيل)
+                </button>
+
                 <label class="smart-toggle toggle-money">
                     <input type="checkbox" id="autoPaymentCheckbox" class="money-check" checked>
                     <span>التحصيل المالي 💰</span>
