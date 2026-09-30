@@ -8488,6 +8488,78 @@ window.processAiLogic = function(text) {
              return { response: `مش لاقي أي مجموعة بالاسم ده يا مستر. متأكد من الاسم؟ 🤔`, suggestions: backToMenuSuggestion };
         }
     }
+
+
+    // 🧠 مهارة تحليل الغياب الخطر (3 حصص غياب من أصل آخر 4 حصص)
+    if (command.includes("غايبين 3") || command.includes("3 حصص") || command.includes("اخر 4")) {
+        
+        // 1. تحديد الصف الدراسي المستهدف من كلامك
+        let targetLevel = null;
+        if (command.includes("الصف الاول") || command.includes("اولى")) targetLevel = "الصف الأول الثانوي";
+        else if (command.includes("الصف الثاني") || command.includes("تانيه") || command.includes("ثانية")) targetLevel = "الصف الثاني الثانوي";
+        else if (command.includes("الصف الثالث") || command.includes("تالته") || command.includes("ثالثة")) targetLevel = "الصف الثالث الثانوي";
+
+        // 2. فلترة الطلاب بناءً على الصف
+        let targetStudents = students;
+        if (targetLevel) {
+            targetStudents = students.filter(s => s.level === targetLevel);
+        }
+
+        let atRiskStudents = [];
+
+        // 3. خوارزمية فحص آخر 4 حصص لكل طالب بناءً على مجموعته
+        targetStudents.forEach(st => {
+            // جلب حصص مجموعة الطالب فقط وترتيبها من الأحدث للأقدم
+            let groupSessions = classSessions
+                .filter(s => s.group === st.group)
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            // أخذ آخر 4 حصص فقط
+            let last4Sessions = groupSessions.slice(0, 4);
+
+            // التأكد أن المجموعة أخذت حصص بالفعل
+            if (last4Sessions.length > 0) { 
+                let absentCount = 0;
+                
+                last4Sessions.forEach(session => {
+                    let stat = session.attendance[st.code] || session.attendance[st.phone];
+                    // إذا لم يكن حاضراً أو متأخراً (أي غائب أو لم يتم رصده من الأساس)
+                    if (stat !== 'present' && stat !== 'late') {
+                        absentCount++;
+                    }
+                });
+
+                // 🚨 الشرط: إذا غاب 3 مرات أو أكثر في آخر 4 حصص
+                if (absentCount >= 3) {
+                    atRiskStudents.push({
+                        "كود الطالب": st.code,
+                        "اسم الطالب": st.name,
+                        "المجموعة": st.group,
+                        "رقم ولي الأمر": st.parentPhone && st.parentPhone !== "0" ? st.parentPhone : "غير مسجل",
+                        "الغياب في آخر 4 حصص": absentCount + " مرات"
+                    });
+                }
+            }
+        });
+
+        // 4. استخراج التقرير والرد عليك
+        if (atRiskStudents.length > 0) {
+            // إنشاء شيت إكسيل نظيف ومحدد
+            const ws = XLSX.utils.json_to_sheet(atRiskStudents);
+            ws['!cols'] = [{wch: 15}, {wch: 30}, {wch: 25}, {wch: 18}, {wch: 25}]; // تظبيط عرض العواميد
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "الطلاب المنذرين");
+
+            let fileNameLevel = targetLevel ? targetLevel.replace(/\s+/g, '_') : "جميع_الصفوف";
+            XLSX.writeFile(wb, `تقرير_إنذار_غياب_${fileNameLevel}.xlsx`);
+
+            addAiMessage(`تم يا مستر! 🚨<br>فحصت سجلات <b>${targetLevel ? targetLevel : 'كل الطلاب'}</b>، ولقيت <b>${atRiskStudents.length}</b> طالب غايبين 3 حصص أو أكتر في آخر 4 حصص لمجموعاتهم.<br>نزّلتلك شيت إكسيل نظيف فيه (الكود، الاسم، المجموعة، ورقم ولي الأمر) عشان السكرتارية تتواصل معاهم فوراً! 📊`);
+        } else {
+            addAiMessage(`ممتاز يا مستر! 🎉<br>راجعت سجلات <b>${targetLevel ? targetLevel : 'كل الطلاب'}</b> ومفيش أي طالب غاب 3 حصص في آخر 4 حصص. نسبة الحضور ممتازة!`);
+        }
+
+        return;
+    }
     
     // --- ب) فتح وإنشاء الحصص (مع التقاط موضوع الحصة) ---
     if (query.includes("افتح حصه") || query.includes("عرض حصه") || query.includes("افتح حصة") || query.includes("انشاء حصه") || query.includes("انشاء حصة") || query.includes("عمل حصة")) {
