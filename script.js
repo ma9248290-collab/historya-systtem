@@ -8168,7 +8168,6 @@ window.openQuickAddFromSession = function() {
 };
 
 
-
 window.closeShefoChat = function() {
     document.getElementById("shefo-chat-overlay").style.display = "none";
 };
@@ -8257,15 +8256,6 @@ window.closeShefoChat = function() {
     document.getElementById("shefo-chat-overlay").style.display = "none";
 };
 
-window.sendAiCommand = function(text) {
-    document.getElementById("shefo-text-input").value = text;
-    sendShefoMessage();
-};
-
-window.handleAiKeyPress = function(e) {
-    if(e.key === 'Enter') sendShefoMessage();
-};
-
 // فتح وقفل القائمة المنسدلة للأوامر
 window.toggleAiMenu = function() {
     let popup = document.getElementById("ai-dropdown-popup");
@@ -8328,42 +8318,6 @@ window.renderAiSuggestions = function(suggestionsArray) {
         };
         container.appendChild(btn);
     });
-};
-
-window.sendShefoMessage = function() {
-    let input = document.getElementById("shefo-text-input");
-    let text = input.value.trim();
-    if (!text) return;
-    
-    let messagesContainer = document.getElementById("shefo-chat-messages");
-    document.getElementById("ai-suggestions-container").style.display = "none";
-    
-    let userMsgDiv = document.createElement("div");
-    userMsgDiv.className = "user-message";
-    userMsgDiv.innerText = text;
-    messagesContainer.appendChild(userMsgDiv);
-    input.value = "";
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-    let typingDiv = document.createElement("div");
-    typingDiv.className = "ai-message";
-    typingDiv.innerHTML = `<div class="ai-typing"><span></span><span></span><span></span></div>`;
-    messagesContainer.appendChild(typingDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-    setTimeout(() => {
-        typingDiv.remove();
-        let aiResult = processAiLogic(text); 
-        
-        let aiMsgDiv = document.createElement("div");
-        aiMsgDiv.className = "ai-message";
-        aiMsgDiv.innerHTML = aiResult.response;
-        messagesContainer.appendChild(aiMsgDiv);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        
-        renderAiSuggestions(aiResult.suggestions);
-
-    }, 600);
 };
 
 // 🧠 قلب التنفيذ (Auto Executor) المطور الشامل
@@ -8490,14 +8444,14 @@ window.processAiLogic = function(text) {
     }
 
 
-    // 🧠 مهارة تحليل الغياب الخطر (3 حصص غياب من أصل آخر 4 حصص)
-    if (command.includes("غايبين 3") || command.includes("3 حصص") || command.includes("اخر 4")) {
+    // 🧠 مهارة تحليل الغياب الخطر (3 حصص غياب من أصل آخر 4 حصص) - الجديدة والمحسنة!
+    if (query.includes("غايبين 3") || query.includes("3 حصص") || query.includes("اخر 4") || query.includes("غايب") && query.includes("3")) {
         
         // 1. تحديد الصف الدراسي المستهدف من كلامك
         let targetLevel = null;
-        if (command.includes("الصف الاول") || command.includes("اولى")) targetLevel = "الصف الأول الثانوي";
-        else if (command.includes("الصف الثاني") || command.includes("تانيه") || command.includes("ثانية")) targetLevel = "الصف الثاني الثانوي";
-        else if (command.includes("الصف الثالث") || command.includes("تالته") || command.includes("ثالثة")) targetLevel = "الصف الثالث الثانوي";
+        if (query.includes("اول") || query.includes("اولى")) targetLevel = "الصف الأول الثانوي";
+        else if (query.includes("ثاني") || query.includes("تانيه") || query.includes("ثانية")) targetLevel = "الصف الثاني الثانوي";
+        else if (query.includes("ثالث") || query.includes("تالته") || query.includes("ثالثة")) targetLevel = "الصف الثالث الثانوي";
 
         // 2. فلترة الطلاب بناءً على الصف
         let targetStudents = students;
@@ -8535,8 +8489,9 @@ window.processAiLogic = function(text) {
                         "كود الطالب": st.code,
                         "اسم الطالب": st.name,
                         "المجموعة": st.group,
+                        "رقم الطالب": st.phone && st.phone !== "0" ? st.phone : "غير مسجل",
                         "رقم ولي الأمر": st.parentPhone && st.parentPhone !== "0" ? st.parentPhone : "غير مسجل",
-                        "الغياب في آخر 4 حصص": absentCount + " مرات"
+                        "الغياب": absentCount + " من أصل " + last4Sessions.length + " حصص"
                     });
                 }
             }
@@ -8546,19 +8501,23 @@ window.processAiLogic = function(text) {
         if (atRiskStudents.length > 0) {
             // إنشاء شيت إكسيل نظيف ومحدد
             const ws = XLSX.utils.json_to_sheet(atRiskStudents);
-            ws['!cols'] = [{wch: 15}, {wch: 30}, {wch: 25}, {wch: 18}, {wch: 25}]; // تظبيط عرض العواميد
+            ws['!cols'] = [{wch: 15}, {wch: 30}, {wch: 25}, {wch: 15}, {wch: 15}, {wch: 20}]; // تظبيط عرض العواميد
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "الطلاب المنذرين");
 
             let fileNameLevel = targetLevel ? targetLevel.replace(/\s+/g, '_') : "جميع_الصفوف";
             XLSX.writeFile(wb, `تقرير_إنذار_غياب_${fileNameLevel}.xlsx`);
 
-            addAiMessage(`تم يا مستر! 🚨<br>فحصت سجلات <b>${targetLevel ? targetLevel : 'كل الطلاب'}</b>، ولقيت <b>${atRiskStudents.length}</b> طالب غايبين 3 حصص أو أكتر في آخر 4 حصص لمجموعاتهم.<br>نزّلتلك شيت إكسيل نظيف فيه (الكود، الاسم، المجموعة، ورقم ولي الأمر) عشان السكرتارية تتواصل معاهم فوراً! 📊`);
+            return { 
+                response: `تم يا مستر! 🚨<br>فحصت سجلات <b>${targetLevel ? targetLevel : 'كل الطلاب'}</b>، ولقيت <b>${atRiskStudents.length}</b> طالب غايبين 3 حصص أو أكتر في آخر 4 حصص لمجموعاتهم.<br>نزّلتلك شيت إكسيل نظيف فيه (الكود، الاسم، المجموعة، أرقام التواصل) عشان السكرتارية تتواصل معاهم فوراً! 📊`, 
+                suggestions: backToMenuSuggestion 
+            };
         } else {
-            addAiMessage(`ممتاز يا مستر! 🎉<br>راجعت سجلات <b>${targetLevel ? targetLevel : 'كل الطلاب'}</b> ومفيش أي طالب غاب 3 حصص في آخر 4 حصص. نسبة الحضور ممتازة!`);
+            return { 
+                response: `ممتاز يا مستر! 🎉<br>راجعت سجلات <b>${targetLevel ? targetLevel : 'كل الطلاب'}</b> ومفيش أي طالب غاب 3 حصص في آخر 4 حصص. نسبة الحضور ممتازة!`, 
+                suggestions: backToMenuSuggestion 
+            };
         }
-
-        return;
     }
     
     // --- ب) فتح وإنشاء الحصص (مع التقاط موضوع الحصة) ---
