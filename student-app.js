@@ -954,20 +954,22 @@ window.reviewExam = function(examId) {
 // 🎬 مشغل الكورسات (Playlist & Video Player) المحدث
 // ==========================================
 
-window.openCoursePlayer = function(courseId, startVideoIndex = 0, fromHistory = false) {
-    if (window.originalOpenCoursePlayer && !fromHistory) window.originalOpenCoursePlayer(courseId, startVideoIndex);
-    if (!fromHistory && !window.isHistoryNavigating) {
-        history.pushState({ type: 'player', id: courseId }, '', `#player-${courseId}`);
-    }
+// ==========================================
+// 🎬 مشغل الكورسات (Playlist & Video Player) المحدث
+// ==========================================
 
+window.openCoursePlayer = function(courseId, startVideoIndex = 0) {
     let course = window.allLectures.find(l => l.id === courseId);
     if(!course) return;
 
+    // إخفاء الشاشة الرئيسية وإظهار المشغل
     document.body.classList.add("no-select");
     document.getElementById("app-layout").style.display = "none";
     document.getElementById("protected-course-screen").style.display = "flex";
     document.getElementById("player-course-title").innerText = `${course.title}`;
-    document.getElementById("video-watermark").innerHTML = `${currentStudent.name} <br> ${currentStudent.phone}`;
+    
+    let watermark = document.getElementById("video-watermark");
+    if(watermark) watermark.innerHTML = `${currentStudent.name} <br> ${currentStudent.phone}`;
 
     let vids = course.videos || [];
     if(vids.length === 0 && course.url) vids.push({title: "المحاضرة كاملة", url: course.url, type: "free"});
@@ -976,14 +978,15 @@ window.openCoursePlayer = function(courseId, startVideoIndex = 0, fromHistory = 
     let hasPurchasedWholeCourse = currentStudent.purchasedCourses && currentStudent.purchasedCourses.includes(courseId);
     let firstUnlockedIndex = -1;
 
+    // فحص الفيديوهات وبناء قائمة التشغيل
     vids.forEach((v, idx) => {
         let safeTitle = v.title.replace(/'/g, "\\'");
         
-        // --- 🔒 نظام الحماية (نفس المطبق في الخارج) ---
         let specificVideoId = `${courseId}_v${idx}`; 
         let isVideoFree = v.type === 'free' || !v.type; 
         let hasPurchasedVideo = currentStudent.purchasedCourses && (currentStudent.purchasedCourses.includes(specificVideoId) || hasPurchasedWholeCourse);
 
+        // فحص الحضور
         let didAttend = false;
         let linkedArr = [];
         if (v.linkedSessions && Array.isArray(v.linkedSessions)) linkedArr = linkedArr.concat(v.linkedSessions);
@@ -1001,6 +1004,7 @@ window.openCoursePlayer = function(courseId, startVideoIndex = 0, fromHistory = 
             }
         }
 
+        // فحص الامتحانات
         let isLockedByExam = false;
         if (v.requiredExam) {
             let examSubs = window.studentSubmissions ? window.studentSubmissions[v.requiredExam] : null;
@@ -1020,7 +1024,7 @@ window.openCoursePlayer = function(courseId, startVideoIndex = 0, fromHistory = 
         if (canWatch && firstUnlockedIndex === -1) firstUnlockedIndex = idx;
         let isActive = idx === startVideoIndex && canWatch;
 
-        // --- 🎨 رسم العنصر في القائمة بناءً على حالته ---
+        // رسم العنصر
         if (canWatch) {
             let bgStyle = isActive ? "background: rgba(59, 130, 246, 0.15); border-right: 4px solid #3b82f6; color: #3b82f6; font-weight: 900;" : "background: transparent; color: #94a3b8; border-right: 4px solid transparent; font-weight: bold;";
             let icon = isActive ? '▶️' : '📺';
@@ -1037,7 +1041,7 @@ window.openCoursePlayer = function(courseId, startVideoIndex = 0, fromHistory = 
         } else {
             playlistHtml += `
             <div class="playlist-item locked" style="background: rgba(239, 68, 68, 0.05); color: #ef4444; border-right: 4px solid transparent; font-weight: bold; padding:15px; border-radius:8px; margin-bottom:8px; cursor:not-allowed; display: flex; align-items: center; gap: 10px; opacity: 0.7;"
-                 onclick="alert('🚫 هذا المحتوى مغلق! يجب شراؤه أو اجتياز امتحانه أولاً للتمكن من مشاهدته.')">
+                 onclick="if(typeof showToast === 'function') showToast('🚫 هذا المحتوى مغلق! يجب شراؤه أو اجتياز امتحانه أولاً للتمكن من مشاهدته.', 'error'); else alert('🚫 هذا المحتوى مغلق!');">
                 <span class="vid-icon" style="font-size: 18px;">🔒</span> 
                 <span style="flex: 1; font-size: 15px; text-decoration: line-through;">${v.title}</span>
             </div>`;
@@ -1046,22 +1050,65 @@ window.openCoursePlayer = function(courseId, startVideoIndex = 0, fromHistory = 
 
     document.getElementById("player-playlist").innerHTML = playlistHtml;
 
-    // تشغيل أول فيديو مسموح به إذا كان الفيديو المطلوب مغلقاً
-    let targetIndex = canPlay(startVideoIndex, vids, courseId, hasPurchasedWholeCourse) ? startVideoIndex : firstUnlockedIndex;
-    
+    // تحديد الفيديو المستهدف للتشغيل
+    let targetIndex = -1;
+    let requestedVideo = vids[startVideoIndex];
+    if (requestedVideo) {
+        let specificVideoId = `${courseId}_v${startVideoIndex}`; 
+        let isVideoFree = requestedVideo.type === 'free' || !requestedVideo.type; 
+        let hasPurchasedVideo = currentStudent.purchasedCourses && (currentStudent.purchasedCourses.includes(specificVideoId) || hasPurchasedWholeCourse);
+        
+        let didAttend = false;
+        let linkedArr = [];
+        if (requestedVideo.linkedSessions && Array.isArray(requestedVideo.linkedSessions)) linkedArr = linkedArr.concat(requestedVideo.linkedSessions);
+        if (requestedVideo.linkedSession && !linkedArr.includes(requestedVideo.linkedSession)) linkedArr.push(requestedVideo.linkedSession);
+
+        if (linkedArr.length > 0 && window.allClassSessions) {
+            for (let sessId of linkedArr) {
+                let sessionObj = window.allClassSessions.find(s => String(s.id) === String(sessId));
+                if (sessionObj && sessionObj.attendance) {
+                    let status = sessionObj.attendance[currentStudent.code] || sessionObj.attendance[currentStudent.phone];
+                    if (status === 'present' || status === 'late' || (typeof status === 'object' && status.status === 'makeup')) { didAttend = true; break; }
+                }
+            }
+        }
+        
+        let isLockedByExam = false;
+        if (requestedVideo.requiredExam) {
+            let examSubs = window.studentSubmissions ? window.studentSubmissions[requestedVideo.requiredExam] : null;
+            let studentSub = examSubs ? (examSubs[currentStudent.code] || examSubs[currentStudent.phone]) : null;
+            if (!studentSub) isLockedByExam = true;
+            else {
+                let requiredExamObj = allOnlineExams.find(e => e.id === requestedVideo.requiredExam);
+                if (requiredExamObj) {
+                    let passScore = requiredExamObj.passScore || (requiredExamObj.totalScore / 2);
+                    if (studentSub.score < passScore) isLockedByExam = true;
+                }
+            }
+        }
+
+        if ((isVideoFree || hasPurchasedVideo || didAttend) && !isLockedByExam) {
+            targetIndex = startVideoIndex;
+        }
+    }
+
+    if (targetIndex === -1) targetIndex = firstUnlockedIndex;
+
+    // تشغيل الفيديو المسموح به
     if(targetIndex !== -1 && vids.length > targetIndex) {
         let element = document.querySelector('.playlist-item[data-index="'+targetIndex+'"]');
         playCourseVideo(vids[targetIndex].url, vids[targetIndex].title, course.id, targetIndex, element);
     } else {
-        document.getElementById("video-iframe").src = ""; // منع التشغيل لو مفيش حاجة مفتوحة
+        let iframe = document.getElementById("video-iframe");
+        if(iframe) iframe.src = ""; 
     }
     
+    // تفعيل الحماية
     document.addEventListener('contextmenu', blockContext);
     document.addEventListener('keydown', blockKeys);
     window.addEventListener('blur', applyBlackout);
     window.addEventListener('focus', removeBlackout);
 };
-
 // دالة مساعدة سريعة للفحص
 function canPlay(idx, vids, courseId, hasPurchasedWholeCourse) {
     if(idx >= vids.length || idx < 0) return false;
