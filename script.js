@@ -4586,43 +4586,6 @@ document.getElementById("lecLevel")?.addEventListener("change", function() {
 
 
 
-// 4. تعديل دالة الفتح للتعديل (openEditCourseModal)
-window.openEditCourseModal = function(id) {
-    let lec = window.fetchedLectures.find(l => l.id === id);
-    if(!lec) return;
-
-    // تعبئة البيانات الأساسية للكورس (بدون التسعير القديم لأنه اتنقل جوه الفيديوهات)
-    document.getElementById("editLecId").value = lec.id;
-    document.getElementById("editLecTitle").value = lec.title;
-    document.getElementById("editLecDesc").value = lec.desc || "";
-    document.getElementById("editLecMaxViews").value = lec.maxViews || 0;
-    document.getElementById("editLecImageBase64").value = lec.image || "";
-
-    // تظبيط قائمة الصفوف الدراسية
-    let selectLevel = document.getElementById("editLecLevel");
-    document.getElementById("editLecTrack").value = lec.track || 'all';
-    let activeLevels = JSON.parse(localStorage.getItem("activeLevels")) || ["الصف الأول الثانوي", "الصف الثاني الثانوي", "الصف الثالث الثانوي"];
-    selectLevel.innerHTML = '<option value="all">كل الصفوف (عام)</option>';
-    activeLevels.forEach(lvl => { selectLevel.innerHTML += `<option value="${lvl}" ${lec.level === lvl ? 'selected' : ''}>${lvl}</option>`; });
-
-    // رسم الفيديوهات الخاصة بالكورس بكل بياناتها (بما فيها السعر والنوع لكل فيديو)
-    let vContainer = document.getElementById("editCourseVideosContainer");
-    vContainer.innerHTML = "";
-    
-    if(lec.videos && lec.videos.length > 0) {
-        lec.videos.forEach(v => addEditCourseVideoRow(v.title, v.url, v.linkedSessions || v.linkedSession, v.requiredExam, v.type, v.price));
-    } else {
-        addEditCourseVideoRow();
-    }
-    
-    // فتح النافذة
-    openModal("editCourseModal");
-};
-
-
-
-
-
 // --- 🎬 عرض الكورسات (مع زراير التعديل والإحصائيات) ---
 // --- 🎬 عرض الكورسات (تعديل الزرار الخارجي لـ المحتوى) ---
 window.renderLectures = async function() {
