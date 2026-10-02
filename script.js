@@ -4370,12 +4370,14 @@ window.addEditCourseVideoRow = function(title = "", url = "", linkedSessions = [
     container.appendChild(div);
 };
 
-// 3. الحفظ الجديد للكورس
+
+
 window.saveLecture = async function() {
     let title = document.getElementById("lecTitle").value.trim();
     let level = document.getElementById("lecLevel").value;
     let desc = document.getElementById("lecDesc").value.trim();
     let maxViews = parseInt(document.getElementById("lecMaxViews").value) || 0;
+    let isHidden = document.getElementById("lecVisibility").value === "hidden";
 
     let videos = [];
     document.querySelectorAll(".video-row").forEach(row => {
@@ -4386,23 +4388,32 @@ window.saveLecture = async function() {
         let vType = row.querySelector(".vid-type").value;
         let vPrice = row.querySelector(".vid-price") ? parseFloat(row.querySelector(".vid-price").value) || 0 : 0;
         
-        if(vUrl)videos.push({ title: vTitle || "فيديو", url: vUrl, linkedSessions: vSessions, requiredExam: vExam, type: vType, price: vPrice });
+        if(vUrl) videos.push({ title: vTitle || "فيديو", url: vUrl, linkedSessions: vSessions, requiredExam: vExam, type: vType, price: vPrice });
     });
 
     if(!title || videos.length === 0) return showToast("يرجى إدخال اسم الكورس وفيديو واحد على الأقل!", "error");
 
     let btn = document.querySelector('#platform-lectures .save-btn');
-    let originalText = btn.innerText; btn.innerText = "جاري النشر... ⏳";
+    let originalText = btn.innerText; 
+    btn.innerText = "جاري النشر... ⏳";
 
     try {
         let imageBase64 = await window.readFileAsBase64("lecImageFile").catch(() => null);
         let defaultImage = "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=600&auto=format&fit=crop";
 
         let newLecture = { 
-            id: "lec_" + Date.now(), title: title, level: level, type: "mixed", 
-            price: 0, maxViews: maxViews, desc: desc, videos: videos, 
+            id: "lec_" + Date.now(), 
+            title: title, 
+            level: level, 
+            type: "mixed", 
+            price: 0, 
+            maxViews: maxViews, 
+            desc: desc, 
+            videos: videos, 
             track: document.getElementById("lecTrack").value,
-            image: imageBase64 || defaultImage, date: new Date().toISOString().split('T')[0] 
+            isHidden: isHidden,
+            image: imageBase64 || defaultImage, 
+            date: new Date().toISOString().split('T')[0] 
         };
 
         await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/lectures/${newLecture.id}.json`, { 
@@ -4410,17 +4421,59 @@ window.saveLecture = async function() {
         });
         
         showToast("تم نشر الكورس بنجاح! 🎬");
-        document.getElementById("lecTitle").value = ""; document.getElementById("lecMaxViews").value = "0";
-        document.getElementById("courseVideosContainer").innerHTML = ""; addCourseVideoRow();
-        btn.innerText = originalText; renderLectures();
-    } catch(e) { alert("حدث خطأ أثناء النشر!"); btn.innerText = originalText; }
+        document.getElementById("lecTitle").value = ""; 
+        document.getElementById("lecMaxViews").value = "0";
+        document.getElementById("courseVideosContainer").innerHTML = ""; 
+        addCourseVideoRow();
+        btn.innerText = originalText; 
+        renderLectures();
+    } catch(e) { 
+        alert("حدث خطأ أثناء النشر!"); 
+        btn.innerText = originalText; 
+    }
 };
 
-// 4. الحفظ عند التعديل
+window.openEditCourseModal = function(id) {
+    let lec = window.fetchedLectures.find(l => l.id === id);
+    if(!lec) return;
+
+    document.getElementById("editLecId").value = lec.id;
+    document.getElementById("editLecTitle").value = lec.title;
+    document.getElementById("editLecDesc").value = lec.desc || "";
+    document.getElementById("editLecMaxViews").value = lec.maxViews || 0;
+    document.getElementById("editLecImageBase64").value = lec.image || "";
+    document.getElementById("editLecImageFile").value = ""; 
+    document.getElementById("editLecVisibility").value = lec.isHidden ? "hidden" : "visible";
+
+    let selectLevel = document.getElementById("editLecLevel");
+    document.getElementById("editLecTrack").value = lec.track || 'all';
+    let activeLevels = JSON.parse(localStorage.getItem("activeLevels")) || ["الصف الأول الثانوي", "الصف الثاني الثانوي", "الصف الثالث الثانوي"];
+    selectLevel.innerHTML = '<option value="all">كل الصفوف (عام)</option>';
+    activeLevels.forEach(lvl => { selectLevel.innerHTML += `<option value="${lvl}" ${lec.level === lvl ? 'selected' : ''}>${lvl}</option>`; });
+
+    let savedSessions = lec.linkedSessions || [];
+    if(lec.linkedSession && !savedSessions.includes(lec.linkedSession)) savedSessions.push(lec.linkedSession); 
+    
+    filterCourseSessions('editLecLevel', 'editLecSessionsContainer', savedSessions);
+
+    let vContainer = document.getElementById("editCourseVideosContainer");
+    vContainer.innerHTML = "";
+    if(lec.videos && lec.videos.length > 0) {
+        lec.videos.forEach(v => addEditCourseVideoRow(v.title, v.url, v.linkedSessions || v.linkedSession, v.requiredExam, v.type, v.price));
+    } else if (lec.url) {
+        addEditCourseVideoRow("المحاضرة كاملة", lec.url); 
+    } else {
+        addEditCourseVideoRow();
+    }
+
+    openModal("editCourseModal");
+};
+
 window.saveEditedCourse = async function() {
     let id = document.getElementById("editLecId").value;
     let title = document.getElementById("editLecTitle").value.trim();
     let maxViews = parseInt(document.getElementById("editLecMaxViews").value) || 0;
+    let isHidden = document.getElementById("editLecVisibility").value === "hidden";
     
     let videos = [];
     document.querySelectorAll(".video-row-edit").forEach(row => {
@@ -4445,59 +4498,34 @@ window.saveEditedCourse = async function() {
         let lec = window.fetchedLectures.find(l => l.id === id);
         
         let updatedLecture = { 
-            ...lec, title: title, level: document.getElementById("editLecLevel").value,
+            ...lec, 
+            title: title, 
+            level: document.getElementById("editLecLevel").value,
             track: document.getElementById("editLecTrack").value,
-            type: "mixed", price: 0, image: newImageBase64 || oldImage, maxViews: maxViews,
-            desc: document.getElementById("editLecDesc").value.trim(), videos: videos,
-            linkedSessions: null, linkedSession: null // مسح النظام القديم
+            type: "mixed", 
+            price: 0, 
+            image: newImageBase64 || oldImage, 
+            maxViews: maxViews,
+            desc: document.getElementById("editLecDesc").value.trim(), 
+            videos: videos,
+            isHidden: isHidden,
+            linkedSessions: null, 
+            linkedSession: null 
         };
 
         await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/lectures/${id}.json`, { 
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedLecture) 
         });
-        showToast("تم حفظ التعديلات! 💾"); closeModal("editCourseModal"); renderLectures();
-    } catch(e) { alert("حدث خطأ أثناء الحفظ!"); }
+        showToast("تم حفظ التعديلات! 💾"); 
+        closeModal("editCourseModal"); 
+        renderLectures();
+    } catch(e) { 
+        alert("حدث خطأ أثناء الحفظ!"); 
+    }
     btn.innerText = originalText;
 };
 
-// --- فتح نافذة التعديل (محدث ليدعم حصص متعددة) ---
-window.openEditCourseModal = function(id) {
-    let lec = window.fetchedLectures.find(l => l.id === id);
-    if(!lec) return;
 
-    document.getElementById("editLecId").value = lec.id;
-    document.getElementById("editLecTitle").value = lec.title;
-    document.getElementById("editLecType").value = lec.type;
-    document.getElementById("editLecPrice").value = lec.price || 0;
-    document.getElementById("editPriceContainer").style.display = lec.type === 'paid' ? 'block' : 'none';
-    document.getElementById("editLecDesc").value = lec.desc || "";
-    document.getElementById("editLecMaxViews").value = lec.maxViews || 0;
-    document.getElementById("editLecImageBase64").value = lec.image || "";
-    document.getElementById("editLecImageFile").value = ""; 
-
-    let selectLevel = document.getElementById("editLecLevel");
-    let activeLevels = JSON.parse(localStorage.getItem("activeLevels")) || ["الصف الأول الثانوي", "الصف الثاني الثانوي", "الصف الثالث الثانوي"];
-    selectLevel.innerHTML = '<option value="all">كل الصفوف (عام)</option>';
-    activeLevels.forEach(lvl => { selectLevel.innerHTML += `<option value="${lvl}" ${lec.level === lvl ? 'selected' : ''}>${lvl}</option>`; });
-
-    // 👈 تجهيز الحصص المربوطة القديمة وفتح الفلتر
-    let savedSessions = lec.linkedSessions || [];
-    if(lec.linkedSession && !savedSessions.includes(lec.linkedSession)) savedSessions.push(lec.linkedSession); // دعم للكورسات القديمة اللي كانت متسجلة بحصة واحدة
-    
-    filterCourseSessions('editLecLevel', 'editLecSessionsContainer', savedSessions);
-
-    let vContainer = document.getElementById("editCourseVideosContainer");
-    vContainer.innerHTML = "";
-    if(lec.videos && lec.videos.length > 0) {
-        lec.videos.forEach(v => addEditCourseVideoRow(v.title, v.url, v.linkedSessions || v.linkedSession, v.requiredExam, v.type, v.price));
-    } else if (lec.url) {
-        addEditCourseVideoRow("المحاضرة كاملة", lec.url); 
-    } else {
-        addEditCourseVideoRow();
-    }
-
-    openModal("editCourseModal");
-};
 
 
 
@@ -4995,7 +5023,8 @@ window.saveOnlineExam = async function() {
     let title = document.getElementById("onlineExamTitle").value.trim();
     let duration = document.getElementById("onlineExamDuration").value;
     let autoResult = document.getElementById("onlineExamAutoShowResult").checked;
-    let selectedGroups = []; document.querySelectorAll('input[name="examGroup"]:checked').forEach(cb => selectedGroups.push(cb.value));
+    let selectedGroups = []; 
+    document.querySelectorAll('input[name="examGroup"]:checked').forEach(cb => selectedGroups.push(cb.value));
 
     if(!title || !duration || currentQuestions.length === 0 || selectedGroups.length === 0) {
         if(typeof showToast === 'function') showToast("⚠️ يرجى إكمال بيانات الامتحان واختيار مجموعة وإضافة أسئلة!", "error");
@@ -5003,8 +5032,23 @@ window.saveOnlineExam = async function() {
         return;
     }
 
+    let passScore = document.getElementById("onlineExamPassScore").value;
     let totalScore = currentQuestions.reduce((sum, q) => sum + (q.points || 0), 0);
-    let newExam = { id: "exam_" + Date.now(), title: title, duration: parseInt(duration), group: selectedGroups, autoShowResult: autoResult, totalScore: totalScore,track: document.getElementById("onlineExamTrack").value, status: "open", date: new Date().toISOString().split('T')[0], questions: currentQuestions };
+    let trackElement = document.getElementById("onlineExamTrack");
+
+    let newExam = { 
+        id: "exam_" + Date.now(), 
+        title: title, 
+        duration: parseInt(duration), 
+        group: selectedGroups, 
+        autoShowResult: autoResult, 
+        totalScore: totalScore, 
+        passScore: parseInt(passScore) || (totalScore / 2), 
+        track: trackElement ? trackElement.value : "all", 
+        status: "open", 
+        date: new Date().toISOString().split('T')[0], 
+        questions: currentQuestions 
+    };
 
     try {
         let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams.json`);
@@ -5017,8 +5061,11 @@ window.saveOnlineExam = async function() {
         if(typeof showToast === 'function') showToast("تم نشر الامتحان للطلاب بنجاح! 🚀");
         else alert("تم نشر الامتحان بنجاح!");
         
-        closeModal('buildOnlineExamModal'); renderOnlineExams();
-    } catch(e) { alert("حدث خطأ أثناء حفظ الامتحان."); }
+        closeModal('buildOnlineExamModal'); 
+        renderOnlineExams();
+    } catch(e) { 
+        alert("حدث خطأ أثناء حفظ الامتحان."); 
+    }
 };
 
 window.renderOnlineExams = async function() {
@@ -5190,7 +5237,12 @@ window.renderExamSubmissionsList = function(showSubmitted) {
                 <td><strong>${st.code}</strong></td><td>${st.name}</td><td>${st.group}</td>
                 <td><strong style="color:${scoreColor}; font-size: 16px;">${subData.score} / ${exam.totalScore}</strong></td>
                 <td>${statusBadge}</td>
-                <td><button class="save-btn" style="background: #3b82f6; width: auto; padding: 6px 12px; margin: 0; font-size: 12px; border:none; border-radius:6px; cursor:pointer;" onclick="openGradeSubmission('${exam.id}', '${subKey}')">التقييم 📝</button></td>
+                <td>
+    <div style="display: flex; gap: 5px;">
+        <button class="save-btn" style="background: #3b82f6; width: auto; padding: 6px 12px; margin: 0; font-size: 12px; border:none; border-radius:6px; cursor:pointer;" onclick="openGradeSubmission('${exam.id}', '${subKey}')">التقييم 📝</button>
+        <button class="save-btn" style="background: #ef4444; width: auto; padding: 6px 12px; margin: 0; font-size: 12px; border:none; border-radius:6px; cursor:pointer;" onclick="deleteStudentSubmission('${exam.id}', '${subKey}')" title="حذف ليتمكن من الإعادة">إعادة 🔄</button>
+    </div>
+</td>
             </tr>`;
         });
 
@@ -5216,6 +5268,17 @@ window.renderExamSubmissionsList = function(showSubmitted) {
         });
     }
 };
+
+
+window.deleteStudentSubmission = async function(examId, subKey) {
+    if(!confirm("هل أنت متأكد من حذف إجابة هذا الطالب نهائياً ليتمكن من إعادة الامتحان؟")) return;
+    try {
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/onlineSubmissions/${examId}/${subKey}.json`, { method: 'DELETE' });
+        showToast("تم الحذف بنجاح. يمكن للطالب الآن دخول الامتحان مرة أخرى!", "success");
+        openOnlineExamDetails(examId); // ريفريش للجدول
+    } catch(e) { showToast("حدث خطأ أثناء الحذف", "error"); }
+};
+
 
 window.openGradeSubmission = function(examId, subKey) {
     try {
