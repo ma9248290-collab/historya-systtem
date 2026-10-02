@@ -473,10 +473,27 @@ currentStudent.level = (studentGroupObj && studentGroupObj.level) ? studentGroup
 
                 msgEl.style.display = "block";
                 if(foundStudent) {
-                    msgEl.style.color = "var(--success)";
-                    msgEl.style.background = "rgba(16, 185, 129, 0.1)";
-                    msgEl.innerHTML = `✅ تم العثور على حسابك!<br><br>الاسم: <strong>${foundStudent.name}</strong><br>الكود الخاص بك: <br><span style="font-size: 24px; font-weight: 900; letter-spacing: 2px; color: var(--primary); display: inline-block; margin-top: 5px;">${foundStudent.code}</span>`;
-                } else {
+    msgEl.style.color = "var(--success)";
+    msgEl.style.background = "rgba(16, 185, 129, 0.1)";
+    msgEl.style.padding = "20px";
+    
+    msgEl.innerHTML = `
+        <div style="text-align: center;">
+            <div style="font-size: 16px; margin-bottom: 10px; font-weight: bold;">✅ تم العثور على حسابك!</div>
+            <div style="font-size: 15px; margin-bottom: 15px; color: var(--text-main);">الاسم: <strong style="color: var(--secondary);">${foundStudent.name}</strong></div>
+            <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 5px; font-weight: bold;">الكود الخاص بك:</div>
+            
+            <div style="display: flex; align-items: center; justify-content: space-between; background: #ffffff; border: 2px dashed #10b981; padding: 10px 15px; border-radius: 12px; margin-top: 10px; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.1);">
+                <span style="font-size: 32px; font-weight: 900; letter-spacing: 5px; color: var(--primary); margin-right: 10px;">${foundStudent.code}</span>
+                <button onclick="navigator.clipboard.writeText('${foundStudent.code}'); this.innerHTML='✅ تم النسخ'; this.style.background='#10b981'; this.style.color='white'; this.style.borderColor='#10b981'; setTimeout(()=> {this.innerHTML='📋 نسخ الكود'; this.style.background='#f8fafc'; this.style.color='var(--text-main)'; this.style.borderColor='#cbd5e1';}, 2000);" style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; font-weight: 900; font-size: 13px; cursor: pointer; transition: 0.3s; color: var(--text-main); font-family: 'Cairo';">
+                    📋 نسخ الكود
+                </button>
+            </div>
+            
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 15px; font-weight: bold;">انسخ الكود واضغط على (العودة لتسجيل الدخول) لاستخدامه.</p>
+        </div>
+    `;
+} else {
                     msgEl.style.color = "var(--danger)";
                     msgEl.style.background = "rgba(239, 68, 68, 0.1)";
                     msgEl.innerText = "❌ لم يتم العثور على أي طالب بهذا الرقم!";
@@ -1517,65 +1534,78 @@ window.purchaseVideo = async function(courseId, videoIndex, price, videoTitle) {
 
 
         window.redeemCode = async function() {
-            const codeInput = document.getElementById("rechargeCodeInput");
-            const code = codeInput.value.trim();
-            if(!code) return showToast("أدخل الكود أولاً!", "error");
+    const codeInput = document.getElementById("rechargeCodeInput");
+    const code = codeInput.value.trim();
+    
+    // 💡 دالة آمنة لإظهار الإشعارات (تمنع توقف الكود إذا لم يجد تصميم التوست)
+    const notify = (msg, type) => {
+        if (typeof showToast === 'function') showToast(msg, type);
+        else alert(msg);
+    };
 
-            // 🛡️ التعديل هنا: قفل الزرار فوراً عشان نمنع الطالب من التكرار 🛡️
-            let btn = event.currentTarget;
-            let origText = btn.innerText;
-            btn.innerText = "جاري الشحن... ⏳";
-            btn.disabled = true;
-            btn.style.opacity = "0.7";
+    if(!code) return notify("أدخل الكود أولاً!", "error");
 
-            try {
-                let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/chargeCodes/${code}.json`);
-                let codeData = await res.json();
-                
-                if(!codeData || codeData.status === 'used') {
-                    showToast("الكود غير صحيح أو مستخدم مسبقاً!", "error");
-                    btn.innerText = origText;
-                    btn.disabled = false;
-                    btn.style.opacity = "1";
-                    return;
-                }
+    // 🛡️ الحصول على الزرار بطريقة آمنة لا تسبب Crash
+    let btn = document.querySelector('button[onclick="redeemCode()"]');
+    let origText = btn ? btn.innerText : "شحن الآن 🚀";
+    
+    if(btn) {
+        btn.innerText = "جاري الشحن... ⏳";
+        btn.disabled = true;
+        btn.style.opacity = "0.7";
+    }
 
-                let dataRes = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data.json`);
-                let data = await dataRes.json();
-                
-                let sIdx = data.students.findIndex(s => s && s.code === currentStudent.code);
-                if(sIdx !== -1) {
-                    let amount = parseFloat(codeData.amount);
-                    
-                    // 🛡️ التعديل 2: تأمين الحفظ السحابي
-                    // نحرق الكود الأول عشان لو حصل أي تهنيج الفلوس متضاعفش
-                    await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/chargeCodes/${code}/status.json`, { 
-                        method: 'PUT', 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        body: JSON.stringify("used") 
-                    });
-
-                    // بعدين نضيف الفلوس للطالب
-                    currentStudent.walletBalance = (currentStudent.walletBalance || 0) + amount;
-                    await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data/students/${sIdx}.json`, { 
-                        method: 'PATCH', 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        body: JSON.stringify({ walletBalance: currentStudent.walletBalance }) 
-                    });
-
-                    showToast(`تم شحن ${amount} ج.م بنجاح! 🎉`, "success");
-                    codeInput.value = ""; 
-                    fetchStudentData(true); // تحديث الرصيد في الشاشة
-                }
-            } catch (e) { 
-                showToast("حدث خطأ في الاتصال بالإنترنت!", "error"); 
-            } finally {
-                // نرجع الزرار لأصله بعد ما كل حاجة تخلص (أو تفشل)
+    try {
+        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/chargeCodes/${code}.json`);
+        let codeData = await res.json();
+        
+        if(!codeData || codeData.status === 'used') {
+            notify("الكود غير صحيح أو مستخدم مسبقاً!", "error");
+            if(btn) {
                 btn.innerText = origText;
                 btn.disabled = false;
                 btn.style.opacity = "1";
             }
-        };
+            return;
+        }
+
+        let dataRes = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data.json`);
+        let data = await dataRes.json();
+        
+        let sIdx = data.students.findIndex(s => s && s.code === currentStudent.code);
+        if(sIdx !== -1) {
+            let amount = parseFloat(codeData.amount);
+            
+            // نحرق الكود الأول عشان لو حصل أي تهنيج الفلوس متضاعفش
+            await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/chargeCodes/${code}/status.json`, { 
+                method: 'PUT', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify("used") 
+            });
+
+            // بعدين نضيف الفلوس للطالب
+            currentStudent.walletBalance = (currentStudent.walletBalance || 0) + amount;
+            await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data/students/${sIdx}.json`, { 
+                method: 'PATCH', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ walletBalance: currentStudent.walletBalance }) 
+            });
+
+            notify(`تم شحن ${amount} ج.م بنجاح! 🎉`, "success");
+            codeInput.value = ""; 
+            fetchStudentData(true); // تحديث الرصيد في الشاشة فوراً
+        }
+    } catch (e) { 
+        notify("حدث خطأ في الاتصال بالإنترنت!", "error"); 
+    } finally {
+        // نرجع الزرار لأصله بعد ما كل حاجة تخلص (أو تفشل)
+        if(btn) {
+            btn.innerText = origText;
+            btn.disabled = false;
+            btn.style.opacity = "1";
+        }
+    }
+};
         // ==========================================
 // 🔙 نظام التنقل الذكي وزر الرجوع (History API) - خاص بمنصة الطالب
 // ==========================================

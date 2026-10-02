@@ -255,10 +255,11 @@
     <div id="landing-page" class="landing-page">
         <nav class="landing-navbar">
             <div class="landing-logo"><img src="logo.png" alt="Logo"><span id="nav-brand-name">هيستوريا</span></div>
-            <div class="nav-actions">
-                <button class="btn-outline" onclick="openAuthModal('register')">إنشاء حساب</button>
-                <button class="btn-solid" onclick="openAuthModal('login')">تسجيل الدخول</button>
-            </div>
+           <div class="nav-actions">
+            <button class="btn-solid" onclick="openAuthModal('login')">تسجيل الدخول</button>
+    <button class="btn-outline" onclick="openAuthModal('forgot')">احصل على الكود</button>
+    
+</div>
         </nav>
 
         <main class="hero-section">
@@ -293,18 +294,18 @@
             <button class="close-auth" onclick="closeAuthModal()">✖</button>
             <div class="auth-form-side">
                 <div id="login-form-view">
-                    <h2 style="color: var(--secondary); margin: 0 0 8px 0; font-weight: 900; font-size: 32px;">مرحباً بعودتك 👋</h2>
-                    <p style="color: var(--text-muted); margin-bottom: 35px; font-weight: bold;">أدخل بياناتك للوصول إلى منصتك التعليمية</p>
-                    <div class="auth-input-group"><label>🔢 كود الطالب</label><input type="text" id="studentCode" placeholder="أدخل كودك هنا..." style="text-align: center; letter-spacing: 2px;"></div>
-                    <div class="auth-input-group"><label>📞 رقم هاتف ولي الأمر (كلمة المرور)</label><input type="text" id="parentPhone" placeholder="01XXXXXXXXX" style="text-align: center; letter-spacing: 2px;"></div>
-                    <div id="error-msg" style="color: white; background: var(--danger); padding: 15px; border-radius: 12px; display: none;">البيانات غير صحيحة!</div>
-                    <button class="btn-solid" style="width: 100%; margin-top: 15px;" id="login-btn-action" onclick="fetchStudentData()">تسجيل الدخول 🚀</button>
-                    <button class="btn-outline" style="width: 100%; margin-top: 15px;" onclick="toggleAuthView('register')">أنشئ حسابك الآن</button>
-                    
-                    <div style="margin-top: 25px;">
-                        <button style="background: transparent; border: none; color: var(--text-muted); text-decoration: underline; font-size: 15px; font-weight: bold; cursor: pointer;" onclick="toggleAuthView('forgot')">نسيت كود الطالب؟ اضغط هنا لاسترجاعه</button>
-                    </div>
-                </div>
+    <h2 style="color: var(--secondary); margin: 0 0 8px 0; font-weight: 900; font-size: 32px;">مرحباً بعودتك 👋</h2>
+    <p style="color: var(--text-muted); margin-bottom: 35px; font-weight: bold;">أدخل بياناتك للوصول إلى منصتك التعليمية</p>
+    <div class="auth-input-group"><label>🔢 كود الطالب</label><input type="text" id="studentCode" placeholder="أدخل كودك هنا..." style="text-align: center; letter-spacing: 2px;"></div>
+    <div class="auth-input-group"><label>📞 رقم هاتف ولي الأمر (كلمة المرور)</label><input type="text" id="parentPhone" placeholder="01XXXXXXXXX" style="text-align: center; letter-spacing: 2px;"></div>
+    <div id="error-msg" style="color: white; background: var(--danger); padding: 15px; border-radius: 12px; display: none;">البيانات غير صحيحة!</div>
+    
+    <!-- زر تسجيل الدخول الأساسي -->
+    <button class="btn-solid" style="width: 100%; margin-top: 15px;" id="login-btn-action" onclick="fetchStudentData()">تسجيل الدخول 🚀</button>
+    
+    <!-- زر الحصول على الكود (تم تصميمه كزر بارز بدلاً من نص صغير) -->
+    <button class="btn-outline" style="width: 100%; margin-top: 15px;" onclick="toggleAuthView('forgot')">احصل على الكود 🔍</button>
+</div>
                 
                 <div id="forgot-form-view" style="display: none;">
                     <h2 style="color: var(--secondary); margin: 0 0 5px 0; font-weight: 900; font-size: 24px;">استرجاع كود الطالب 🔍</h2>
