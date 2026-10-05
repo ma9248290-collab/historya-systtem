@@ -6645,7 +6645,7 @@ window.openWrongGroupModal = function(student, currentSession) {
 };
 
 // ==========================================
-// 📋 تسجيل الحضور المطور (مزامنة لحظية دقيقة للطالب فقط دون رفع كل البيانات)
+// 📋 تسجيل الحضور المطور (مزامنة لحظية + إشعارات صوتية ومرئية)
 // ==========================================
 window.markAttendance = function(codeOrPhone, status, isManual = false) {
     const sIndex = classSessions.findIndex(s => s.id === currentActiveSessionId);
@@ -6678,13 +6678,7 @@ window.markAttendance = function(codeOrPhone, status, isManual = false) {
         // ⏰ حفظ الوقت
         let now = new Date();
         let timeStr = formatTime12(`${now.getHours()}:${now.getMinutes()}`);
-        
-        // إعطاء أولوية في الترتيب للي ضرب باركود، أما اليدوي بيفضل مكانه عشان الجدول مينطش
-        let timestamp = isManual ? 0 : now.getTime();
-
-        if (isManual && s.attendanceLog && s.attendanceLog[student.code] && s.attendanceLog[student.code].ts > 0) {
-            timestamp = s.attendanceLog[student.code].ts;
-        }
+        let timestamp = now.getTime();
 
         if (!s.attendanceLog) s.attendanceLog = {};
 
@@ -6696,11 +6690,18 @@ window.markAttendance = function(codeOrPhone, status, isManual = false) {
             delete s.attendanceLog[student.code];
             firebaseStatusUpdate[student.code] = null;
             firebaseLogUpdate[student.code] = null;
+            if(typeof showToast === 'function') showToast(`تم إلغاء حضور ${student.name}`, 'warning');
         } else {
             s.attendance[student.code] = status;
-            s.attendanceLog[student.code] = { time: timeStr, ts: timestamp };
+            
+            // 💡 السحر هنا: لو ضغط يدوي، هنضيف خاصية (isManual: true) عشان الجدول ميرتبوش فوق خالص!
+            s.attendanceLog[student.code] = { time: timeStr, ts: timestamp, isManual: isManual };
+            
             firebaseStatusUpdate[student.code] = status;
-            firebaseLogUpdate[student.code] = { time: timeStr, ts: timestamp };
+            firebaseLogUpdate[student.code] = { time: timeStr, ts: timestamp, isManual: isManual };
+            
+            let statusText = status === 'present' ? 'حاضر ✅' : 'متأخر ⏳';
+            if(typeof showToast === 'function') showToast(`تم تسجيل ${student.name} كـ ${statusText}`, 'success');
         }
 
         // 1. الحفظ المحلي السريع
@@ -6710,7 +6711,7 @@ window.markAttendance = function(codeOrPhone, status, isManual = false) {
         // 2. تحديث الشاشة فوراً
         renderAttendanceTable(s);
 
-        // 3. 🚀 المزامنة اللحظية (Micro-Patch) للطالب ده بس في الفايربيز!
+        // 3. 🚀 المزامنة اللحظية للطالب ده بس في الفايربيز
         let baseUrl = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data`;
 
         fetch(`${baseUrl}/classSessions/${sIndex}/attendance.json`, {
@@ -6725,7 +6726,7 @@ window.markAttendance = function(codeOrPhone, status, isManual = false) {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ behaviorPoints: student.behaviorPoints })
         }).catch(e => console.error("Sync Error:", e));
 
-        // 4. الإشعارات للأبلكيشن
+        // 4. الإشعارات للأبلكيشن (لو متفعلة ومفيش رصد يدوي عشان منعملش سبام لأولياء الأمور)
         if (status !== 'none' && !isManual) {
             if(typeof notifyParentApp === 'function') notifyParentApp(student.code, "تحديث حضور 🏫", `تم تحضير ${student.name}`);
         }
