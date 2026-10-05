@@ -4935,18 +4935,192 @@ window.deleteLecture = async function(id) {
 };
 
 // --- 📝 الامتحانات الإلكترونية ---
+
 window.openOnlineExamBuilder = function() {
+    document.getElementById("editingOnlineExamId").value = ""; // تصفير الـ ID عشان نكريت جديد
     document.getElementById("onlineExamTitle").value = "";
     document.getElementById("onlineExamDuration").value = "60";
+    document.getElementById("onlineExamPassScore").value = "";
     document.getElementById("onlineExamAutoShowResult").checked = true;
+    
+    // إرجاع اسم الزر لشكله الطبيعي
+    let submitBtn = document.querySelector("#buildOnlineExamModal .save-btn");
+    if(submitBtn) submitBtn.innerText = "🚀 نشر الامتحان الإلكتروني";
+
     let groupContainer = document.getElementById("onlineExamGroupsContainer");
     if(groupContainer && typeof groups !== 'undefined') {
         groupContainer.innerHTML = groups.map(g => `<label style="display: flex; align-items: center; gap: 8px; cursor: pointer; background: var(--hover-bg); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); font-weight: bold;"><input type="checkbox" name="examGroup" value="${g.name}" style="accent-color: var(--primary-color); width: 18px; height: 18px;">${g.name}</label>`).join('');
     }
+    
     currentQuestions = [];
     document.getElementById("examQuestionsContainer").innerHTML = "";
     addQuestionBlock('mcq'); 
     openModal('buildOnlineExamModal');
+};
+
+// ✏️ الدالة الجديدة لفتح الامتحان القديم وتعديله
+window.openEditOnlineExam = function(examId) {
+    let exam = window.fetchedOnlineExams.find(e => e.id === examId);
+    if (!exam) return;
+
+    // تعبئة البيانات الأساسية
+    document.getElementById("editingOnlineExamId").value = exam.id;
+    document.getElementById("onlineExamTitle").value = exam.title;
+    document.getElementById("onlineExamDuration").value = exam.duration;
+    document.getElementById("onlineExamPassScore").value = exam.passScore || "";
+    document.getElementById("onlineExamTrack").value = exam.track || "all";
+    document.getElementById("onlineExamAutoShowResult").checked = exam.autoShowResult;
+    
+    // تغيير اسم الزر ليدل على التعديل
+    let submitBtn = document.querySelector("#buildOnlineExamModal .save-btn");
+    if(submitBtn) submitBtn.innerText = "💾 حفظ تعديلات الامتحان";
+
+    // تعبئة المجموعات المستهدفة
+    let groupContainer = document.getElementById("onlineExamGroupsContainer");
+    if(groupContainer && typeof groups !== 'undefined') {
+        let examGroups = Array.isArray(exam.group) ? exam.group : [exam.group];
+        groupContainer.innerHTML = groups.map(g => {
+            let isChecked = examGroups.includes(g.name) || examGroups.includes('all') ? "checked" : "";
+            return `<label style="display: flex; align-items: center; gap: 8px; cursor: pointer; background: var(--hover-bg); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); font-weight: bold;"><input type="checkbox" name="examGroup" value="${g.name}" ${isChecked} style="accent-color: var(--primary-color); width: 18px; height: 18px;">${g.name}</label>`;
+        }).join('');
+    }
+
+    // جلب الأسئلة القديمة وعرضها
+    currentQuestions = JSON.parse(JSON.stringify(exam.questions || [])); 
+    renderQuestionBlocks();
+    
+    openModal('buildOnlineExamModal');
+};
+
+window.saveOnlineExam = async function() {
+    let editId = document.getElementById("editingOnlineExamId").value; // لو فيه ID معناه إننا بنعدل
+    let title = document.getElementById("onlineExamTitle").value.trim();
+    let duration = document.getElementById("onlineExamDuration").value;
+    let autoResult = document.getElementById("onlineExamAutoShowResult").checked;
+    let selectedGroups = []; 
+    document.querySelectorAll('input[name="examGroup"]:checked').forEach(cb => selectedGroups.push(cb.value));
+
+    if(!title || !duration || currentQuestions.length === 0 || selectedGroups.length === 0) {
+        if(typeof showToast === 'function') showToast("⚠️ يرجى إكمال بيانات الامتحان واختيار مجموعة وإضافة أسئلة!", "error");
+        else alert("⚠️ يرجى إكمال بيانات الامتحان!");
+        return;
+    }
+
+    let passScore = document.getElementById("onlineExamPassScore").value;
+    let totalScore = currentQuestions.reduce((sum, q) => sum + (parseFloat(q.points) || 0), 0);
+    let trackElement = document.getElementById("onlineExamTrack");
+
+    // زر التحميل
+    let btn = document.querySelector("#buildOnlineExamModal .save-btn");
+    let origText = btn.innerText;
+    btn.innerText = "جاري الحفظ... ⏳";
+    btn.disabled = true;
+
+    try {
+        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams.json`);
+        let existingExams = await res.json() || [];
+        existingExams = Array.isArray(existingExams) ? existingExams : Object.values(existingExams).filter(e => e !== null);
+
+        if (editId) {
+            // 📝 حفظ التعديلات على امتحان موجود
+            let examIndex = existingExams.findIndex(e => e.id === editId);
+            if (examIndex > -1) {
+                existingExams[examIndex].title = title;
+                existingExams[examIndex].duration = parseInt(duration);
+                existingExams[examIndex].group = selectedGroups;
+                existingExams[examIndex].autoShowResult = autoResult;
+                existingExams[examIndex].totalScore = totalScore;
+                existingExams[examIndex].passScore = parseInt(passScore) || (totalScore / 2);
+                existingExams[examIndex].track = trackElement ? trackElement.value : "all";
+                existingExams[examIndex].questions = currentQuestions;
+            }
+        } else {
+            // 🚀 نشر امتحان جديد
+            let newExam = { 
+                id: "exam_" + Date.now(), 
+                title: title, 
+                duration: parseInt(duration), 
+                group: selectedGroups, 
+                autoShowResult: autoResult, 
+                totalScore: totalScore, 
+                passScore: parseInt(passScore) || (totalScore / 2), 
+                track: trackElement ? trackElement.value : "all", 
+                status: "open", 
+                date: new Date().toISOString().split('T')[0], 
+                questions: currentQuestions 
+            };
+            existingExams.push(newExam);
+        }
+
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams.json`, { 
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(existingExams) 
+        });
+
+        if(typeof showToast === 'function') showToast(editId ? "تم تعديل الامتحان بنجاح! ✏️" : "تم نشر الامتحان للطلاب بنجاح! 🚀");
+        
+        closeModal('buildOnlineExamModal'); 
+        renderOnlineExams();
+    } catch(e) { 
+        alert("حدث خطأ أثناء حفظ الامتحان."); 
+    } finally {
+        btn.innerText = origText;
+        btn.disabled = false;
+    }
+};
+
+// ==========================================
+// 💳 رسم كروت الامتحانات (تصميم VIP المطور والمجمع)
+// ==========================================
+window.renderOnlineExams = async function() {
+    let container = document.getElementById("online-exams-container");
+    if(!container) return;
+    container.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding:20px; color:var(--text-muted);">جاري التحميل... ⏳</div>`;
+    
+    try {
+        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams.json`);
+        let exams = await res.json() || [];
+        window.fetchedOnlineExams = Array.isArray(exams) ? exams : Object.values(exams).filter(e => e !== null);
+        
+        if(window.fetchedOnlineExams.length === 0) return container.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 12px;">لا توجد امتحانات إلكترونية حتى الآن.</div>`;
+
+        container.innerHTML = "";
+        [...window.fetchedOnlineExams].reverse().forEach((exam) => {
+            let statusColor = exam.status === 'open' ? '#10b981' : '#ef4444';
+            let statusText = exam.status === 'open' ? 'متاح للطلاب ✅' : 'مغلق ❌';
+            let originalIndex = window.fetchedOnlineExams.findIndex(e => e.id === exam.id);
+            let groupsText = Array.isArray(exam.group) ? exam.group.join('، ') : (exam.group === 'all' ? 'الكل' : exam.group);
+
+            container.innerHTML += `
+            <div class="card" style="background: var(--card-bg); border-radius: 16px; border: 1px solid var(--border-color); padding: 22px; display: flex; flex-direction: column; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border-top: 4px solid ${statusColor}; transition: 0.3s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 10px 25px rgba(0,0,0,0.08)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(0,0,0,0.03)';">
+                
+                <!-- الهيدر والحالة -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; gap: 10px;">
+                    <h3 style="margin: 0; color: var(--secondary-color); font-size: 18px; font-weight: 900; line-height: 1.4; flex: 1;">${exam.title}</h3>
+                    <span style="background: ${statusColor}15; color: ${statusColor}; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 900; border: 1px solid ${statusColor}40; white-space: nowrap;">${statusText}</span>
+                </div>
+
+                <!-- تفاصيل الامتحان -->
+                <div style="background: #f8fafc; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 20px; display: flex; flex-direction: column; gap: 8px;">
+                    <span style="font-size: 13px; font-weight: bold; color: var(--text-main);">🎯 المجموع: <strong style="color: var(--primary-color);">${exam.totalScore} درجة</strong></span>
+                    <span style="font-size: 13px; font-weight: bold; color: var(--text-main);">⏱️️ المدة: <strong>${exam.duration} دقيقة</strong></span>
+                    <span style="font-size: 13px; font-weight: bold; color: var(--text-main);">👥 المستهدف: <strong style="color: #3b82f6;">${groupsText}</strong></span>
+                </div>
+
+                <!-- الأزرار السفلية المجمعة -->
+                <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
+                    <button class="save-btn" style="width: 100%; background: #3b82f6; margin: 0; font-size: 14px; padding: 12px; border-radius: 10px; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2); transition: 0.2s;" onclick="openOnlineExamDetails('${exam.id}')" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">📊 عرض الدرجات والتسليمات</button>
+                    
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="openEditOnlineExam('${exam.id}')" style="flex: 1; background: #f8fafc; color: var(--text-main); border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='#e2e8f0';">✏️ تعديل</button>
+                        
+                        <button onclick="toggleExamStatus(${originalIndex}, '${exam.status}')" style="flex: 1; background: ${exam.status === 'open' ? '#fef3c7' : '#d1fae5'}; color: ${exam.status === 'open' ? '#d97706' : '#059669'}; border: 1px solid ${exam.status === 'open' ? '#fcd34d' : '#6ee7b7'}; border-radius: 8px; padding: 8px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onmouseover="this.style.filter='brightness(0.95)';">${exam.status === 'open' ? '🔒 قفل' : '🔓 فتح'}</button>
+                        
+                        <button onclick="deleteOnlineExam(${originalIndex})" style="flex: 1; background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; border-radius: 8px; padding: 8px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='#fecaca';">🗑️ حذف</button>
+                    </div>
+                </div>
+            </div>`;
+        });
+    } catch(e) { container.innerHTML = `<div style="grid-column: 1/-1; color:red; text-align:center;">حدث خطأ في جلب الامتحانات</div>`; }
 };
 
 window.addQuestionBlock = function(type = 'mcq') {
@@ -4982,77 +5156,8 @@ window.updateQuestion = function(index, field, value) { currentQuestions[index][
 window.updateOption = function(qIndex, optIndex, value) { currentQuestions[qIndex].options[optIndex] = value; };
 window.removeQuestion = function(index) { currentQuestions.splice(index, 1); renderQuestionBlocks(); };
 
-window.saveOnlineExam = async function() {
-    let title = document.getElementById("onlineExamTitle").value.trim();
-    let duration = document.getElementById("onlineExamDuration").value;
-    let autoResult = document.getElementById("onlineExamAutoShowResult").checked;
-    let selectedGroups = []; 
-    document.querySelectorAll('input[name="examGroup"]:checked').forEach(cb => selectedGroups.push(cb.value));
 
-    if(!title || !duration || currentQuestions.length === 0 || selectedGroups.length === 0) {
-        if(typeof showToast === 'function') showToast("⚠️ يرجى إكمال بيانات الامتحان واختيار مجموعة وإضافة أسئلة!", "error");
-        else alert("⚠️ يرجى إكمال بيانات الامتحان!");
-        return;
-    }
 
-    let passScore = document.getElementById("onlineExamPassScore").value;
-    let totalScore = currentQuestions.reduce((sum, q) => sum + (q.points || 0), 0);
-    let trackElement = document.getElementById("onlineExamTrack");
-
-    let newExam = { 
-        id: "exam_" + Date.now(), 
-        title: title, 
-        duration: parseInt(duration), 
-        group: selectedGroups, 
-        autoShowResult: autoResult, 
-        totalScore: totalScore, 
-        passScore: parseInt(passScore) || (totalScore / 2), 
-        track: trackElement ? trackElement.value : "all", 
-        status: "open", 
-        date: new Date().toISOString().split('T')[0], 
-        questions: currentQuestions 
-    };
-
-    try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams.json`);
-        let existingExams = await res.json() || [];
-        if(!Array.isArray(existingExams)) existingExams = Object.values(existingExams).filter(e => e !== null);
-        existingExams.push(newExam);
-
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(existingExams) });
-
-        if(typeof showToast === 'function') showToast("تم نشر الامتحان للطلاب بنجاح! 🚀");
-        else alert("تم نشر الامتحان بنجاح!");
-        
-        closeModal('buildOnlineExamModal'); 
-        renderOnlineExams();
-    } catch(e) { 
-        alert("حدث خطأ أثناء حفظ الامتحان."); 
-    }
-};
-
-window.renderOnlineExams = async function() {
-    let container = document.getElementById("online-exams-container");
-    if(!container) return;
-    container.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding:20px; color:var(--text-muted);">جاري التحميل... ⏳</div>`;
-    try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams.json`);
-        let exams = await res.json() || [];
-        window.fetchedOnlineExams = Array.isArray(exams) ? exams : Object.values(exams).filter(e => e !== null);
-        
-        if(window.fetchedOnlineExams.length === 0) return container.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 12px;">لا توجد امتحانات إلكترونية حتى الآن.</div>`;
-
-        container.innerHTML = "";
-        [...window.fetchedOnlineExams].reverse().forEach((exam) => {
-            let statusColor = exam.status === 'open' ? 'var(--success-color)' : 'var(--danger-color)';
-            let statusText = exam.status === 'open' ? 'متاح للطلاب ✅' : 'مغلق ❌';
-            let originalIndex = window.fetchedOnlineExams.findIndex(e => e.id === exam.id);
-            let groupsText = Array.isArray(exam.group) ? exam.group.join('، ') : (exam.group === 'all' ? 'الكل' : exam.group);
-
-            container.innerHTML += `<div class="card" style="padding:20px; border-top: 4px solid ${statusColor}; display: flex; flex-direction: column;"><h3 style="margin:0 0 10px 0; color:var(--secondary-color);">${exam.title}</h3><div style="font-size:14px; color:var(--text-muted); margin-bottom:15px; display:flex; flex-direction:column; gap:5px; font-weight:bold;"><span>🎯 المجموع: ${exam.totalScore} درجة</span><span>⏱️ المدة: ${exam.duration} دقيقة</span><span>👥 المجموعات: ${groupsText}</span><span style="color:${statusColor};">${statusText}</span></div><div style="display:flex; gap:10px; margin-top: auto;"><button class="save-btn" style="flex: 1; background: #3b82f6; margin: 0; font-size: 15px;" onclick="openOnlineExamDetails('${exam.id}')">عرض الدرجات 📊</button><button onclick="toggleExamStatus(${originalIndex}, '${exam.status}')" style="background:${exam.status === 'open' ? '#f59e0b' : '#10b981'}; color:white; border:none; border-radius:8px; padding:0 15px; cursor:pointer; font-size: 18px;" title="فتح/قفل الامتحان">${exam.status === 'open' ? '🛑' : '🟢'}</button><button onclick="deleteOnlineExam(${originalIndex})" style="background:#ef4444; color:white; border:none; border-radius:8px; padding:0 15px; cursor:pointer; font-size: 18px;" title="حذف نهائي">🗑️</button></div></div>`;
-        });
-    } catch(e) { container.innerHTML = `<div style="grid-column: 1/-1; color:red; text-align:center;">حدث خطأ في جلب الامتحانات</div>`; }
-};
 
 
 
