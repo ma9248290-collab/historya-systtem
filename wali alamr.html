@@ -5,13 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>بوابة ولي الأمر | هيستوريا</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
-    <!-- استدعاء مكتبة الرسوم البيانية -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --primary: #980000;
             --primary-light: #b30000;
-            --bg-color: #f1f5f9;
+            --bg-color: #f8fafc;
             --card-bg: #ffffff;
             --text-main: #1e293b;
             --text-muted: #64748b;
@@ -20,6 +19,7 @@
             --danger: #ef4444;
             --warning: #f59e0b;
             --info: #3b82f6;
+            --purple: #8b5cf6;
         }
         
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -37,48 +37,103 @@
         .custom-input:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 4px rgba(152,0,0,0.1); }
         .btn { width: 100%; background: linear-gradient(45deg, var(--primary), var(--primary-light)); color: white; border: none; padding: 16px; border-radius: 12px; font-size: 18px; font-weight: 900; cursor: pointer; transition: 0.3s; font-family: 'Cairo'; box-shadow: 0 10px 20px rgba(152,0,0,0.2); margin-top: 10px; }
         .btn:hover { transform: translateY(-3px); box-shadow: 0 15px 25px rgba(152,0,0,0.3); }
-        .btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
         .error-msg { color: var(--danger); font-size: 14px; font-weight: bold; margin-top: 15px; display: none; background: #fee2e2; padding: 10px; border-radius: 8px; }
 
-        /* لوحة التحكم (الدشابورد) */
-        .dashboard { display: none; padding: 20px; max-width: 1100px; margin: 0 auto; padding-bottom: 50px; animation: fadeIn 0.5s ease; }
-        .header { display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); padding: 20px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
+        /* لوحة التحكم */
+        .dashboard { display: none; padding: 20px; max-width: 1200px; margin: 0 auto; padding-bottom: 50px; animation: fadeIn 0.5s ease; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); padding: 20px 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 25px; flex-wrap: wrap; gap: 15px; border: 1px solid var(--border); }
         .student-info { display: flex; align-items: center; gap: 15px; }
-        .student-avatar { font-size: 40px; background: rgba(152,0,0,0.1); padding: 10px; border-radius: 50%; }
-        .student-info h1 { font-size: 20px; font-weight: 900; margin: 0; color: var(--primary); }
-        .student-info p { margin: 0; color: var(--text-muted); font-size: 13px; font-weight: bold; }
-        .logout-btn { background: #fee2e2; color: var(--danger); border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; font-family: 'Cairo'; transition: 0.2s; }
+        .student-avatar { font-size: 40px; background: rgba(152,0,0,0.05); padding: 12px; border-radius: 16px; border: 1px dashed var(--primary); }
+        .student-info h1 { font-size: 22px; font-weight: 900; margin: 0 0 5px 0; color: var(--primary); }
+        .student-info p { margin: 0; color: var(--text-muted); font-size: 14px; font-weight: bold; }
+        .logout-btn { background: #fee2e2; color: var(--danger); border: none; padding: 10px 20px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; font-family: 'Cairo'; transition: 0.2s; }
         .logout-btn:hover { background: var(--danger); color: white; }
 
-        /* كروت الإحصائيات */
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 25px; }
-        .stat-card { background: var(--card-bg); padding: 20px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); display: flex; align-items: center; justify-content: space-between; border-right: 5px solid var(--border); }
-        .stat-card.att { border-color: var(--success); }
-        .stat-card.exam { border-color: var(--info); }
-        .stat-card.hw { border-color: var(--warning); }
-        .stat-info h3 { font-size: 14px; color: var(--text-muted); margin: 0 0 5px 0; }
-        .stat-info .num { font-size: 28px; font-weight: 900; margin: 0; color: var(--text-main); }
-        .stat-icon { font-size: 35px; opacity: 0.8; }
+        /* الشبكة العلوية (الترتيب + الـ 4 كروت) */
+        .main-stats-container { 
+            display: grid; 
+            grid-template-columns: 2fr 1fr; /* الكروت 2، الترتيب 1 */
+            gap: 20px; 
+            margin-bottom: 25px; 
+            align-items: stretch;
+        }
+        @media (max-width: 900px) { .main-stats-container { grid-template-columns: 1fr; } }
+        
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(2, 1fr); /* 2x2 منتظم */
+            gap: 20px; 
+            height: 100%;
+        }
+        
+        .stat-card { 
+            background: var(--card-bg); 
+            padding: 20px; 
+            border-radius: 20px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03); 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            border: 1px solid var(--border); 
+            transition: 0.3s; 
+        }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(0,0,0,0.06); }
+        
+        .stat-icon-box {
+            width: 55px; height: 55px; border-radius: 14px; display: flex; justify-content: center; align-items: center; font-size: 28px;
+        }
+        .stat-card.att .stat-icon-box { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .stat-card.exam .stat-icon-box { background: rgba(59, 130, 246, 0.1); color: var(--info); }
+        .stat-card.hw .stat-icon-box { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+        .stat-card.behavior .stat-icon-box { background: rgba(139, 92, 246, 0.1); color: var(--purple); }
 
-        /* قسم الملاحظات */
-        .note-section { background: linear-gradient(to left, #fffbeb, #ffffff); border: 1px solid #fde68a; border-right: 5px solid var(--warning); padding: 20px; border-radius: 20px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
+        .stat-info h3 { font-size: 14px; color: var(--text-muted); margin: 0 0 5px 0; font-weight: bold; }
+        .stat-info .num { font-size: 28px; font-weight: 900; margin: 0; color: var(--text-main); }
+
+        /* لوحة التميز والترتيب */
+        .leaderboard-panel { 
+            background: linear-gradient(135deg, #1e293b, #0f172a); 
+            border-radius: 20px; 
+            padding: 30px; 
+            color: white; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            position: relative; 
+            overflow: hidden; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15); 
+            text-align: center;
+        }
+        .leaderboard-panel::after { content: '🏆'; position: absolute; right: -20px; bottom: -20px; font-size: 150px; opacity: 0.1; transform: rotate(-15deg); pointer-events: none; }
+        .lb-title { font-size: 16px; color: #94a3b8; margin-bottom: 10px; font-weight: bold; z-index: 1; }
+        .lb-rank { font-size: 45px; font-weight: 900; color: #f59e0b; margin-bottom: 15px; z-index: 1; text-shadow: 0 4px 10px rgba(245, 158, 11, 0.3); }
+        .lb-desc { font-size: 13px; color: #cbd5e1; line-height: 1.6; z-index: 1; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; }
+
+        /* قسم الملاحظات والإنذارات */
+        .alerts-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px; }
+        .note-section { background: #fffbeb; border: 1px solid #fde68a; border-right: 5px solid var(--warning); padding: 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
         .note-section h3 { color: var(--warning); margin: 0 0 10px 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
         .note-text { color: var(--text-main); font-weight: bold; font-size: 15px; line-height: 1.6; }
+        
+        .finance-section { background: #eff6ff; border: 1px solid #bfdbfe; border-right: 5px solid var(--info); padding: 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
+        .finance-section h3 { color: var(--info); margin: 0 0 10px 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+        .finance-text { color: var(--text-main); font-weight: bold; font-size: 15px; line-height: 1.6; display: flex; justify-content: space-between; align-items: center; }
 
         /* الرسوم البيانية المتعددة */
         .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 25px; }
-        .chart-container { background: var(--card-bg); padding: 20px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); display: flex; flex-direction: column; }
+        .chart-container { background: var(--card-bg); padding: 20px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid var(--border); }
         
         /* الجداول */
-        .section-title { font-size: 17px; font-weight: 900; margin: 0 0 15px 0; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
-        .table-wrapper { background: var(--card-bg); border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); overflow-x: auto; margin-bottom: 25px; }
+        .section-title { font-size: 18px; font-weight: 900; margin: 0 0 15px 0; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
+        .table-wrapper { background: var(--card-bg); border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); overflow-x: auto; margin-bottom: 25px; border: 1px solid var(--border); }
         table { width: 100%; border-collapse: collapse; min-width: 500px; }
-        th, td { padding: 15px; text-align: right; border-bottom: 1px solid var(--border); font-size: 14px; }
+        th, td { padding: 16px; text-align: right; border-bottom: 1px solid var(--border); font-size: 14px; }
         th { background: #f8fafc; color: var(--text-muted); font-weight: bold; }
         tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #f8fafc; }
         
         /* البادجات */
-        .badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block; }
+        .badge { padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: bold; display: inline-block; }
         .badge-present { background: #d1fae5; color: #059669; }
         .badge-late { background: #fef3c7; color: #d97706; }
         .badge-absent { background: #fee2e2; color: #ef4444; }
@@ -90,9 +145,8 @@
         /* الموبايل */
         @media (max-width: 600px) {
             .header { flex-direction: column; align-items: flex-start; }
-            .logout-btn { align-self: flex-end; }
-            .stat-card { padding: 15px; }
-            .stat-info .num { font-size: 24px; }
+            .logout-btn { align-self: stretch; text-align: center; margin-top: 10px; }
+            .stats-grid { grid-template-columns: 1fr; }
             th, td { padding: 12px 10px; font-size: 13px; }
         }
     </style>
@@ -104,7 +158,7 @@
         <div class="login-card">
             <div class="logo-circle">👨‍👦</div>
             <h2>بوابة تقارير الطلاب</h2>
-            <p>أدخل بيانات الطالب لمتابعة مستواه الدراسي</p>
+            <p>أدخل بيانات الطالب لمتابعة مستواه الدراسي الشامل</p>
             
             <div class="input-group">
                 <label>🔢 كود الطالب</label>
@@ -128,40 +182,70 @@
                 <div class="student-avatar">🎓</div>
                 <div>
                     <h1 id="stName">جاري التحميل...</h1>
-                    <p id="stDetails">الكود: --- | المجموعة: ---</p>
+                    <p id="stDetails">الكود: --- | المجموعة: --- | الصف: ---</p>
                 </div>
             </div>
             <button class="logout-btn" onclick="logout()">تسجيل خروج 🚪</button>
         </div>
 
-        <!-- الملاحظات -->
-        <div class="note-section" id="noteSection" style="display: none;">
-            <h3>📝 ملاحظة هامة من المستر:</h3>
-            <div class="note-text" id="stNote"></div>
+        <!-- الملاحظات والتنبيهات (المالية والسلوكية) -->
+        <div class="alerts-container">
+            <div class="note-section" id="noteSection" style="display: none;">
+                <h3>📝 ملاحظة هامة من المستر:</h3>
+                <div class="note-text" id="stNote"></div>
+            </div>
+            
+            <div class="finance-section" id="financeSection" style="display: none;">
+                <h3>💰 حالة الاشتراك (الشهر الحالي):</h3>
+                <div class="finance-text">
+                    <span id="finStatusText">جاري التحقق...</span>
+                    <span id="finStatusBadge"></span>
+                </div>
+            </div>
+            
+            <div class="note-section" id="atRiskSection" style="display: none; background: #fef2f2; border-color: #fecaca; border-right-color: var(--danger);">
+                <h3 style="color: var(--danger);">🚨 تنبيه إداري (مستوى خطر):</h3>
+                <div class="note-text" id="atRiskText" style="color: var(--danger);">الطالب يعاني من تأخر دراسي (رسوب متكرر أو غياب متتالي). يرجى المتابعة المكثفة!</div>
+            </div>
         </div>
 
-        <!-- الكروت الإحصائية -->
-        <div class="stats-grid">
-            <div class="stat-card att">
-                <div class="stat-info">
-                    <h3>نسبة الحضور</h3>
-                    <p class="num" id="statAtt">0%</p>
+        <!-- الكروت الإحصائية ولوحة الترتيب منظمة في 2x2 Grid جنب المتصدر -->
+        <div class="main-stats-container">
+            <div class="stats-grid">
+                <div class="stat-card att">
+                    <div class="stat-info">
+                        <h3>نسبة الحضور</h3>
+                        <p class="num" id="statAtt">0%</p>
+                    </div>
+                    <div class="stat-icon-box">📅</div>
                 </div>
-                <div class="stat-icon">📅</div>
+                <div class="stat-card exam">
+                    <div class="stat-info">
+                        <h3>متوسط الامتحانات</h3>
+                        <p class="num" id="statExam">0%</p>
+                    </div>
+                    <div class="stat-icon-box">📝</div>
+                </div>
+                <div class="stat-card hw">
+                    <div class="stat-info">
+                        <h3>متوسط الواجبات</h3>
+                        <p class="num" id="statHw">0%</p>
+                    </div>
+                    <div class="stat-icon-box">📚</div>
+                </div>
+                <div class="stat-card behavior">
+                    <div class="stat-info">
+                        <h3>نقاط التميز</h3>
+                        <p class="num" id="statBehavior" style="color: var(--purple);">0</p>
+                    </div>
+                    <div class="stat-icon-box">⭐</div>
+                </div>
             </div>
-            <div class="stat-card exam">
-                <div class="stat-info">
-                    <h3>متوسط الامتحانات</h3>
-                    <p class="num" id="statExam">0%</p>
-                </div>
-                <div class="stat-icon">📝</div>
-            </div>
-            <div class="stat-card hw">
-                <div class="stat-info">
-                    <h3>متوسط الواجبات</h3>
-                    <p class="num" id="statHw">0%</p>
-                </div>
-                <div class="stat-icon">📚</div>
+            
+            <div class="leaderboard-panel">
+                <div class="lb-title">ترتيب الطالب في المجموعة</div>
+                <div class="lb-rank" id="stRank">المركز --</div>
+                <div class="lb-desc">يتم الحساب بناءً على الامتحانات والواجبات والحضور ونقاط التميز. شجّع البطل للوصول للقمة! 💪</div>
             </div>
         </div>
 
@@ -236,14 +320,19 @@
     </div>
 
 <script>
-    // 💡 إعدادات قاعدة البيانات (نفس الرابط بتاعك)
+    // 💡 إعدادات قاعدة البيانات
     const DB_URL = "https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master";
     
-    // حفظ متغيرات الجرافات عشان نقدر نعملها Destroy مع تسجيل الخروج
     window.charts = { att: null, exam: null, hw: null };
     let currentUser = null; 
 
-    // 1. دالة تسجيل الدخول
+    // دالة الحصول على اسم الشهر العربي
+    function getArabicMonthName(yyyy_mm) {
+        const months = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+        let m = parseInt(yyyy_mm.split('-')[1]);
+        return months[m - 1] + " " + yyyy_mm.split('-')[0];
+    }
+
     async function login() {
         const code = document.getElementById("loginCode").value.trim();
         const phone = document.getElementById("loginPhone").value.trim();
@@ -273,7 +362,7 @@
                 currentUser = student;
                 document.getElementById("loginScreen").style.display = "none";
                 document.getElementById("dashboardScreen").style.display = "block";
-                loadStudentReports(buster); 
+                loadStudentReports(buster, students); 
             } else {
                 error.innerText = "الكود أو رقم ولي الأمر غير صحيح!";
                 error.style.display = "block";
@@ -287,24 +376,22 @@
         btn.disabled = false;
     }
 
-    // 2. دالة تسجيل الخروج
     function logout() {
         currentUser = null;
         document.getElementById("loginCode").value = "";
         document.getElementById("dashboardScreen").style.display = "none";
         document.getElementById("loginScreen").style.display = "flex";
-        
-        // تدمير الجرافات
         if(window.charts.att) window.charts.att.destroy();
         if(window.charts.exam) window.charts.exam.destroy();
         if(window.charts.hw) window.charts.hw.destroy();
     }
 
-    // 3. تحميل ورسم التقارير للطالب
-    async function loadStudentReports(buster) {
+    async function loadStudentReports(buster, allStudents) {
         document.getElementById("stName").innerText = currentUser.name;
-        document.getElementById("stDetails").innerText = `الكود: ${currentUser.code} | المجموعة: ${currentUser.group}`;
+        document.getElementById("stDetails").innerText = `الكود: ${currentUser.code} | المجموعة: ${currentUser.group} | الصف: ${currentUser.level}`;
+        document.getElementById("statBehavior").innerText = currentUser.behaviorPoints || 0;
         
+        // 1. عرض الملاحظات
         let noteSec = document.getElementById("noteSection");
         if (currentUser.note && currentUser.note.trim() !== "") {
             document.getElementById("stNote").innerText = currentUser.note;
@@ -314,23 +401,69 @@
         }
 
         try {
-            let [sessRes, examRes, hwRes] = await Promise.all([
+            let [sessRes, examRes, hwRes, groupRes, monthlyRes] = await Promise.all([
                 fetch(`${DB_URL}/data/classSessions.json${buster}`, { cache: 'no-store' }),
                 fetch(`${DB_URL}/data/exams.json${buster}`, { cache: 'no-store' }),
-                fetch(`${DB_URL}/data/homeworks.json${buster}`, { cache: 'no-store' })
+                fetch(`${DB_URL}/data/homeworks.json${buster}`, { cache: 'no-store' }),
+                fetch(`${DB_URL}/data/groups.json${buster}`, { cache: 'no-store' }),
+                fetch(`${DB_URL}/data/monthlyPayments.json${buster}`, { cache: 'no-store' })
             ]);
 
             let dbSessions = await sessRes.json() || [];
             let dbExams = await examRes.json() || [];
             let dbHomeworks = await hwRes.json() || [];
+            let dbGroups = await groupRes.json() || [];
+            let dbMonthly = await monthlyRes.json() || {};
 
             let sessions = Array.isArray(dbSessions) ? dbSessions : Object.values(dbSessions).filter(x => x !== null);
             let exams = Array.isArray(dbExams) ? dbExams : Object.values(dbExams).filter(x => x !== null);
             let homeworks = Array.isArray(dbHomeworks) ? dbHomeworks : Object.values(dbHomeworks).filter(x => x !== null);
+            let groups = Array.isArray(dbGroups) ? dbGroups : Object.values(dbGroups).filter(x => x !== null);
 
             let mySessions = sessions.filter(s => s.group === currentUser.group).sort((a,b) => new Date(b.date) - new Date(a.date));
             let myExams = exams.filter(e => e.group === currentUser.group).sort((a,b) => new Date(b.date) - new Date(a.date));
             let myHw = homeworks.filter(h => h.group === currentUser.group).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+            // --- فحص حالة الاشتراك المالي ---
+            let groupObj = groups.find(g => g.name === currentUser.group);
+            let finSec = document.getElementById("financeSection");
+            if (groupObj && groupObj.payType === 'month') {
+                let currentMonthKey = new Date().toISOString().substring(0, 7); 
+                let isPaid = dbMonthly[currentUser.code] && dbMonthly[currentUser.code][currentMonthKey] === true;
+                
+                let finStatusText = document.getElementById("finStatusText");
+                let finStatusBadge = document.getElementById("finStatusBadge");
+                
+                finStatusText.innerText = `اشتراك شهر (${getArabicMonthName(currentMonthKey)})`;
+                if(isPaid) {
+                    finStatusBadge.innerHTML = `<span class="badge badge-present">مسدد ✅</span>`;
+                } else {
+                    finStatusBadge.innerHTML = `<span class="badge badge-absent">غير مسدد ❌</span>`;
+                }
+                finSec.style.display = "block";
+            } else {
+                finSec.style.display = "none";
+            }
+
+            // --- حساب الترتيب (Leaderboard) في المجموعة ---
+            let groupStudents = allStudents.filter(s => s.group === currentUser.group);
+            let leaderboard = groupStudents.map(student => {
+                let score = 0; 
+                mySessions.forEach(session => { let att = session.attendance ? (session.attendance[student.code] || session.attendance[student.phone]) : null; if(att === 'present') score += 10; }); 
+                myExams.forEach(exam => { let g = exam.grades ? (exam.grades[student.code] !== undefined ? exam.grades[student.code] : exam.grades[student.phone]) : undefined; if(g !== undefined) { score += (parseFloat(g) / parseFloat(exam.maxScore)) * 50; } }); 
+                myHw.forEach(hw => { let g = hw.grades ? (hw.grades[student.code] !== undefined ? hw.grades[student.code] : hw.grades[student.phone]) : undefined; if(g !== undefined) { score += (parseFloat(g) / parseFloat(hw.maxScore)) * 20; } }); 
+                score += (student.behaviorPoints || 0); 
+                return { code: student.code, score: Math.round(score) };
+            });
+            leaderboard.sort((a, b) => b.score - a.score);
+            let myRank = leaderboard.findIndex(st => st.code === currentUser.code) + 1;
+            
+            let rankHtml = `المركز الـ ${myRank}`;
+            if(myRank === 1) rankHtml = "المركز الأول 🥇";
+            else if(myRank === 2) rankHtml = "المركز الثاني 🥈";
+            else if(myRank === 3) rankHtml = "المركز الثالث 🥉";
+            document.getElementById("stRank").innerHTML = rankHtml;
+
 
             // متغيرات الحسابات والجرافات
             let attCount = 0;
@@ -341,13 +474,19 @@
             let examLabels = [], examData = [];
             let hwLabels = [], hwData = [];
 
-            // تجهيز بيانات آخر 5 للحضور
             let sessionsForChart = [...mySessions].reverse().slice(-5).reverse();
             let examsForChart = [...myExams].reverse().slice(-5).reverse();
             let hwForChart = [...myHw].reverse().slice(-5).reverse();
 
-            // --- 1. الحضور ---
+            // --- 1. الحضور وفحص الخطر ---
             let attHtml = "";
+            let absentInLastTwo = false;
+            if(mySessions.length >= 2) {
+                let s1 = mySessions[0].attendance ? (mySessions[0].attendance[currentUser.code] || mySessions[0].attendance[currentUser.phone]) : null;
+                let s2 = mySessions[1].attendance ? (mySessions[1].attendance[currentUser.code] || mySessions[1].attendance[currentUser.phone]) : null;
+                if(s1 === 'absent' && s2 === 'absent') absentInLastTwo = true;
+            }
+
             mySessions.forEach(s => {
                 let statRaw = s.attendance ? (s.attendance[currentUser.code] || s.attendance[currentUser.phone]) : null;
                 let statStr = typeof statRaw === 'object' ? statRaw.status : statRaw;
@@ -367,17 +506,17 @@
                 let score = 0;
                 if (statStr === 'present' || statStr === 'makeup') score = 100;
                 else if (statStr === 'late') score = 50;
-                
-                attLabels.push(s.date.substring(5)); // إظهار الشهر واليوم فقط
-                attData.push(score);
+                attLabels.push(s.date.substring(5)); attData.push(score);
             });
 
             document.getElementById("attTable").innerHTML = attHtml || `<tr><td colspan="3" style="text-align:center;">لا توجد حصص مسجلة</td></tr>`;
             document.getElementById("statAtt").innerText = mySessions.length > 0 ? Math.round((attCount / mySessions.length) * 100) + "%" : "0%";
 
-            // --- 2. الامتحانات ---
+            // --- 2. الامتحانات وفحص الخطر ---
             let examHtml = "";
-            myExams.forEach(e => {
+            let failedLastTwoExams = 0;
+            
+            myExams.forEach((e, index) => {
                 let grade = e.grades ? (e.grades[currentUser.code] !== undefined ? e.grades[currentUser.code] : e.grades[currentUser.phone]) : undefined;
                 let max = parseFloat(e.maxScore) || 0;
                 if (grade !== undefined && grade !== "") {
@@ -386,10 +525,26 @@
                     let perc = Math.round((gNum / max) * 100);
                     let color = perc >= 85 ? 'var(--success)' : (perc >= 50 ? 'var(--warning)' : 'var(--danger)');
                     examHtml += `<tr><td>${e.date}</td><td>${e.name}</td><td><strong style="color:${color};">${grade}</strong> / ${max}</td><td><span class="badge" style="background: ${color}20; color: ${color};">${perc}%</span></td></tr>`;
+                    
+                    if(index < 2 && perc < 50) failedLastTwoExams++; 
                 } else {
                     examHtml += `<tr><td>${e.date}</td><td>${e.name}</td><td>-- / ${max}</td><td><span class="badge badge-neutral">لم يُمتحن</span></td></tr>`;
                 }
             });
+
+            // عرض إنذار الخطر
+            let riskSec = document.getElementById("atRiskSection");
+            let riskText = document.getElementById("atRiskText");
+            let riskReasons = [];
+            if(absentInLastTwo) riskReasons.push("الغياب في آخر حصتين");
+            if(failedLastTwoExams === 2) riskReasons.push("الرسوب في آخر امتحانين");
+            
+            if(riskReasons.length > 0) {
+                riskText.innerHTML = `الطالب يعاني من تأخر ملحوظ بسبب: <strong>(${riskReasons.join(" و ")})</strong>. يرجى المتابعة المكثفة!`;
+                riskSec.style.display = "block";
+            } else {
+                riskSec.style.display = "none";
+            }
 
             examsForChart.forEach(e => {
                 let grade = e.grades ? (e.grades[currentUser.code] !== undefined ? e.grades[currentUser.code] : e.grades[currentUser.phone]) : undefined;
@@ -440,7 +595,6 @@
         }
     }
 
-    // 4. دالة رسم جراف مخصص ديناميكياً
     function drawSpecificChart(canvasId, chartKey, labels, data, labelName, borderColor, bgColor) {
         const ctx = document.getElementById(canvasId).getContext('2d');
         if (window.charts[chartKey]) window.charts[chartKey].destroy();
@@ -480,7 +634,6 @@
             }
         });
     }
-
 </script>
 </body>
 </html>
