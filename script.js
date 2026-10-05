@@ -6262,12 +6262,16 @@ window.switchPage = function(pageId) {
 
 
 // ==========================================
-// 📋 تسجيل الحضور المطور (منع القفز أثناء الرصد اليدوي)
+// 📋 تسجيل الحضور المطور (منع القفز + مزامنة لحظية دقيقة)
 // ==========================================
 window.markAttendance = function(codeOrPhone, status, isManual = false) {
-    const s = classSessions.find(s => s.id === currentActiveSessionId);
+    const sIndex = classSessions.findIndex(s => s.id === currentActiveSessionId);
+    const s = classSessions[sIndex];
+    
     if(s && s.status === 'open') {
-        const student = students.find(st => st.code === codeOrPhone || st.phone === codeOrPhone);
+        const studentIndex = students.findIndex(st => st.code === codeOrPhone || st.phone === codeOrPhone);
+        const student = students[studentIndex];
+        
         if(!student) return;
 
         if(student.isSuspended && status !== 'none') {
@@ -6286,33 +6290,58 @@ window.markAttendance = function(codeOrPhone, status, isManual = false) {
             if (status === 'late') student.behaviorPoints = (student.behaviorPoints || 0) + 2;
         }
 
+        let now = new Date();
+        let timeStr = formatTime12(`${now.getHours()}:${now.getMinutes()}`);
+        let timestamp = isManual ? 0 : now.getTime(); 
+
         if (!s.attendanceLog) s.attendanceLog = {};
+        
+        let firebaseStatusUpdate = null;
+        let firebaseLogUpdate = null;
+
         if (status === 'none') {
             delete s.attendance[student.code];
             delete s.attendanceLog[student.code];
+            firebaseStatusUpdate = { [student.code]: null };
+            firebaseLogUpdate = { [student.code]: null };
         } else {
             s.attendance[student.code] = status; 
-            let now = new Date();
-            let timeStr = formatTime12(`${now.getHours()}:${now.getMinutes()}`);
             
-            // 💡 السحر هنا: لو ضغط يدوي من الزرار، هنديله ts بـ 0 عشان مينطش لأول الجدول
-            let timestamp = isManual ? 0 : now.getTime(); 
-            
-            // لو كان مسجل قبل كده وليه وقت حقيقي، نحافظ عليه عشان ترتيبه ميبظش
             if (isManual && s.attendanceLog[student.code] && s.attendanceLog[student.code].ts > 0) {
                 timestamp = s.attendanceLog[student.code].ts;
             }
 
-            s.attendanceLog[student.code] = {
-                time: timeStr,
-                ts: timestamp 
-            };
+            s.attendanceLog[student.code] = { time: timeStr, ts: timestamp };
+            
+            firebaseStatusUpdate = { [student.code]: status };
+            firebaseLogUpdate = { [student.code]: { time: timeStr, ts: timestamp } };
         }
 
+        // 1. حفظ في المتصفح
         localStorage.setItem("classSessions", JSON.stringify(classSessions));
         localStorage.setItem("students", JSON.stringify(students));
         
+        // 2. تحديث الشاشة
         renderAttendanceTable(s);
+
+        // 3. 🚀 المزامنة اللحظية (تحديث جزء صغير جداً في الفايربيز بدون تأخير)
+        let uid = window.getSafeUid ? window.getSafeUid() : "Historia_System_Master";
+        
+        // رفع حالة الحضور للطالب ده بس
+        fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/classSessions/${sIndex}/attendance.json`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(firebaseStatusUpdate)
+        }).catch(e => console.log("Live Sync Error:", e));
+
+        // رفع وقت الحضور للطالب ده بس
+        fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/classSessions/${sIndex}/attendanceLog.json`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(firebaseLogUpdate)
+        }).catch(e => console.log("Live Sync Error:", e));
+
+        // تحديث نقاط سلوك الطالب ده بس
+        fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/students/${studentIndex}.json`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ behaviorPoints: student.behaviorPoints })
+        }).catch(e => console.log("Live Sync Error:", e));
+
 
         if (status !== 'none' && !isManual) {
             if(typeof notifyParentApp === 'function') notifyParentApp(student.code, "تحديث حضور 🏫", `تم تحضير ${student.name}`);
