@@ -1162,6 +1162,10 @@ function canPlay(idx, vids, courseId, hasPurchasedWholeCourse) {
     return (isVideoFree || hasPurchasedVideo || didAttend) && !isLockedByExam;
 }
 
+// ==========================================
+// 🎬 مشغل الكورسات (Playlist & Video Player) المحدث
+// ==========================================
+
 window.playCourseVideo = async function(url, videoTitle, courseId, videoIndex, element = null) {
     let course = window.allLectures.find(l => l.id === courseId);
     if (!course) return;
@@ -1187,7 +1191,29 @@ window.playCourseVideo = async function(url, videoTitle, courseId, videoIndex, e
     let extraViews = parseInt(data.extraViews) || 0;
     let totalAllowed = maxViews + extraViews;
 
-    if (maxViews > 0 && data.views >= totalAllowed) {
+    // 🚀 **ميزة حماية المشاهدات الجديدة: منع احتساب مشاهدة جديدة قبل مرور 10 دقائق**
+    let now = new Date();
+    let isViewCounted = false; // هل هنحسب مشاهدة جديدة ولا لأ؟
+
+    if (data.lastRawTime) { // لو كان متسجل وقت قبل كده
+        let lastTime = new Date(data.lastRawTime);
+        let diffMs = now - lastTime;
+        let diffMins = Math.floor(diffMs / 60000); // الفرق بالدقائق
+
+        if (diffMins < 10) {
+            // لو عدى أقل من 10 دقائق، اعتبره لسه بيتفرج ومتحسبش مشاهدة
+            if(typeof showToast === 'function') {
+                showToast("إعادة استكمال المشاهدة (لن تُخصم فرصة مشاهدة جديدة) 🔄", "info");
+            }
+        } else {
+            isViewCounted = true; // عدى 10 دقائق، دي مشاهدة جديدة
+        }
+    } else {
+         isViewCounted = true; // أول مرة يتفرج
+    }
+
+    // التحقق من लिमिट المشاهدات لو هنحسب مشاهدة جديدة
+    if (isViewCounted && maxViews > 0 && data.views >= totalAllowed) {
         if(typeof showToast === 'function') {
             showToast("🚫 لقد استنفدت العدد المسموح لمشاهدة هذا الفيديو. يرجى مراجعة إدارة السنتر لتجديد الفرصة.", "error");
         } else {
@@ -1214,7 +1240,7 @@ window.playCourseVideo = async function(url, videoTitle, courseId, videoIndex, e
         element.style.borderRight = '4px solid #3b82f6';
         element.style.fontWeight = '900';
         let activeIconSpan = element.querySelector('.vid-icon');
-        if(activeIconSpan) activeIconSpan.innerText = '▶️';
+        if(activeIconSpan) activeIconSpan.innerText = '▶️️';
     }
 
     let embedUrl = url;
@@ -1239,15 +1265,21 @@ window.playCourseVideo = async function(url, videoTitle, courseId, videoIndex, e
     
     document.getElementById("video-iframe").src = embedUrl;
 
-    // تسجيل المشاهدة وإضافة التاريخ
-    let now = new Date();
+    // 🔄 **تحديث الداتا بناءً على شرط الـ 10 دقائق**
+    let newViewsCount = isViewCounted ? data.views + 1 : data.views;
     let dateStr = now.toLocaleDateString('ar-EG') + " | " + now.toLocaleTimeString('ar-EG', { hour: 'numeric', minute: 'numeric', hour12: true });
     
     let updateUrl = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/course_tracking/${courseId}/${usedKey}/${videoIndex}.json`;
     await fetch(updateUrl, {
         method: 'PUT', 
         headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ videoTitle: videoTitle, views: data.views + 1, lastSeen: dateStr, extraViews: extraViews })
+        body: JSON.stringify({ 
+            videoTitle: videoTitle, 
+            views: newViewsCount, 
+            lastSeen: dateStr, 
+            lastRawTime: now.toISOString(), // ⏰ أضفنا ده عشان نحسب بيه الـ 10 دقايق بدقة
+            extraViews: extraViews 
+        })
     });
 };
 
