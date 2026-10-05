@@ -5680,71 +5680,119 @@ window.renderStoreLogs = function() {
 
 
 
-
 // ==========================================
-// 🎨 دمج شريط التحميل وزرار الإحصائيات جوه الكارت بشياكة واحترافية
+// 💳 رسم كروت الحصص (تصميم VIP المطور - ألوان متناسقة)
 // ==========================================
-const originalRenderSessionCards = window.renderSessionCards;
 window.renderSessionCards = function() {
-    if(originalRenderSessionCards) originalRenderSessionCards();
-    
-    // التعديل السحري على الكروت بعد رسمها
-    classSessions.forEach(session => {
-        let delBtn = document.querySelector(`button[onclick*="deleteSession('${session.id}')"]`);
-        if(delBtn) {
-            let cardActionsDiv = delBtn.parentElement;
-            
-            if (session.isSending) {
-                // شكل شريط التحميل وهو شغال (تصميم فخم)
-                cardActionsDiv.innerHTML = `
-                    <div style="width: 100%; text-align: center; background: rgba(59, 130, 246, 0.05); padding: 12px; border-radius: 10px; border: 1px dashed rgba(59, 130, 246, 0.3); margin-bottom: 12px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                            <span style="font-size: 13px; color: #3b82f6; font-weight: 800;">⏳ جاري إرسال التقارير...</span>
-                            <span id="prog-text-${session.id}" style="font-size: 12px; font-weight: bold; background: #3b82f6; color: white; padding: 2px 8px; border-radius: 20px;">${session.sentProgress}/${session.sentTotal}</span>
-                        </div>
-                        <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 10px; overflow: hidden;">
-                            <div id="prog-bar-${session.id}" style="width: ${(session.sentProgress/session.sentTotal)*100}%; height: 100%; background: linear-gradient(90deg, #3b82f6, #60a5fa); transition: 0.3s; border-radius: 10px;"></div>
-                        </div>
-                    </div>
-                `;
-            } else if (session.reportData) {
-                // زرار التقرير بعد ما يخلص (تصميم Premium بـ Hover Effect)
-                let reportBtn = document.createElement('button');
-                reportBtn.style.cssText = `
-                    width: 100%;
-                    background: linear-gradient(45deg, #10b981, #059669);
-                    color: white;
-                    border: none;
-                    padding: 10px 15px;
-                    border-radius: 10px;
-                    font-size: 14px;
-                    font-weight: 800;
-                    font-family: 'Cairo', sans-serif;
-                    cursor: pointer;
-                    margin-bottom: 12px;
-                    box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
-                    transition: all 0.3s ease;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    gap: 8px;
-                `;
-                
-                // تأثير الأنيميشن لما الماوس ييجي عليه
-                reportBtn.onmouseover = function() {
-                    this.style.transform = 'translateY(-2px)';
-                    this.style.boxShadow = '0 6px 15px rgba(16, 185, 129, 0.4)';
-                };
-                reportBtn.onmouseout = function() {
-                    this.style.transform = 'translateY(0)';
-                    this.style.boxShadow = '0 4px 10px rgba(16, 185, 129, 0.2)';
-                };
-                
-                reportBtn.innerHTML = "<span style='font-size: 18px;'>📊</span> تقرير إرسال الواتساب";
-                reportBtn.onclick = () => showReportModal(session.id);
-                cardActionsDiv.insertBefore(reportBtn, cardActionsDiv.firstChild);
-            }
+    const grid = document.getElementById("sessions-grid");
+    if(!grid) return;
+    grid.innerHTML = "";
+
+    // 1. إضافة أنيميشن النبض الخفيف (لو مش موجود)
+    if (!document.getElementById('pulse-glow-style')) {
+        let style = document.createElement('style');
+        style.id = 'pulse-glow-style';
+        style.innerHTML = `@keyframes pulse-glow { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }`;
+        document.head.appendChild(style);
+    }
+
+    if (classSessions.length === 0) {
+        grid.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 40px; color: var(--text-muted); font-weight: bold; background: var(--card-bg); border-radius: 20px; border: 2px dashed var(--border-color); font-size: 16px;">لا توجد حصص مسجلة حالياً. قم بفتح حصة جديدة لبدء الرصد! 🎯</div>`;
+        return;
+    }
+
+    [...classSessions].reverse().forEach(session => {
+        // 2. حساب الحضور بشكل دقيق
+        let presentCount = 0;
+        if (session.attendance) {
+            Object.values(session.attendance).forEach(val => {
+                if (val === 'present' || val === 'late' || (typeof val === 'object' && val.status === 'makeup')) {
+                    presentCount++;
+                }
+            });
         }
+        const total = students.filter(s => s.group === session.group).length;
+        const percentage = total > 0 ? Math.round((presentCount / total) * 100) : 0;
+        const isClosed = session.status === 'closed';
+
+        // 3. 🎨 التعديل هنا: الخط العلوي للحصة المفتوحة أصبح أخضر ساطع (#10b981)
+        const cardBorder = isClosed ? 'border-top: 4px solid var(--danger-color); opacity: 0.85; filter: grayscale(10%);' : 'border-top: 4px solid #10b981;';
+        
+        const statusBadge = isClosed
+            ? `<span style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 900; border: 1px solid rgba(239, 68, 68, 0.2);">مغلقة 🔒</span>`
+            : `<span style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 900; border: 1px solid rgba(16, 185, 129, 0.2); animation: pulse-glow 2s infinite;">مفتوحة 🟢</span>`;
+
+        const lockBtnColor = isClosed ? '#10b981' : '#f59e0b';
+        const lockBtnIcon = isClosed ? '🔓 فتح الحصة' : '🔒 قفل وإرسال';
+        const progressBarColor = percentage >= 50 ? '#10b981' : (percentage > 0 ? '#f59e0b' : '#cbd5e1');
+
+        // 4. بناء مساحة الإرسال والتقارير الذكية
+        let reportSectionHtml = '';
+        if (session.isSending) {
+            reportSectionHtml = `
+                <div style="width: 100%; text-align: center; background: rgba(59, 130, 246, 0.05); padding: 12px; border-radius: 10px; border: 1px dashed rgba(59, 130, 246, 0.3); margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 13px; color: #3b82f6; font-weight: 800;">⏳ جاري إرسال التقارير...</span>
+                        <span id="prog-text-${session.id}" style="font-size: 12px; font-weight: bold; background: #3b82f6; color: white; padding: 2px 8px; border-radius: 20px;">${session.sentProgress}/${session.sentTotal}</span>
+                    </div>
+                    <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 10px; overflow: hidden;">
+                        <div id="prog-bar-${session.id}" style="width: ${(session.sentProgress/session.sentTotal)*100}%; height: 100%; background: linear-gradient(90deg, #3b82f6, #60a5fa); transition: 0.3s; border-radius: 10px;"></div>
+                    </div>
+                </div>`;
+        } else if (session.reportData) {
+            reportSectionHtml = `
+                <button onclick="showReportModal('${session.id}')" style="width: 100%; background: linear-gradient(45deg, #10b981, #059669); color: white; border: none; padding: 10px 15px; border-radius: 10px; font-size: 14px; font-weight: 800; font-family: 'Cairo', sans-serif; cursor: pointer; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2); transition: all 0.3s ease; display: flex; justify-content: center; align-items: center; gap: 8px;" onmouseover="this.style.transform='translateY(-2px)';" onmouseout="this.style.transform='translateY(0)';">
+                    <span style="font-size: 18px;">📊</span> تقرير إرسال الواتساب
+                </button>`;
+        }
+
+        // 5. 🎨 التعديل هنا: زر الدخول للرصد أصبح بلون أخضر موحد
+        let cardHtml = `
+        <div style="background: var(--card-bg); border-radius: 16px; border: 1px solid var(--border-color); padding: 22px; display: flex; flex-direction: column; box-shadow: 0 4px 15px rgba(0,0,0,0.03); transition: 0.3s; ${cardBorder}" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 10px 25px rgba(0,0,0,0.08)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(0,0,0,0.03)';">
+            
+            <!-- الهيدر: التاريخ والحالة -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <span style="color: var(--text-muted); font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 5px;">📅 ${session.date}</span>
+                ${statusBadge}
+            </div>
+
+            <!-- معلومات المجموعة والموضوع -->
+            <div style="margin-bottom: 20px;">
+                <h3 style="margin: 0 0 8px 0; color: var(--secondary-color); font-size: 20px; font-weight: 900; letter-spacing: -0.5px;">${session.group}</h3>
+                <p style="margin: 0; color: var(--primary-color); font-size: 14px; font-weight: bold; background: rgba(152, 0, 0, 0.05); display: inline-block; padding: 4px 10px; border-radius: 6px; border: 1px dashed var(--primary-color);">🎯 ${session.topic || 'حصة عادية'}</p>
+            </div>
+
+            <!-- شريط الحضور التفاعلي -->
+            <div style="margin-bottom: 20px; background: #f8fafc; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 13px; font-weight: bold; color: var(--text-main);">نسبة الحضور</span>
+                    <span style="font-size: 14px; font-weight: 900; color: ${progressBarColor};">${presentCount} <span style="font-size: 11px; color: var(--text-muted); font-weight: bold;">من ${total}</span></span>
+                </div>
+                <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 10px; overflow: hidden;">
+                    <div style="width: ${percentage}%; height: 100%; background: ${progressBarColor}; border-radius: 10px; transition: width 0.8s ease-out;"></div>
+                </div>
+            </div>
+
+            ${reportSectionHtml}
+
+            <!-- الأزرار الرئيسية والإجراءات -->
+            <div style="margin-top: auto; display: flex; flex-direction: column; gap: 12px;">
+                <button onclick="openSessionDetails('${session.id}')" style="width: 100%; padding: 14px; font-size: 16px; font-weight: 900; border-radius: 12px; border: none; cursor: ${isClosed ? 'not-allowed' : 'pointer'}; background: ${isClosed ? '#f1f5f9' : '#10b981'}; color: ${isClosed ? '#94a3b8' : 'white'}; transition: 0.3s; box-shadow: ${isClosed ? 'none' : '0 5px 15px rgba(16, 185, 129, 0.3)'}; border: ${isClosed ? '1px solid #e2e8f0' : 'none'};" ${isClosed ? 'disabled' : ''} onmouseover="if(!this.disabled) this.style.transform='scale(1.02)';" onmouseout="if(!this.disabled) this.style.transform='scale(1)';">
+                    ${isClosed ? 'الحصة مغلقة للرصد 🔒' : 'الدخول للرصد 📠'}
+                </button>
+                
+                <div style="display: flex; gap: 8px; justify-content: space-between;" class="admin-only">
+                    <button onclick="openEditSessionModal('${session.id}')" style="flex: 1; background: #f8fafc; color: var(--text-main); border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='#e2e8f0';" onmouseout="this.style.background='#f8fafc';">✏️ تعديل</button>
+                    
+                    <button onclick="toggleSessionStatus('${session.id}')" style="flex: 2; background: ${lockBtnColor}15; color: ${lockBtnColor}; border: 1px solid ${lockBtnColor}40; border-radius: 8px; padding: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='${lockBtnColor}30';" onmouseout="this.style.background='${lockBtnColor}15';">${lockBtnIcon}</button>
+                    
+                    <button onclick="deleteSession('${session.id}')" style="flex: 1; background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; border-radius: 8px; padding: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='#fecaca';" onmouseout="this.style.background='#fee2e2';">🗑️ حذف</button>
+                </div>
+            </div>
+
+        </div>`;
+        
+        grid.innerHTML += cardHtml;
     });
 };
 // ==========================================
@@ -6214,130 +6262,84 @@ window.switchPage = function(pageId) {
 
 
 // ==========================================
-// 📋 تسجيل الحضور المطور (مع تسجيل وقت الدخول بدقة)
+// 📋 تسجيل الحضور المطور (منع القفز أثناء الرصد اليدوي)
 // ==========================================
-window.markAttendance = function(codeOrPhone, status) {
+window.markAttendance = function(codeOrPhone, status, isManual = false) {
     const s = classSessions.find(s => s.id === currentActiveSessionId);
     if(s && s.status === 'open') {
         const student = students.find(st => st.code === codeOrPhone || st.phone === codeOrPhone);
         if(!student) return;
 
-        // منع التحضير اليدوي لو موقوف (نسمح بس بـ none عشان لو حبيت تلغي حضور متسجل بالغلط)
         if(student.isSuspended && status !== 'none') {
             showToast(`⛔ الطالب (${student.name}) موقوف، لا يمكن تحضيره!`, 'error');
             return;
         }
-        
-        // 🚨 التنبيه الذكي بالغياب أو حضور المنصة في الحصة السابقة
-        const groupS = classSessions.filter(session => session.group === s.group).sort((a,b)=>new Date(a.date)-new Date(b.date)); 
-        const currentIndex = groupS.findIndex(session => session.id === s.id);
-        if (currentIndex > 0) {
-            const prevSession = groupS[currentIndex - 1];
-            const pStat = prevSession.attendance[student.code] || prevSession.attendance[student.phone];
-            
-            let attendedOnline = false;
-            if (window.platformLectures && window.platformTracking) {
-                let linkedLecture = window.platformLectures.find(l => l.linkedSession === prevSession.id || (l.linkedSessions && l.linkedSessions.includes(prevSession.id)));
-                if (linkedLecture && window.platformTracking[linkedLecture.id] && (window.platformTracking[linkedLecture.id][student.phone] || window.platformTracking[linkedLecture.id][student.code])) {
-                    attendedOnline = true;
-                }
-            }
 
-            if (pStat === 'absent' && !attendedOnline) {
-                setTimeout(() => showToast(`تنبيه: الطالب (${student.name}) كان غائباً الحصة السابقة!`, "warning"), 400); 
-            } else if (attendedOnline) {
-                setTimeout(() => showToast(`ممتاز: الطالب (${student.name}) حضر الحصة السابقة أونلاين على المنصة!`, "info"), 400); 
-            }
-        }
-
-        // 🌟 خصم/إضافة نقاط السلوك
         let oldStatus = s.attendance[student.code] || s.attendance[student.phone];
         if (oldStatus) {
             if (oldStatus === 'present') student.behaviorPoints = Math.max(0, (student.behaviorPoints || 0) - 5);
             if (oldStatus === 'late') student.behaviorPoints = Math.max(0, (student.behaviorPoints || 0) - 2);
         }
         
-        // لو الحالة مش 'none' (يعني مش تصفير)، ضيف النقط
         if (status !== 'none') {
             if (status === 'present') student.behaviorPoints = (student.behaviorPoints || 0) + 5;
             if (status === 'late') student.behaviorPoints = (student.behaviorPoints || 0) + 2;
         }
 
-        // ⏰ حفظ الوقت (التعديل الجديد)
         if (!s.attendanceLog) s.attendanceLog = {};
         if (status === 'none') {
-            delete s.attendance[student.code]; // مسح الحالة تماماً لو ضغط على إلغاء
+            delete s.attendance[student.code];
             delete s.attendanceLog[student.code];
         } else {
             s.attendance[student.code] = status; 
-            
             let now = new Date();
             let timeStr = formatTime12(`${now.getHours()}:${now.getMinutes()}`);
+            
+            // 💡 السحر هنا: لو ضغط يدوي من الزرار، هنديله ts بـ 0 عشان مينطش لأول الجدول
+            let timestamp = isManual ? 0 : now.getTime(); 
+            
+            // لو كان مسجل قبل كده وليه وقت حقيقي، نحافظ عليه عشان ترتيبه ميبظش
+            if (isManual && s.attendanceLog[student.code] && s.attendanceLog[student.code].ts > 0) {
+                timestamp = s.attendanceLog[student.code].ts;
+            }
+
             s.attendanceLog[student.code] = {
                 time: timeStr,
-                ts: now.getTime() // ده اللي هنرتب بيه (ملي ثانية)
+                ts: timestamp 
             };
         }
 
         localStorage.setItem("classSessions", JSON.stringify(classSessions));
         localStorage.setItem("students", JSON.stringify(students));
         
-        // 🔄 تحديث الجدول فوراً بالترتيب الجديد
         renderAttendanceTable(s);
 
-        // 🚀 إرسال الإشعار اللحظي للتطبيق
-        if (status !== 'none') {
-            let title = "تحديث حضور وانصراف 🏫";
-            let msg = status === 'present' ? `✅ وصل ${student.name} إلى السنتر لحضور حصة (${s.topic || 'اليوم'}).` : 
-                      status === 'late' ? `⏳ تأخر ${student.name} عن موعد بداية حصة (${s.topic || 'اليوم'}).` : 
-                      `❌ تنبيه: ${student.name} غائب عن حصة (${s.topic || 'اليوم'}).`;
-            
-            if(typeof notifyParentApp === 'function') notifyParentApp(student.code, title, msg);
+        if (status !== 'none' && !isManual) {
+            if(typeof notifyParentApp === 'function') notifyParentApp(student.code, "تحديث حضور 🏫", `تم تحضير ${student.name}`);
         }
     }
 };
 
 // ==========================================
-// 📊 رسم جدول الحضور المطور (تصميم احترافي + LIFO + وقت)
+// 📊 رسم جدول الحضور
 // ==========================================
 window.renderAttendanceTable = function(session) { 
     const tbody = document.getElementById("attendance-list"); 
-    const gStudents = students.filter(s => s.group === session.group); 
+    const gStudents = students.filter(s => s.group === session.group || (session.attendance && session.attendance[s.code])); 
     
     if(gStudents.length === 0) return tbody.innerHTML=`<tr><td colspan="6" style="text-align:center; padding: 30px; font-weight: bold; color: var(--text-muted);">لا يوجد طلاب مسجلين في هذه المجموعة</td></tr>`; 
     
     const groupS = classSessions.filter(s => s.group === session.group).sort((a,b)=>new Date(a.date)-new Date(b.date)); 
     const prevSession = groupS[groupS.findIndex(s => s.id === session.id) - 1]; 
-    // 💡 تحديث الشريط الذكي بمعلومات الصف
-    const groupObj = groups.find(g => g.name === session.group);
-    if(groupObj) {
-        document.getElementById('quick-info-level-name').innerText = `إضافة سريعة لطلاب (${groupObj.level})`;
-        let lastSt = window.getLastStudentInLevel(groupObj.level);
-        if (lastSt) {
-            document.getElementById('quick-info-last-code').innerText = lastSt.code;
-            document.getElementById('quick-info-last-name').innerText = `(${lastSt.name})`;
-        } else {
-            document.getElementById('quick-info-last-code').innerText = "لا يوجد طلاب بعد";
-            document.getElementById('quick-info-last-name').innerText = "";
-        }
-    }
-    // ⏱️ الترتيب الذكي: آخر طالب ضرب الباركود يظهر أول واحد فوق
+    
     let sortedStudents = [...gStudents].sort((a, b) => {
         let logA = session.attendanceLog ? session.attendanceLog[a.code] : null;
         let logB = session.attendanceLog ? session.attendanceLog[b.code] : null;
-        
         let tsA = logA ? logA.ts : 0;
         let tsB = logB ? logB.ts : 0;
-        
         if (tsA > 0 && tsB > 0) return tsB - tsA; 
         if (tsA > 0) return -1;
         if (tsB > 0) return 1;
-        
-        let statA = session.attendance[a.code];
-        let statB = session.attendance[b.code];
-        if (statA && !statB) return -1;
-        if (!statA && statB) return 1;
-        
         return 0; 
     });
 
@@ -6348,48 +6350,54 @@ window.renderAttendanceTable = function(session) {
         const stat = session.attendance[st.code] || session.attendance[st.phone]; 
         const log = session.attendanceLog ? session.attendanceLog[st.code] : null;
         
-        // العدادات
-        if (stat === 'present') countPresent++;
-        if (stat === 'late') countLate++;
+        let isMakeup = typeof stat === 'object' && stat.status === 'makeup';
+        let isStatusLate = stat === 'late' || (isMakeup && stat.isLate);
+        
+        if (stat === 'present' || (isMakeup && !stat.isLate)) countPresent++;
+        if (isStatusLate) countLate++;
         if (stat === 'absent') countAbsent++;
 
-        // تصميم شيك للوقت والحالة
         let timeDisplay = log ? `<span style="font-size:11px; color:var(--text-muted); font-weight:bold; display:block; margin-top:3px;">🕒 ${log.time}</span>` : '';
-        const statHtml = stat === 'present' ? `<span style="color:#10b981; font-weight:900; font-size:14px;">حاضر ✅</span>${timeDisplay}` : 
-                         stat === 'late' ? `<span style="color:#f59e0b; font-weight:900; font-size:14px;">متأخر ⏳</span>${timeDisplay}` : 
-                         stat === 'absent' ? `<span style="color:#ef4444; font-weight:900; font-size:14px;">غائب ❌</span>${timeDisplay}` : 
-                         `<span style="color:var(--text-muted); font-size:13px; font-weight:bold;">--</span>`; 
         
-        // حالة الحصة السابقة (بتصميم كبسولة صغيرة عشان متكبرش الجدول)
+        let statHtml = '';
+        if (stat === 'present') statHtml = `<span style="color:#10b981; font-weight:900; font-size:14px;">حاضر ✅</span>${timeDisplay}`;
+        else if (stat === 'late') statHtml = `<span style="color:#f59e0b; font-weight:900; font-size:14px;">متأخر ⏳</span>${timeDisplay}`;
+        else if (stat === 'absent') statHtml = `<span style="color:#ef4444; font-weight:900; font-size:14px;">غائب ❌</span>${timeDisplay}`;
+        else if (isMakeup) statHtml = `<span style="color:#3b82f6; font-weight:900; font-size:14px;">تعويض 💻</span>${timeDisplay}`;
+        else statHtml = `<span style="color:var(--text-muted); font-size:13px; font-weight:bold;">--</span>`;
+        
         let pHT = '<span style="color:var(--text-muted); font-size:12px;">--</span>'; 
         if(prevSession) { 
             const p = prevSession.attendance[st.code] || prevSession.attendance[st.phone]; 
             pHT = p==='present'?'<span style="background:rgba(16,185,129,0.1); color:#10b981; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:bold;">حاضر</span>':
                   p==='late'?'<span style="background:rgba(245,158,11,0.1); color:#f59e0b; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:bold;">متأخر</span>':
-                  p==='absent'?'<span style="background:rgba(239,68,68,0.1); color:#ef4444; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:bold;">غائب</span>':'--'; 
+                  p==='absent'?'<span style="background:rgba(239,68,68,0.1); color:#ef4444; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:bold;">غائب</span>':
+                  (typeof p === 'object' && p.status === 'makeup') ? '<span style="background:rgba(59,130,246,0.1); color:#3b82f6; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:bold;">تعويض</span>' : '--'; 
         } 
         
         let noteIcon = st.note && st.note.trim() !== "" ? `<span style="cursor: pointer; margin-right: 8px; font-size: 15px; filter: drop-shadow(0 2px 4px rgba(139,92,246,0.4));" title="يوجد ملاحظة (اضغط للعرض)" onclick="openStudentNoteModal('${st.code}')">📝</span>` : ``;
+        let guestGroupBadge = st.group !== session.group ? `<span style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; padding: 2px 6px; border-radius: 6px; font-size: 11px; font-weight: bold; margin-right: 5px;">ضيف من: ${st.group}</span>` : '';
 
-        // 🔘 زر الإجراء: إما "بانتظار الرصد" (لو متسجلش) أو "إلغاء ✖" (لو متسجل)
+        // 💡 التعديل هنا: إضافة (true) لاستدعاء الدالة بشكل يدوي لمنع النط
         let actionButtons = '';
         if (stat) {
-            actionButtons = `<button onclick="markAttendance('${st.code}', 'none')" style="background: rgba(239, 68, 68, 0.05); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); padding: 4px 10px; border-radius: 6px; font-size:12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='#ef4444'; this.style.color='#fff';" onmouseout="this.style.background='rgba(239, 68, 68, 0.05)'; this.style.color='#ef4444';">إلغاء ✖</button>`;
+            actionButtons = `<button onclick="markAttendance('${st.code}', 'none', true)" style="background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; padding: 4px 12px; border-radius: 6px; font-size:12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='#ef4444'; this.style.color='#fff';" onmouseout="this.style.background='#fee2e2'; this.style.color='#ef4444';">إلغاء ✖</button>`;
         } else {
-            actionButtons = `<span style="color: #94a3b8; font-size: 11px; font-weight: bold; background: var(--hover-bg); padding: 4px 8px; border-radius: 6px; border: 1px dashed var(--border-color);">بانتظار الرصد 📠</span>`;
+            actionButtons = `
+            <div style="display: inline-flex; gap: 5px; background: var(--bg-color); padding: 4px; border-radius: 8px; border: 1px solid var(--border-color);">
+                <button onclick="markAttendance('${st.code}', 'present', true)" title="حاضر" style="background: #d1fae5; color: #10b981; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 13px;" onmouseover="this.style.background='#10b981'; this.style.color='white';">✅</button>
+                <button onclick="markAttendance('${st.code}', 'late', true)" title="متأخر" style="background: #fef3c7; color: #f59e0b; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 13px;" onmouseover="this.style.background='#f59e0b'; this.style.color='white';">⏳</button>
+                <button onclick="markAttendance('${st.code}', 'absent', true)" title="غائب" style="background: #fee2e2; color: #ef4444; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 13px;" onmouseover="this.style.background='#ef4444'; this.style.color='white';">❌</button>
+            </div>`;
         }
 
-        // تأثير الفلاش الخفيف للصف اللي لسه مسجل حالاً
         let rowBg = '';
-        if (log && (Date.now() - log.ts) < 5000) {
-             rowBg = 'animation: flashRow 2s ease-out;';
-        } else if (stat) {
-             rowBg = 'background: rgba(248, 250, 252, 0.5);'; // تمييز خفيف جداً
-        }
+        if (log && (Date.now() - log.ts) < 5000 && log.ts > 0) { rowBg = 'animation: flashRow 2s ease-out;'; } 
+        else if (stat) { rowBg = 'background: rgba(248, 250, 252, 0.5);'; }
 
         htmlContent += `<tr style="${rowBg}">
             <td><strong style="color:var(--primary-color); font-size:14px;">${st.code}</strong></td>
-            <td><div style="font-weight:bold; font-size:14px; display:flex; align-items:center;">${st.name} ${noteIcon}</div></td>
+            <td><div style="font-weight:bold; font-size:14px; display:flex; flex-direction:column; justify-content:center;"><div style="display:flex; align-items:center;">${st.name} ${noteIcon}</div>${guestGroupBadge}</div></td>
             <td style="direction: ltr; font-size:13px; color:var(--text-main);">${st.phone && st.phone !== "0" ? st.phone : "--"}</td>
             <td>${pHT}</td>
             <td>${statHtml}</td>
@@ -6397,18 +6405,10 @@ window.renderAttendanceTable = function(session) {
         </tr>`; 
     }); 
     
-    // تحديث الإحصائيات
     if(document.getElementById("att-count-total")) document.getElementById("att-count-total").innerText = gStudents.length;
     if(document.getElementById("att-count-present")) document.getElementById("att-count-present").innerText = countPresent;
     if(document.getElementById("att-count-late")) document.getElementById("att-count-late").innerText = countLate;
     if(document.getElementById("att-count-absent")) document.getElementById("att-count-absent").innerText = countAbsent;
-
-    if (!document.getElementById('flash-row-style')) {
-        let style = document.createElement('style');
-        style.id = 'flash-row-style';
-        style.innerHTML = `@keyframes flashRow { 0% { background-color: rgba(16, 185, 129, 0.15); } 100% { background-color: transparent; } }`;
-        document.head.appendChild(style);
-    }
 
     tbody.innerHTML = htmlContent; 
 };
@@ -6596,7 +6596,57 @@ window.openWrongGroupModal = function(student, currentSession) {
     openModal('wrongGroupModal');
 };
 
+// 1. تسجيل الحضور كتعويض (يظهر في الحصة الحالية وفي مجموعته الأصلية باللون الأزرق)
+window.markAttendanceInActualGroup = function() {
+    if (!tempWrongGroupStudent) return;
 
+    let originalSessionId = document.getElementById('wgActualGroupSessions').value;
+    let currentSession = classSessions.find(s => s.id === currentActiveSessionId);
+    let originalSession = classSessions.find(s => s.id === originalSessionId);
+
+    let isLate = document.getElementById('markAsLateCheckbox')?.checked;
+
+    // أ. تسجيله في الحصة الحالية (عشان يظهر قدام المدرس دلوقتي في الجدول)
+    if (currentSession) {
+        currentSession.attendance[tempWrongGroupStudent.code] = { status: 'makeup', isLate: isLate };
+        if (!currentSession.attendanceLog) currentSession.attendanceLog = {};
+        let now = new Date();
+        currentSession.attendanceLog[tempWrongGroupStudent.code] = {
+            time: formatTime12(`${now.getHours()}:${now.getMinutes()}`),
+            ts: now.getTime()
+        };
+    }
+
+    // ب. تسجيله في حصته الأصلية (عشان يظهر في النقط الزرقاء في إدارة المجموعات)
+    if (originalSession) {
+        originalSession.attendance[tempWrongGroupStudent.code] = { status: 'makeup', isLate: isLate };
+    }
+
+    // إضافة نقاط السلوك
+    tempWrongGroupStudent.behaviorPoints = (tempWrongGroupStudent.behaviorPoints || 0) + (isLate ? 2 : 5);
+
+    localStorage.setItem("classSessions", JSON.stringify(classSessions));
+    localStorage.setItem("students", JSON.stringify(students));
+
+    if(typeof showToast === 'function') {
+        showToast(`✅ تم تحضير ${tempWrongGroupStudent.name} كتعويض بنجاح!`);
+    }
+
+    closeModal('wrongGroupModal');
+
+    // تحديث الجدول الحالي
+    if (currentSession) renderAttendanceTable(currentSession);
+
+    // تفعيل الدفع السريع لو مطلوب
+    let autoPaymentEnabled = document.getElementById('autoPaymentCheckbox')?.checked;
+    if (autoPaymentEnabled) {
+        setTimeout(() => openQuickPaymentModal(tempWrongGroupStudent), 500);
+    } else {
+        setTimeout(() => document.getElementById('attendanceBarcode').focus(), 100);
+    }
+
+    tempWrongGroupStudent = null;
+};
 
 // 2. النقل النهائي للمجموعة الحالية + التحضير الفوري
 window.moveStudentAndAttend = function() {

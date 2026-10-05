@@ -582,42 +582,52 @@
     </div>
 
 
-    <!-- 📠 لوحة التحكم والرصد الجديدة -->
-    <div class="attendance-panel">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
-            <h4 style="color: var(--secondary-color); margin: 0; font-size: 18px; display: flex; align-items: center; gap: 8px;">
-                <span>📠</span> لوحة الرصد السريع
+    <!-- 📠 لوحة التحكم والرصد الجديدة (تصميم مدمج وشيك جداً) -->
+    <div class="attendance-panel" style="padding: 15px 20px; border-radius: 16px; border: 1px solid var(--border-color); background: var(--card-bg); box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 20px;">
+        
+        <!-- الصف العلوي: العنوان والخيارات (متأخر/مالي) -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+            <h4 style="color: var(--secondary-color); margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                <span style="background: rgba(59, 130, 246, 0.1); padding: 6px; border-radius: 8px; font-size: 14px;">📠</span> لوحة الرصد السريع
             </h4>
-            
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                <!-- الزر الجديد لاستخراج الإكسيل -->
-                <button class="save-btn" style="background: #10b981; margin: 0; padding: 8px 15px; font-size: 14px; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);" onclick="downloadCurrentSessionReport()">
-                    📥 استخراج تقرير الحصة (إكسيل)
-                </button>
-
-                <label class="smart-toggle toggle-money">
-                    <input type="checkbox" id="autoPaymentCheckbox" class="money-check" checked>
-                    <span>التحصيل المالي 💰</span>
-                </label>
-                <label class="smart-toggle toggle-late">
+            <div style="display: flex; gap: 10px;">
+                <label class="smart-toggle toggle-late" style="border-radius: 8px; padding: 6px 12px;">
                     <input type="checkbox" id="markAsLateCheckbox" class="late-check">
-                    <span>تسجيل كمتأخر ⏳</span>
+                    <span style="font-size: 13px;">تسجيل كمتأخر ⏳</span>
+                </label>
+                <label class="smart-toggle toggle-money" style="border-radius: 8px; padding: 6px 12px;">
+                    <input type="checkbox" id="autoPaymentCheckbox" class="money-check" checked>
+                    <span style="font-size: 13px;">التحصيل المالي 💰</span>
                 </label>
             </div>
         </div>
 
-        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch;">
-            <div class="barcode-input-wrapper">
-                <span class="barcode-icon">🎯</span>
-                <input type="text" id="attendanceBarcode" placeholder="اسحب الباركود أو اكتب الكود / الاسم...">
+        <!-- الصف السفلي: شريط الأدوات مدمج (باركود - كاميرا/صوت - شيت/تقرير) -->
+        <div style="display: flex; gap: 10px; align-items: center; background: var(--bg-color); padding: 8px; border-radius: 12px; border: 1px solid var(--border-color); flex-wrap: wrap;">
+
+            <!-- الباركود -->
+            <div class="barcode-input-wrapper" style="flex: 1; min-width: 200px;">
+                <span class="barcode-icon" style="right: 12px; font-size: 16px; color: var(--primary-color);">🎯</span>
+                <input type="text" id="attendanceBarcode" placeholder="الباركود / الكود..." style="height: 40px; font-size: 14px; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);">
             </div>
-            <button class="action-btn btn-cam" onclick="startCameraScanner('attendanceBarcode')">📷 كاميرا</button>
-            <button class="action-btn btn-mic voice-btn" id="voiceBtn_attendance" onclick="toggleVoiceRecognition('attendance', 'attendanceBarcode')">🎙️ صوت</button>
-            <div style="width: 2px; background: #e2e8f0; margin: 0 5px; border-radius: 2px; display: block;"></div>
-            <div style="position: relative; display: inline-block;">
-                <input type="file" id="importAttendanceExcel" accept=".xlsx, .xls" style="position: absolute; width: 100%; height: 100%; opacity: 0; cursor: pointer;" onchange="importAttendanceFromExcel(event)">
-                <button class="action-btn btn-excel" style="pointer-events: none;">📥 شيت إكسيل</button>
+
+            <!-- الكاميرا والصوت -->
+            <div style="display: flex; gap: 5px;">
+                <button class="action-btn btn-mic voice-btn" id="voiceBtn_attendance" style="height: 40px; border-radius: 8px; padding: 0 12px; font-size: 13px;" onclick="toggleVoiceRecognition('attendance', 'attendanceBarcode')">🎙️ صوت</button>
+                <button class="action-btn btn-cam" style="height: 40px; border-radius: 8px; padding: 0 12px; font-size: 13px;" onclick="startCameraScanner('attendanceBarcode')">📷 كاميرا</button>
             </div>
+
+            <div style="width: 1px; height: 30px; background: #cbd5e1; margin: 0 5px;"></div>
+
+            <!-- الإكسيل (رفع وتحميل) -->
+            <div style="display: flex; gap: 5px;">
+                <div style="position: relative; display: inline-block;">
+                    <input type="file" id="importAttendanceExcel" accept=".xlsx, .xls" style="position: absolute; width: 100%; height: 100%; opacity: 0; cursor: pointer;" onchange="importAttendanceFromExcel(event)">
+                    <button class="action-btn btn-excel" style="height: 40px; border-radius: 8px; padding: 0 12px; font-size: 13px; pointer-events: none; background: #0ea5e9;">📤 رفع شيت</button>
+                </div>
+                <button class="action-btn" style="height: 40px; border-radius: 8px; padding: 0 12px; font-size: 13px; background: #10b981;" onclick="downloadCurrentSessionReport()">📥 تقرير إكسيل</button>
+            </div>
+
         </div>
     </div>
 
