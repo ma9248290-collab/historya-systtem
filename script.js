@@ -6261,93 +6261,7 @@ window.switchPage = function(pageId) {
 };
 
 
-// ==========================================
-// 📋 تسجيل الحضور المطور (منع القفز + مزامنة لحظية دقيقة)
-// ==========================================
-window.markAttendance = function(codeOrPhone, status, isManual = false) {
-    const sIndex = classSessions.findIndex(s => s.id === currentActiveSessionId);
-    const s = classSessions[sIndex];
-    
-    if(s && s.status === 'open') {
-        const studentIndex = students.findIndex(st => st.code === codeOrPhone || st.phone === codeOrPhone);
-        const student = students[studentIndex];
-        
-        if(!student) return;
 
-        if(student.isSuspended && status !== 'none') {
-            showToast(`⛔ الطالب (${student.name}) موقوف، لا يمكن تحضيره!`, 'error');
-            return;
-        }
-
-        let oldStatus = s.attendance[student.code] || s.attendance[student.phone];
-        if (oldStatus) {
-            if (oldStatus === 'present') student.behaviorPoints = Math.max(0, (student.behaviorPoints || 0) - 5);
-            if (oldStatus === 'late') student.behaviorPoints = Math.max(0, (student.behaviorPoints || 0) - 2);
-        }
-        
-        if (status !== 'none') {
-            if (status === 'present') student.behaviorPoints = (student.behaviorPoints || 0) + 5;
-            if (status === 'late') student.behaviorPoints = (student.behaviorPoints || 0) + 2;
-        }
-
-        let now = new Date();
-        let timeStr = formatTime12(`${now.getHours()}:${now.getMinutes()}`);
-        let timestamp = isManual ? 0 : now.getTime(); 
-
-        if (!s.attendanceLog) s.attendanceLog = {};
-        
-        let firebaseStatusUpdate = null;
-        let firebaseLogUpdate = null;
-
-        if (status === 'none') {
-            delete s.attendance[student.code];
-            delete s.attendanceLog[student.code];
-            firebaseStatusUpdate = { [student.code]: null };
-            firebaseLogUpdate = { [student.code]: null };
-        } else {
-            s.attendance[student.code] = status; 
-            
-            if (isManual && s.attendanceLog[student.code] && s.attendanceLog[student.code].ts > 0) {
-                timestamp = s.attendanceLog[student.code].ts;
-            }
-
-            s.attendanceLog[student.code] = { time: timeStr, ts: timestamp };
-            
-            firebaseStatusUpdate = { [student.code]: status };
-            firebaseLogUpdate = { [student.code]: { time: timeStr, ts: timestamp } };
-        }
-
-        // 1. حفظ في المتصفح
-        localStorage.setItem("classSessions", JSON.stringify(classSessions));
-        localStorage.setItem("students", JSON.stringify(students));
-        
-        // 2. تحديث الشاشة
-        renderAttendanceTable(s);
-
-        // 3. 🚀 المزامنة اللحظية (تحديث جزء صغير جداً في الفايربيز بدون تأخير)
-        let uid = window.getSafeUid ? window.getSafeUid() : "Historia_System_Master";
-        
-        // رفع حالة الحضور للطالب ده بس
-        fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/classSessions/${sIndex}/attendance.json`, {
-            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(firebaseStatusUpdate)
-        }).catch(e => console.log("Live Sync Error:", e));
-
-        // رفع وقت الحضور للطالب ده بس
-        fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/classSessions/${sIndex}/attendanceLog.json`, {
-            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(firebaseLogUpdate)
-        }).catch(e => console.log("Live Sync Error:", e));
-
-        // تحديث نقاط سلوك الطالب ده بس
-        fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/students/${studentIndex}.json`, {
-            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ behaviorPoints: student.behaviorPoints })
-        }).catch(e => console.log("Live Sync Error:", e));
-
-
-        if (status !== 'none' && !isManual) {
-            if(typeof notifyParentApp === 'function') notifyParentApp(student.code, "تحديث حضور 🏫", `تم تحضير ${student.name}`);
-        }
-    }
-};
 
 // ==========================================
 // 📊 رسم جدول الحضور
@@ -6625,34 +6539,136 @@ window.openWrongGroupModal = function(student, currentSession) {
     openModal('wrongGroupModal');
 };
 
-// 1. تسجيل الحضور كتعويض (يظهر في الحصة الحالية وفي مجموعته الأصلية باللون الأزرق)
+// ==========================================
+// 📋 تسجيل الحضور المطور (مزامنة لحظية دقيقة للطالب فقط دون رفع كل البيانات)
+// ==========================================
+window.markAttendance = function(codeOrPhone, status, isManual = false) {
+    const sIndex = classSessions.findIndex(s => s.id === currentActiveSessionId);
+    const s = classSessions[sIndex];
+
+    if(s && s.status === 'open') {
+        // تأمين التطابق بين النص والرقم لحل مشكلة الرصد اليدوي
+        const studentIndex = students.findIndex(st => String(st.code) === String(codeOrPhone) || String(st.phone) === String(codeOrPhone));
+        const student = students[studentIndex];
+
+        if(!student) return;
+
+        if(student.isSuspended && status !== 'none') {
+            if(typeof showToast === 'function') showToast(`⛔ الطالب (${student.name}) موقوف، لا يمكن تحضيره!`, 'error');
+            return;
+        }
+
+        // 🌟 خصم/إضافة نقاط السلوك
+        let oldStatus = s.attendance[student.code] || s.attendance[student.phone];
+        if (oldStatus) {
+            if (oldStatus === 'present') student.behaviorPoints = Math.max(0, (student.behaviorPoints || 0) - 5);
+            if (oldStatus === 'late') student.behaviorPoints = Math.max(0, (student.behaviorPoints || 0) - 2);
+        }
+        
+        if (status !== 'none') {
+            if (status === 'present') student.behaviorPoints = (student.behaviorPoints || 0) + 5;
+            if (status === 'late') student.behaviorPoints = (student.behaviorPoints || 0) + 2;
+        }
+
+        // ⏰ حفظ الوقت
+        let now = new Date();
+        let timeStr = formatTime12(`${now.getHours()}:${now.getMinutes()}`);
+        
+        // إعطاء أولوية في الترتيب للي ضرب باركود، أما اليدوي بيفضل مكانه عشان الجدول مينطش
+        let timestamp = isManual ? 0 : now.getTime();
+
+        if (isManual && s.attendanceLog && s.attendanceLog[student.code] && s.attendanceLog[student.code].ts > 0) {
+            timestamp = s.attendanceLog[student.code].ts;
+        }
+
+        if (!s.attendanceLog) s.attendanceLog = {};
+
+        let firebaseStatusUpdate = {};
+        let firebaseLogUpdate = {};
+
+        if (status === 'none') {
+            delete s.attendance[student.code];
+            delete s.attendanceLog[student.code];
+            firebaseStatusUpdate[student.code] = null;
+            firebaseLogUpdate[student.code] = null;
+        } else {
+            s.attendance[student.code] = status;
+            s.attendanceLog[student.code] = { time: timeStr, ts: timestamp };
+            firebaseStatusUpdate[student.code] = status;
+            firebaseLogUpdate[student.code] = { time: timeStr, ts: timestamp };
+        }
+
+        // 1. الحفظ المحلي السريع
+        localStorage.setItem("classSessions", JSON.stringify(classSessions));
+        localStorage.setItem("students", JSON.stringify(students));
+
+        // 2. تحديث الشاشة فوراً
+        renderAttendanceTable(s);
+
+        // 3. 🚀 المزامنة اللحظية (Micro-Patch) للطالب ده بس في الفايربيز!
+        let baseUrl = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data`;
+
+        fetch(`${baseUrl}/classSessions/${sIndex}/attendance.json`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(firebaseStatusUpdate)
+        }).catch(e => console.error("Sync Error:", e));
+
+        fetch(`${baseUrl}/classSessions/${sIndex}/attendanceLog.json`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(firebaseLogUpdate)
+        }).catch(e => console.error("Sync Error:", e));
+
+        fetch(`${baseUrl}/students/${studentIndex}.json`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ behaviorPoints: student.behaviorPoints })
+        }).catch(e => console.error("Sync Error:", e));
+
+        // 4. الإشعارات للأبلكيشن
+        if (status !== 'none' && !isManual) {
+            if(typeof notifyParentApp === 'function') notifyParentApp(student.code, "تحديث حضور 🏫", `تم تحضير ${student.name}`);
+        }
+    }
+};
+
+// ==========================================
+// 1. تسجيل الحضور كتعويض (مزود بالمزامنة اللحظية أيضاً)
+// ==========================================
 window.markAttendanceInActualGroup = function() {
     if (!tempWrongGroupStudent) return;
 
     let originalSessionId = document.getElementById('wgActualGroupSessions').value;
-    let currentSession = classSessions.find(s => s.id === currentActiveSessionId);
-    let originalSession = classSessions.find(s => s.id === originalSessionId);
+    
+    let currentSessionIndex = classSessions.findIndex(s => s.id === currentActiveSessionId);
+    let currentSession = classSessions[currentSessionIndex];
 
+    let originalSessionIndex = classSessions.findIndex(s => s.id === originalSessionId);
+    let originalSession = classSessions[originalSessionIndex];
+
+    let studentIndex = students.findIndex(s => s.code === tempWrongGroupStudent.code);
     let isLate = document.getElementById('markAsLateCheckbox')?.checked;
 
-    // أ. تسجيله في الحصة الحالية (عشان يظهر قدام المدرس دلوقتي في الجدول)
+    let now = new Date();
+    let timeStr = formatTime12(`${now.getHours()}:${now.getMinutes()}`);
+    let ts = now.getTime();
+
+    let baseUrl = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data`;
+
+    // أ. تسجيله في الحصة الحالية ورفع التحديث اللحظي
     if (currentSession) {
         currentSession.attendance[tempWrongGroupStudent.code] = { status: 'makeup', isLate: isLate };
         if (!currentSession.attendanceLog) currentSession.attendanceLog = {};
-        let now = new Date();
-        currentSession.attendanceLog[tempWrongGroupStudent.code] = {
-            time: formatTime12(`${now.getHours()}:${now.getMinutes()}`),
-            ts: now.getTime()
-        };
+        currentSession.attendanceLog[tempWrongGroupStudent.code] = { time: timeStr, ts: ts };
+
+        fetch(`${baseUrl}/classSessions/${currentSessionIndex}/attendance.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [tempWrongGroupStudent.code]: { status: 'makeup', isLate: isLate } }) });
+        fetch(`${baseUrl}/classSessions/${currentSessionIndex}/attendanceLog.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [tempWrongGroupStudent.code]: { time: timeStr, ts: ts } }) });
     }
 
-    // ب. تسجيله في حصته الأصلية (عشان يظهر في النقط الزرقاء في إدارة المجموعات)
+    // ب. تسجيله في حصته الأصلية ورفع التحديث اللحظي
     if (originalSession) {
         originalSession.attendance[tempWrongGroupStudent.code] = { status: 'makeup', isLate: isLate };
+        fetch(`${baseUrl}/classSessions/${originalSessionIndex}/attendance.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [tempWrongGroupStudent.code]: { status: 'makeup', isLate: isLate } }) });
     }
 
-    // إضافة نقاط السلوك
+    // تحديث السلوك اللحظي
     tempWrongGroupStudent.behaviorPoints = (tempWrongGroupStudent.behaviorPoints || 0) + (isLate ? 2 : 5);
+    fetch(`${baseUrl}/students/${studentIndex}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ behaviorPoints: tempWrongGroupStudent.behaviorPoints }) });
 
     localStorage.setItem("classSessions", JSON.stringify(classSessions));
     localStorage.setItem("students", JSON.stringify(students));
@@ -6663,10 +6679,8 @@ window.markAttendanceInActualGroup = function() {
 
     closeModal('wrongGroupModal');
 
-    // تحديث الجدول الحالي
     if (currentSession) renderAttendanceTable(currentSession);
 
-    // تفعيل الدفع السريع لو مطلوب
     let autoPaymentEnabled = document.getElementById('autoPaymentCheckbox')?.checked;
     if (autoPaymentEnabled) {
         setTimeout(() => openQuickPaymentModal(tempWrongGroupStudent), 500);
