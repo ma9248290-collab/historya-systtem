@@ -6680,37 +6680,6 @@ window.showExcelImportReport = function(successList, wrongGroupQueue, notFoundLi
 
 
 // ==========================================
-// 🔄 دوال الطالب في مجموعة مختلفة (نقل أو تعويض)
-// ==========================================
-let tempWrongGroupStudent = null;
-
-window.openWrongGroupModal = function(student, currentSession) {
-    tempWrongGroupStudent = student;
-    
-    document.getElementById('wgStudentName').innerText = student.name;
-    document.getElementById('wgOldGroup').innerText = student.group || 'بدون مجموعة';
-    document.getElementById('wgCurrentGroup').innerText = currentSession.group;
-
-    // البحث عن حصة مفتوحة في مجموعة الطالب الأصلية عشان يسجل حضوره فيها (تعويض)
-    let actualGroupSessions = classSessions.filter(s => s.group === student.group && s.status === 'open').reverse();
-    let selectEl = document.getElementById('wgActualGroupSessions');
-    let attendanceDiv = document.getElementById('wgAttendanceDiv');
-    
-    selectEl.innerHTML = '';
-
-    if(actualGroupSessions.length > 0) {
-        actualGroupSessions.forEach(s => {
-            selectEl.innerHTML += `<option value="${s.id}">${s.date} - ${s.topic || 'حصة'}</option>`;
-        });
-        attendanceDiv.style.display = 'block';
-    } else {
-        attendanceDiv.style.display = 'none'; // لو مجموعته الأصلية معندهاش حصة مفتوحة دلوقتي، هنخفي خيار التعويض
-    }
-
-    openModal('wrongGroupModal');
-};
-
-// ==========================================
 // 📋 تسجيل الحضور المطور (مزامنة لحظية + إشعارات صوتية ومرئية)
 // ==========================================
 window.markAttendance = function(codeOrPhone, status, isManual = false) {
@@ -6800,8 +6769,87 @@ window.markAttendance = function(codeOrPhone, status, isManual = false) {
 };
 
 // ==========================================
-// 1. تسجيل الحضور كتعويض (مزود بالمزامنة اللحظية أيضاً)
+// 🔄 دوال الطالب في مجموعة مختلفة (نقل أو تعويض)
 // ==========================================
+let tempWrongGroupStudent = null;
+
+window.openWrongGroupModal = function(student, currentSession) {
+    tempWrongGroupStudent = student;
+    
+    document.getElementById('wgStudentName').innerText = student.name;
+    document.getElementById('wgOldGroup').innerText = student.group || 'بدون مجموعة';
+    document.getElementById('wgCurrentGroup').innerText = currentSession.group;
+
+    // البحث عن حصة مفتوحة في مجموعة الطالب الأصلية عشان يسجل حضوره فيها (تعويض)
+    let actualGroupSessions = classSessions.filter(s => s.group === student.group && s.status === 'open').reverse();
+    let selectEl = document.getElementById('wgActualGroupSessions');
+    let attendanceDiv = document.getElementById('wgAttendanceDiv');
+    
+    selectEl.innerHTML = '';
+
+    if(actualGroupSessions.length > 0) {
+        actualGroupSessions.forEach(s => {
+            selectEl.innerHTML += `<option value="${s.id}">${s.date} - ${s.topic || 'حصة'}</option>`;
+        });
+        attendanceDiv.style.display = 'block';
+    } else {
+        attendanceDiv.style.display = 'none'; // لو مجموعته الأصلية معندهاش حصة مفتوحة دلوقتي، هنخفي خيار التعويض
+    }
+
+    openModal('wrongGroupModal');
+};
+
+// ❌ تخطي الإجراءات
+window.skipWrongGroup = function() {
+    tempWrongGroupStudent = null;
+    closeModal('wrongGroupModal');
+    setTimeout(() => {
+        let inputEl = document.getElementById('attendanceBarcode');
+        if(inputEl) { inputEl.value = ''; inputEl.focus(); }
+    }, 100);
+};
+
+// 🔄 نقل الطالب للمجموعة الجديدة وتحضيره
+window.moveStudentAndAttend = function() {
+    if (!tempWrongGroupStudent) return;
+    
+    const currentSession = classSessions.find(s => s.id === currentActiveSessionId);
+    if (!currentSession) return;
+
+    const studentIndex = students.findIndex(s => s.code === tempWrongGroupStudent.code);
+    if (studentIndex > -1) {
+        // 1. تغيير مجموعة الطالب في قاعدة البيانات الرئيسية
+        students[studentIndex].group = currentSession.group;
+        localStorage.setItem("students", JSON.stringify(students));
+        
+        // 2. تحديث المزامنة مع الفايربيز اللحظية
+        let baseUrl = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid ? window.getSafeUid() : 'Historia_System_Master'}/data`;
+        fetch(`${baseUrl}/students/${studentIndex}.json`, { 
+            method: 'PATCH', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ group: currentSession.group }) 
+        }).catch(e => console.error("Sync Error:", e));
+
+        // 3. قفل المودال وتحضير الطالب
+        closeModal('wrongGroupModal');
+        
+        let isLate = document.getElementById('markAsLateCheckbox')?.checked;
+        let attStatus = isLate ? 'late' : 'present';
+        
+        markAttendance(tempWrongGroupStudent.code, attStatus);
+        showToast(`تم نقل الطالب لمجموعة (${currentSession.group}) وتحضيره بنجاح! 🔄`, 'success');
+        
+        tempWrongGroupStudent = null;
+        
+        // إرجاع المؤشر
+        setTimeout(() => {
+            let inputEl = document.getElementById('attendanceBarcode');
+            if(inputEl) { inputEl.value = ''; inputEl.focus(); }
+        }, 100);
+    }
+};
+
+// ✅ تحضير كتعويض في مجموعته الأصلية والحالية مع المزامنة اللحظية
 window.markAttendanceInActualGroup = function() {
     if (!tempWrongGroupStudent) return;
 
@@ -6820,34 +6868,48 @@ window.markAttendanceInActualGroup = function() {
     let timeStr = formatTime12(`${now.getHours()}:${now.getMinutes()}`);
     let ts = now.getTime();
 
-    let baseUrl = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data`;
+    // نستخدم دالة getSafeUid إذا كانت موجودة لضمان المسار الصحيح
+    let uid = window.getSafeUid ? window.getSafeUid() : 'Historia_System_Master';
+    let baseUrl = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/data`;
 
-    // أ. تسجيله في الحصة الحالية ورفع التحديث اللحظي
+    // أ. تسجيله في الحصة الحالية كـ (تعويض) ورفع التحديث اللحظي
     if (currentSession) {
         currentSession.attendance[tempWrongGroupStudent.code] = { status: 'makeup', isLate: isLate };
         if (!currentSession.attendanceLog) currentSession.attendanceLog = {};
-        currentSession.attendanceLog[tempWrongGroupStudent.code] = { time: timeStr, ts: ts };
+        currentSession.attendanceLog[tempWrongGroupStudent.code] = { time: timeStr, ts: ts, isManual: false };
 
-        fetch(`${baseUrl}/classSessions/${currentSessionIndex}/attendance.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [tempWrongGroupStudent.code]: { status: 'makeup', isLate: isLate } }) });
-        fetch(`${baseUrl}/classSessions/${currentSessionIndex}/attendanceLog.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [tempWrongGroupStudent.code]: { time: timeStr, ts: ts } }) });
+        fetch(`${baseUrl}/classSessions/${currentSessionIndex}/attendance.json`, { 
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ [tempWrongGroupStudent.code]: { status: 'makeup', isLate: isLate } }) 
+        });
+        
+        fetch(`${baseUrl}/classSessions/${currentSessionIndex}/attendanceLog.json`, { 
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ [tempWrongGroupStudent.code]: { time: timeStr, ts: ts, isManual: false } }) 
+        });
     }
 
-    // ب. تسجيله في حصته الأصلية ورفع التحديث اللحظي
+    // ب. تسجيله في حصته الأصلية كـ (تعويض) ورفع التحديث اللحظي
     if (originalSession) {
+        if (!originalSession.attendance) originalSession.attendance = {};
         originalSession.attendance[tempWrongGroupStudent.code] = { status: 'makeup', isLate: isLate };
-        fetch(`${baseUrl}/classSessions/${originalSessionIndex}/attendance.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [tempWrongGroupStudent.code]: { status: 'makeup', isLate: isLate } }) });
+        fetch(`${baseUrl}/classSessions/${originalSessionIndex}/attendance.json`, { 
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ [tempWrongGroupStudent.code]: { status: 'makeup', isLate: isLate } }) 
+        });
     }
 
     // تحديث السلوك اللحظي
     tempWrongGroupStudent.behaviorPoints = (tempWrongGroupStudent.behaviorPoints || 0) + (isLate ? 2 : 5);
-    fetch(`${baseUrl}/students/${studentIndex}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ behaviorPoints: tempWrongGroupStudent.behaviorPoints }) });
+    fetch(`${baseUrl}/students/${studentIndex}.json`, { 
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ behaviorPoints: tempWrongGroupStudent.behaviorPoints }) 
+    });
 
     localStorage.setItem("classSessions", JSON.stringify(classSessions));
     localStorage.setItem("students", JSON.stringify(students));
 
-    if(typeof showToast === 'function') {
-        showToast(`✅ تم تحضير ${tempWrongGroupStudent.name} كتعويض بنجاح!`);
-    }
+    showToast(`✅ تم تحضير ${tempWrongGroupStudent.name} كتعويض بنجاح!`, 'success');
 
     closeModal('wrongGroupModal');
 
@@ -6857,52 +6919,17 @@ window.markAttendanceInActualGroup = function() {
     if (autoPaymentEnabled) {
         setTimeout(() => openQuickPaymentModal(tempWrongGroupStudent), 500);
     } else {
-        setTimeout(() => document.getElementById('attendanceBarcode').focus(), 100);
+        setTimeout(() => {
+            let inputEl = document.getElementById('attendanceBarcode');
+            if(inputEl) { inputEl.value = ''; inputEl.focus(); }
+        }, 100);
     }
 
     tempWrongGroupStudent = null;
 };
 
-// 2. النقل النهائي للمجموعة الحالية + التحضير الفوري
-window.moveStudentAndAttend = function() {
-    const session = classSessions.find(s => s.id === currentActiveSessionId);
-    let oldGroup = tempWrongGroupStudent.group;
-    
-    // نقل الطالب برمجياً
-    tempWrongGroupStudent.group = session.group;
-    localStorage.setItem("students", JSON.stringify(students));
 
-    // 🔴 سطر السجل
-    if(typeof addSystemLog === "function") {
-        addSystemLog("نقل مجموعة 🔄", `تم نقل الطالب ${tempWrongGroupStudent.name} من (${oldGroup}) إلى (${session.group}) أثناء الحضور.`);
-    }
 
-    // إغلاق النافذة
-    closeModal('wrongGroupModal');
-
-    // تحضير الطالب في الحصة الحالية مباشرة كأنه ضرب الباركود من الأول
-    let isLate = document.getElementById('markAsLateCheckbox')?.checked;
-    let attStatus = isLate ? 'late' : 'present';
-    
-    markAttendance(tempWrongGroupStudent.code, attStatus); 
-    showToast(`🔄 تم النقل بنجاح! و ${isLate ? 'تسجيل تأخير⏳' : 'حضور✅'} لـ: ${tempWrongGroupStudent.name}`);
-
-    // فتح شاشة الدفع لو متفعلة
-    let autoPaymentEnabled = document.getElementById('autoPaymentCheckbox')?.checked;
-    if (autoPaymentEnabled) {
-        setTimeout(() => openQuickPaymentModal(tempWrongGroupStudent), 500);
-    }
-
-    renderAttendanceTable(session);
-    setTimeout(() => document.getElementById('attendanceBarcode').focus(), 100);
-};
-
-// 3. تخطي (إغلاق النافذة والرجوع للباركود)
-window.skipWrongGroup = function() {
-    closeModal('wrongGroupModal');
-    tempWrongGroupStudent = null;
-    setTimeout(() => document.getElementById('attendanceBarcode').focus(), 100);
-};
 
 
 // 🔔 دالة إرسال الإشعارات اللحظية (تعمل عبر سيرفر الإشعارات المنفصل)
