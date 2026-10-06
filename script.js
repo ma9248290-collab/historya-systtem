@@ -9241,3 +9241,117 @@ window.downloadCurrentSessionReport = function() {
 
     showToast("تم تحميل تقرير الحصة بنجاح! 📥");
 };
+
+
+
+
+// ==========================================
+// 🧠 نظام الاقتراحات الذكي للبحث السريع (نفس المجموعة ثم نفس الصف)
+// ==========================================
+window.setupSmartAutocomplete = function(inputId, mode) {
+    let inputEl = document.getElementById(inputId);
+    if(!inputEl) return;
+
+    inputEl.setAttribute('autocomplete', 'off'); // قفل اقتراحات المتصفح العادية المزعجة
+
+    let dropdown = document.getElementById(inputId + '-autocomplete');
+    if(!dropdown) {
+        dropdown = document.createElement('div');
+        dropdown.id = inputId + '-autocomplete';
+        dropdown.className = 'smart-autocomplete-dropdown';
+        inputEl.parentNode.style.position = 'relative'; // عشان القايمة تظهر تحته بالظبط
+        inputEl.parentNode.appendChild(dropdown);
+    }
+
+    inputEl.addEventListener('input', function() {
+        let val = this.value.trim();
+        if(!val) { dropdown.style.display = 'none'; return; }
+
+        let currentGroup = '';
+        let currentLevel = '';
+        
+        // معرفة إحنا شغالين على أي مجموعة وصف دلوقتي
+        if(mode === 'attendance' && currentActiveSessionId) {
+            let s = classSessions.find(x => x.id === currentActiveSessionId);
+            if(s) currentGroup = s.group;
+        } else if (mode === 'exam' && currentActiveExamId) {
+            let e = exams.find(x => x.id === currentActiveExamId);
+            if(e) currentGroup = e.group;
+        } else if (mode === 'hw' && currentActiveHwId) {
+            let h = homeworks.find(x => x.id === currentActiveHwId);
+            if(h) currentGroup = h.group;
+        }
+
+        let groupObj = groups.find(g => g.name === currentGroup);
+        if(groupObj) currentLevel = groupObj.level;
+
+        let normalizedVal = window.smartArabicNormalize(val);
+
+        // 1. فلترة الطلاب
+        let matches = students.filter(s => {
+            if(s.level !== currentLevel) return false; // 🚫 استبعاد صفوف تانية خالص
+            
+            let dbName = window.smartArabicNormalize(s.name);
+            return dbName.includes(normalizedVal) || String(s.code).includes(val) || String(s.phone).includes(val);
+        });
+
+        // 2. ترتيب الطلاب: نفس المجموعة تظهر في الأول
+        matches.sort((a, b) => {
+            let aInGroup = (a.group === currentGroup) ? 0 : 1;
+            let bInGroup = (b.group === currentGroup) ? 0 : 1;
+            return aInGroup - bInGroup;
+        });
+
+        // تحديد أقصى عدد يظهر (10 طلاب عشان الشاشة متزحمش)
+        matches = matches.slice(0, 10);
+
+        // 3. عرض النتائج
+        if(matches.length > 0) {
+            dropdown.innerHTML = matches.map(m => {
+                let isSameGroup = m.group === currentGroup;
+                // بادج أخضر لو في مجموعته، وأصفر لو مجموعة تانية
+                let badge = isSameGroup ? `<span class="badge-same-group">مجموعته ✅</span>` : `<span class="badge-other-group">مجموعة: ${m.group} ⚠️</span>`;
+                
+                return `<div class="autocomplete-item" onclick="selectSmartStudent('${inputId}', '${m.code}', '${mode}')">
+                    <div><strong style="color:var(--primary-color); margin-left:8px;">${m.code}</strong> ${m.name}</div>
+                    ${badge}
+                </div>`;
+            }).join('');
+            dropdown.style.display = 'block';
+        } else {
+            dropdown.innerHTML = `<div style="padding:15px;text-align:center;color:var(--danger-color);font-weight:bold;">لا يوجد طالب بهذا الاسم في هذا الصف.</div>`;
+            dropdown.style.display = 'block';
+        }
+    });
+
+    // إخفاء القايمة لو ضغط بره
+    document.addEventListener('click', function(e) {
+        if(e.target !== inputEl && e.target !== dropdown && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+};
+
+// الدالة اللي بتشتغل لما تختار طالب من القايمة
+window.selectSmartStudent = function(inputId, code, mode) {
+    let inputEl = document.getElementById(inputId);
+    inputEl.value = code;
+    document.getElementById(inputId + '-autocomplete').style.display = 'none';
+    
+    // تنفيذ الأكشن (التحضير أو الرصد) زي كأنك دوست Enter بالظبط
+    if(mode === 'attendance') {
+        window.processAttendanceBarcode(code);
+    } else if (mode === 'exam' || mode === 'hw') {
+        let enterEvent = new KeyboardEvent('keypress', { key: 'Enter', keyCode: 13, which: 13 });
+        inputEl.dispatchEvent(enterEvent);
+    }
+};
+
+// تشغيل النظام على الـ 3 مربعات (الحضور، الامتحان، الواجب)
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        setupSmartAutocomplete('attendanceBarcode', 'attendance');
+        setupSmartAutocomplete('examBarcodeCode', 'exam');
+        setupSmartAutocomplete('hwBarcodeCode', 'hw');
+    }, 1500);
+});
