@@ -150,7 +150,7 @@
 
                     if (licData.status === 'suspended' || isExpired) {
                         errorMsg.style.display = "block";
-                        errorMsg.innerText = "عفواً، المنصة متوقفة حالياً. يرجى مراجعة إدارة السنتر!";
+                        errorMsg.innerText = "عفواً، المنصة متوقفة حالياً. يرجى مراجعة إدارة المستر!";
                         if(btn) { btn.innerHTML = "تسجيل الدخول 🚀"; btn.disabled = false; }
                         if(isAutoLogin) {
                             localStorage.removeItem("historia_student_code"); localStorage.removeItem("historia_parent_phone"); localStorage.removeItem("historia_teacher_id");
@@ -190,12 +190,37 @@
                     return;
                 }
 
+                // 🚨🚨 التعديل الجديد: فحص الإيقاف 🚨🚨
+                if (currentStudent.isSuspended) {
+                    // لو الطالب بيحاول يدخل أوتوماتيك (لأنه كان مسجل قبل ما يتوقف)، هنمسح حفظ الدخول ونظهرله المودال
+                    if(isAutoLogin) {
+                        document.getElementById("landing-page").style.display = "flex";
+                        document.getElementById("app-layout").style.display = "none";
+                        openAuthModal('login'); 
+                        
+                        localStorage.removeItem("historia_student_code"); 
+                        localStorage.removeItem("historia_parent_phone"); 
+                        localStorage.removeItem("historia_teacher_id");
+                        
+                        // كتابة الداتا تاني في المربعات عشان يشوف هو دخل بإيه
+                        document.getElementById("studentCode").value = code;
+                        document.getElementById("parentPhone").value = phone;
+                    }
+                    
+                    errorMsg.style.display = "block"; 
+                    errorMsg.style.background = "var(--danger)"; // لون أحمر للتنبيه
+                    errorMsg.innerText = "⛔ عفواً، حسابك موقوف حالياً من قبل الإدارة. يرجى مراجعة المستر!";
+                    
+                    if(btn) { btn.innerHTML = "تسجيل الدخول 🚀"; btn.disabled = false; }
+                    return; // إيقاف الدالة هنا لمنع الدخول
+                }
+                // 🚨🚨 نهاية التعديل الجديد 🚨🚨
+
                 if (currentStudent.purchasedCourses) currentStudent.purchasedCourses = Array.isArray(currentStudent.purchasedCourses) ? currentStudent.purchasedCourses : Object.values(currentStudent.purchasedCourses);
                 else currentStudent.purchasedCourses = [];
 
                 let studentGroupObj = safeGroups.find(g => typeof g === 'object' && g.name === currentStudent.group);
-// التعديل: نحافظ على صف الطالب اللي اختاره في التسجيل لو مجموعته ملهاش صف (زي الأونلاين)
-currentStudent.level = (studentGroupObj && studentGroupObj.level) ? studentGroupObj.level : (currentStudent.level || "غير محدد");
+                currentStudent.level = (studentGroupObj && studentGroupObj.level) ? studentGroupObj.level : (currentStudent.level || "غير محدد");
 
                 if (currentStudent.level === "غير محدد") {
                     let gName = currentStudent.group || "";
@@ -247,11 +272,11 @@ currentStudent.level = (studentGroupObj && studentGroupObj.level) ? studentGroup
                     myExams.forEach(e => { if (allSubs[e.id] && (allSubs[e.id][currentStudent.code] || allSubs[e.id][currentStudent.phone])) completedItems++; else if (e.status === "open") missingExams++; });
 
                    let myLectures = window.allLectures.filter(l => {
-    if (!l) return false;
-    let levelMatch = l.level === "all" || l.level === currentStudent.level;
-    let trackMatch = !l.track || l.track === 'all' || l.track === (currentStudent.track || 'عام');
-    return levelMatch && trackMatch;
-});
+                        if (!l) return false;
+                        let levelMatch = l.level === "all" || l.level === currentStudent.level;
+                        let trackMatch = !l.track || l.track === 'all' || l.track === (currentStudent.track || 'عام');
+                        return levelMatch && trackMatch;
+                    });
                     totalItems += myLectures.length;
                     let trackRes = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/course_tracking.json`);
                     let allTracks = await trackRes.json() || {};
@@ -353,7 +378,7 @@ currentStudent.level = (studentGroupObj && studentGroupObj.level) ? studentGroup
 
             try {
                 if (type === 'center') {
-                    // طالب السنتر
+                    // طالب المستر
                     studentData.centerName = document.getElementById("regCenterName").value.trim();
                     studentData.groupPref = document.getElementById("regGroupPref").value.trim();
                     studentData.status = "pending";
@@ -1187,7 +1212,7 @@ window.playCourseVideo = async function(url, videoTitle, courseId, videoIndex, e
     
     data = data || { views: 0 };
     
-    // 💡 التعديل هنا: قراءة السماحية الإضافية من السنتر
+    // 💡 التعديل هنا: قراءة السماحية الإضافية من المستر
     let extraViews = parseInt(data.extraViews) || 0;
     let totalAllowed = maxViews + extraViews;
 
@@ -1215,7 +1240,7 @@ window.playCourseVideo = async function(url, videoTitle, courseId, videoIndex, e
     // التحقق من लिमिट المشاهدات لو هنحسب مشاهدة جديدة
     if (isViewCounted && maxViews > 0 && data.views >= totalAllowed) {
         if(typeof showToast === 'function') {
-            showToast("🚫 لقد استنفدت العدد المسموح لمشاهدة هذا الفيديو. يرجى مراجعة إدارة السنتر لتجديد الفرصة.", "error");
+            showToast("🚫 لقد استنفدت العدد المسموح لمشاهدة هذا الفيديو. يرجى مراجعة إدارة المستر لتجديد الفرصة.", "error");
         } else {
             alert("🚫 لقد استنفدت العدد المسموح لمشاهدة هذا الفيديو.");
         }
