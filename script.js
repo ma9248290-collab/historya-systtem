@@ -173,8 +173,10 @@ const errorSound = new Audio('error.mp3');
 successSound.volume = 0.7; 
 errorSound.volume = 0.8;
 
+// ==========================================
+// 🔔 نظام الإشعارات (متضمن اللون الموف للتكرار)
+// ==========================================
 window.showToast = function(message, type = 'success') {
-    // 1. حقن الستايل الاحترافي لو مش موجود
     if (!document.getElementById("premium-toast-styles")) {
         const style = document.createElement("style");
         style.id = "premium-toast-styles";
@@ -197,9 +199,12 @@ window.showToast = function(message, type = 'success') {
             .toast-warning .toast-progress-bar { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
             .toast-warning { border-right: 6px solid #f59e0b; background: linear-gradient(to left, rgba(254, 252, 232, 0.95), rgba(255,255,255,0.95)); }
             
-            /* ✨ التعديل الجديد: لون المنصة الأزرق */
             .toast-info .toast-progress-bar { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
             .toast-info { border-right: 6px solid #3b82f6; background: linear-gradient(to left, rgba(239, 246, 255, 0.95), rgba(255,255,255,0.95)); }
+
+            /* ✨ التعديل الجديد: لون موف للطالب المسجل بالفعل */
+            .toast-duplicate .toast-progress-bar { background: linear-gradient(90deg, #8b5cf6, #a855f7); }
+            .toast-duplicate { border-right: 6px solid #8b5cf6; background: linear-gradient(to left, rgba(243, 232, 255, 0.95), rgba(255,255,255,0.95)); }
             
             @keyframes slideInLeftToast { 0% { opacity: 0; transform: translateX(-60px) scale(0.9); } 100% { opacity: 1; transform: translateX(0) scale(1); } }
             @keyframes slideOutLeftToast { 0% { opacity: 1; transform: translateX(0) scale(1); max-height: 100px; margin-bottom: 15px; } 100% { opacity: 0; transform: translateX(-60px) scale(0.9); max-height: 0; margin-bottom: 0; padding: 0; border: none; } }
@@ -223,12 +228,13 @@ window.showToast = function(message, type = 'success') {
         document.body.appendChild(container); 
     }
 
-    // تحديد الأيقونة
+    // تحديد الأيقونة المناسبة
     let icon = '✨';
     if (type === 'success') icon = '✅';
     if (type === 'error') icon = '❌';
     if (type === 'warning') icon = '🔔';
-    if (type === 'info') icon = '💻'; // أيقونة المنصة الجديدة
+    if (type === 'info') icon = '💻';
+    if (type === 'duplicate') icon = '🔁'; // أيقونة التكرار
 
     const toast = document.createElement('div'); 
     toast.className = `premium-toast toast-${type}`;
@@ -1374,109 +1380,169 @@ function backToSessions() { document.getElementById("sessions-overview").style.d
 
 
 
+// ==========================================
+// 4️⃣ رصد الباركود المطور (تفريغ فوري + تغيير الحالة + استماع عام للسكانر)
+// ==========================================
 
-// ==========================================
-// 4️⃣ رصد الباركود المطور (ربط ذكي وتجاهل أخطاء الاسم)
-// ==========================================
+// 1. الدالة الأساسية لمعالجة الباركود
+window.processAttendanceBarcode = function(val) {
+    val = val.trim();
+    
+    // إرجاع المؤشر (الفوكس) للخانة عشان لو هنسحب اللي بعده
+    let inputEl = document.getElementById('attendanceBarcode');
+    if (inputEl) {
+        inputEl.value = '';
+        inputEl.focus();
+    }
+
+    if(!val) return;
+
+    let student = findStudentByCodeOrName(val); 
+    const session = classSessions.find(s => s.id === currentActiveSessionId); 
+    
+    if(!student) {
+        let normalizedVal = window.smartArabicNormalize(val); 
+        let inputWords = normalizedVal.split(' '); 
+        let foundReqId = null;
+
+        if (window.currentJoinRequests) {
+            for (let id in window.currentJoinRequests) {
+                let reqName = window.smartArabicNormalize(window.currentJoinRequests[id].name);
+                if (reqName === normalizedVal || inputWords.every(word => reqName.includes(word))) {
+                    foundReqId = id; break;
+                }
+            }
+        }
+
+        if (foundReqId) {
+            showToast(`تم العثور عليه في طلبات الانضمام! جاري التسكين... ⏳`, "info");
+            openApproveModal(foundReqId);
+            setTimeout(() => {
+                let groupSelect = document.getElementById("approveStGroup");
+                if(groupSelect) groupSelect.value = session.group;
+            }, 100);
+            window.pendingAttendanceAfterAction = true;
+        } else {
+            showToast(`طالب غير مسجل! جاري فتح الإضافة السريعة... ➕`, "warning");
+            openModal('addStudentModal');
+            setTimeout(() => {
+                let isNumber = /^\d+$/.test(val);
+                if (isNumber) {
+                    document.getElementById('studentCode').value = val;
+                    document.getElementById('studentName').focus();
+                } else {
+                    document.getElementById('studentName').value = val;
+                    let activeGroupObj = groups.find(g => g.name === session.group);
+                    if(activeGroupObj) {
+                        document.getElementById('studentLevel').value = activeGroupObj.level;
+                        filterGroupsByLevel('studentLevel', 'studentGroup');
+                        setTimeout(() => document.getElementById('studentGroup').value = session.group, 50);
+                    }
+                    document.getElementById('studentPhone').focus();
+                }
+            }, 100);
+            window.pendingAttendanceAfterAction = true;
+        }
+        return;
+    } else if (student.isSuspended) {
+        showToast(`⛔ لا يمكن تحضير (${student.name}) لأنه موقوف من الإدارة!`, 'error');
+        try { if(typeof errorSound !== 'undefined') { errorSound.currentTime = 0; errorSound.play(); } } catch(e){}
+        return;
+    } else if(student.group !== session.group) {
+        openWrongGroupModal(student, session);
+        return;
+    } else if(session.status === 'closed') {
+        showToast(`الحصة مغلقة!`, 'error');
+        return;
+    } else { 
+        
+        let isLate = document.getElementById('markAsLateCheckbox')?.checked;
+        let attStatus = isLate ? 'late' : 'present';
+
+        // 💡 فحص التكرار وتحديث الحالة
+        let currentStatus = session.attendance[student.code] || session.attendance[student.phone];
+
+        if (currentStatus) {
+            // 🚀 التعديل: لو الطالب متسجل بس الحالة مختلفة (مثلاً: كان حاضر وأنت دوست "تسجيل كمتأخر" وسحبت الكود)
+            if (currentStatus !== attStatus) {
+                markAttendance(student.code, attStatus); // تحديث الحالة
+                let newStatusText = attStatus === 'late' ? 'متأخر ⏳' : 'حاضر ✅';
+                showToast(`تم تعديل حالة (${student.name}) إلى ${newStatusText}`, 'success');
+                
+                let autoPaymentEnabled = document.getElementById('autoPaymentCheckbox')?.checked;
+                if (autoPaymentEnabled) {
+                    setTimeout(() => openQuickPaymentModal(student), 500);
+                }
+                return;
+            } else {
+                // نفس الحالة بالظبط، يبقى تكرار
+                let statusText = currentStatus === 'present' ? 'حاضر ✅' : currentStatus === 'late' ? 'متأخر ⏳' : 'تعويض 💻';
+                showToast(`الطالب (${student.name}) مسجل بالفعل كـ ${statusText}`, 'duplicate');
+                try { if(typeof errorSound !== 'undefined') { errorSound.currentTime = 0; errorSound.play(); } } catch(e){}
+                return; 
+            }
+        }
+
+        // الرصد العادي لأول مرة
+        markAttendance(student.code, attStatus); 
+        
+        if (student.isSpecialCase) {
+            let alertBox = document.createElement('div');
+            alertBox.innerHTML = `⭐ <b>حالة خاصة:</b> ${student.name} يدفع <b>(${student.specialAmount} ج.م)</b>`;
+            alertBox.style.cssText = "position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#f59e0b; color:white; padding:12px 30px; border-radius:30px; font-weight:900; font-size:16px; z-index:9999999; box-shadow:0 10px 25px rgba(245, 158, 11, 0.4); text-align:center; animation: slideInLeftToast 0.4s ease-out forwards;";
+            document.body.appendChild(alertBox);
+            setTimeout(() => { alertBox.style.opacity = '0'; setTimeout(()=>alertBox.remove(), 400); }, 4000);
+        }
+        
+        let autoPaymentEnabled = document.getElementById('autoPaymentCheckbox')?.checked;
+        if (autoPaymentEnabled) {
+            setTimeout(() => openQuickPaymentModal(student), 500);
+        }
+    }
+};
+
+// 2. الاستماع للخانة مباشرة (عندما تكون محددة)
 document.getElementById('attendanceBarcode')?.addEventListener('keypress', function(e) { 
     if(e.key === 'Enter') { 
         e.preventDefault(); 
-        let val = this.value.trim(); 
-        if(!val) return;
-
-        let student = findStudentByCodeOrName(val); 
-        const session = classSessions.find(s => s.id === currentActiveSessionId); 
-        
-        if(!student) {
-            let normalizedVal = window.smartArabicNormalize(val); 
-            let inputWords = normalizedVal.split(' '); 
-            let foundReqId = null;
-
-            if (window.currentJoinRequests) {
-                for (let id in window.currentJoinRequests) {
-                    let reqName = window.smartArabicNormalize(window.currentJoinRequests[id].name);
-                    // لو الاسم متطابق أو كل الكلمات اللي كتبتها موجودة في اسم الطلب
-                    if (reqName === normalizedVal || inputWords.every(word => reqName.includes(word))) {
-                        foundReqId = id;
-                        break;
-                    }
-                }
-            }
-
-            if (foundReqId) {
-                showToast(`تم العثور عليه في طلبات الانضمام! جاري التسكين... ⏳`, "info");
-                openApproveModal(foundReqId);
-                
-                setTimeout(() => {
-                    let groupSelect = document.getElementById("approveStGroup");
-                    if(groupSelect) groupSelect.value = session.group;
-                }, 100);
-
-                window.pendingAttendanceAfterAction = true;
-
-            } else {
-                showToast(`طالب غير مسجل! جاري فتح الإضافة السريعة... ➕`, "warning");
-                openModal('addStudentModal');
-                
-                setTimeout(() => {
-                    let isNumber = /^\d+$/.test(val);
-                    if (isNumber) {
-                        document.getElementById('studentCode').value = val;
-                        document.getElementById('studentName').focus();
-                    } else {
-                        document.getElementById('studentName').value = val;
-                        let activeGroupObj = groups.find(g => g.name === session.group);
-                        if(activeGroupObj) {
-                            document.getElementById('studentLevel').value = activeGroupObj.level;
-                            filterGroupsByLevel('studentLevel', 'studentGroup');
-                            setTimeout(() => document.getElementById('studentGroup').value = session.group, 50);
-                        }
-                        document.getElementById('studentPhone').focus();
-                    }
-                }, 100);
-
-                window.pendingAttendanceAfterAction = true;
-            }
-            } else if (student.isSuspended) {
-            // ⛔ صدادة الطلاب الموقوفين
-            showToast(`⛔ لا يمكن تحضير (${student.name}) لأنه موقوف من الإدارة!`, 'error');
-            try { if(typeof errorSound !== 'undefined') { errorSound.currentTime = 0; errorSound.play(); } } catch(e){}
-            this.value = ''; 
-            return;
-        } 
-        
-        
-        
-        else if(student.group !== session.group) {
-            openWrongGroupModal(student, session);
-        } else if(session.status === 'closed') {
-            showToast(`الحصة مغلقة!`, 'error');
-        } else { 
-            let isLate = document.getElementById('markAsLateCheckbox')?.checked;
-            let attStatus = isLate ? 'late' : 'present';
-            
-            markAttendance(student.code, attStatus); 
-            showToast(isLate ? `⏳ تم تسجيل تأخير: ${student.name}` : `✅ تم حضور: ${student.name}`); 
-            
-            if (student.isSpecialCase) {
-                let alertBox = document.createElement('div');
-                alertBox.innerHTML = `⭐ <b>حالة خاصة:</b> ${student.name} يدفع <b>(${student.specialAmount} ج.م)</b>`;
-                alertBox.style.cssText = "position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#f59e0b; color:white; padding:12px 30px; border-radius:30px; font-weight:900; font-size:16px; z-index:9999999; box-shadow:0 10px 25px rgba(245, 158, 11, 0.4); text-align:center; animation: slideInLeftToast 0.4s ease-out forwards;";
-                document.body.appendChild(alertBox);
-                setTimeout(() => { alertBox.style.opacity = '0'; setTimeout(()=>alertBox.remove(), 400); }, 4000);
-            }
-            
-            let autoPaymentEnabled = document.getElementById('autoPaymentCheckbox')?.checked;
-            if (autoPaymentEnabled) {
-                setTimeout(() => openQuickPaymentModal(student), 500);
-            }
-        }
-        
-        this.value = ''; 
-        this.focus();
-    } 
+        let val = this.value;
+        this.value = ''; // 🧹 تفريغ إجباري ومباشر من الـ DOM قبل المعالجة
+        window.processAttendanceBarcode(val);
+    }
 });
 
+// 3. 🌐 الاستماع العام للسكانر (Global Scanner Listener)
+window.globalBarcodeBuffer = "";
+window.globalBarcodeTimeout = null;
+
+document.addEventListener('keypress', function(e) {
+    // التأكد إننا في شاشة الرصد وإن المودال مش مفتوح فوقها (زي إضافة طالب)
+    if (document.getElementById('session-details-view')?.style.display !== 'block') return;
+    
+    // تجاهل لو المؤشر جوه خانة الباركود (لأننا بنعالجها فوق عشان ميترصدش مرتين)
+    if (e.target.id === 'attendanceBarcode') return;
+    
+    // تجاهل لو المستخدم بيكتب بإيده في أي خانة تانية (زي خانة البحث)
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    if (e.key === 'Enter') {
+        if (window.globalBarcodeBuffer.length > 0) {
+            e.preventDefault();
+            let scannedVal = window.globalBarcodeBuffer;
+            window.globalBarcodeBuffer = "";
+            window.processAttendanceBarcode(scannedVal);
+        }
+        return;
+    }
+
+    window.globalBarcodeBuffer += e.key;
+
+    // جهاز السكانر بيكتب الحروف بسرعة جداً، تم رفع الوقت لـ 100ms ليغطي كل أنواع السكانر
+    if (window.globalBarcodeTimeout) clearTimeout(window.globalBarcodeTimeout);
+    window.globalBarcodeTimeout = setTimeout(() => {
+        window.globalBarcodeBuffer = "";
+    }, 100);
+});
 
 
 // بتجيب السعر أوتوماتيك من صفحة الماليات
