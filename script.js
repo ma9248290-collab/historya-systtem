@@ -6337,8 +6337,9 @@ window.renderGroupStudentsTable = function() {
             <td style="direction: ltr;">${student.parentPhone}</td>
             <td>
                 <div style="display: flex; gap: 5px; justify-content: center;">
-                    <button class="profile-btn" onclick="openStudentProfile('${student.code}')" style="margin:0;">👤 الملف</button>
-                    <button class="icon-btn danger admin-only" onclick="removeStudentFromGroup('${student.code}')" title="إزالة من المجموعة">❌</button>
+                    <button class="profile-btn" onclick="openStudentProfile('${student.code}', ${students.indexOf(student)})" style="margin:0;">👤 الملف</button>
+                    <button class="icon-btn admin-only" style="background-color: #3b82f6; color: white;" onclick="openMoveGroupModal(${students.indexOf(student)})" title="نقل لمجموعة أخرى">🔄</button>
+                    <button class="icon-btn danger admin-only" onclick="removeStudentFromGroup(${students.indexOf(student)})" title="إزالة من المجموعة">❌</button>
                 </div>
             </td>
         </tr>`; 
@@ -9388,3 +9389,53 @@ document.addEventListener('DOMContentLoaded', () => {
         setupSmartAutocomplete('hwBarcodeCode', 'hw');
     }, 1500);
 });
+
+
+
+
+// فتح نافذة النقل وتعبئة المجموعات المتاحة
+window.openMoveGroupModal = function(studentIndex) {
+    if (studentIndex > -1 && students[studentIndex]) {
+        const student = students[studentIndex];
+        document.getElementById('moveStIndex').value = studentIndex;
+        document.getElementById('moveStName').innerText = student.name;
+        document.getElementById('moveStCurrentGroup').innerText = student.group || 'بدون مجموعة';
+        
+        // تعبئة قائمة المجموعات المتاحة لنفس الصف (ما عدا المجموعة الحالية)
+        let groupSelect = document.getElementById('moveStNewGroup');
+        groupSelect.innerHTML = "<option value=''>اختر المجموعة الجديدة...</option>";
+        
+        groups.filter(g => g.level === student.level && g.name !== student.group).forEach(g => {
+            groupSelect.innerHTML += `<option value="${g.name}">${g.name}</option>`;
+        });
+        
+        openModal('moveGroupModal');
+    }
+};
+
+// تنفيذ النقل الفعلي
+window.confirmMoveGroup = function() {
+    let studentIndex = document.getElementById('moveStIndex').value;
+    let newGroup = document.getElementById('moveStNewGroup').value;
+    
+    if (!newGroup) return showToast("يرجى اختيار المجموعة الجديدة!", "error");
+    
+    if (studentIndex > -1 && students[studentIndex]) {
+        let oldGroup = students[studentIndex].group;
+        students[studentIndex].group = newGroup;
+        
+        localStorage.setItem("students", JSON.stringify(students));
+        
+        if (typeof addSystemLog === "function") {
+            addSystemLog("نقل طالب 🔄", `تم نقل الطالب ${students[studentIndex].name} من مجموعة (${oldGroup}) إلى (${newGroup})`);
+        }
+        
+        showToast(`تم نقل الطالب لـ ${newGroup} بنجاح! ✅`);
+        closeModal('moveGroupModal');
+        
+        // إعادة رسم الجدول الحالي (الطالب سيختفي منه لأنه انتقل)
+        if (typeof renderGroupStudentsTable === "function") renderGroupStudentsTable();
+        if (typeof renderGroupCards === "function") renderGroupCards();
+        if (typeof syncDataToBot === "function") syncDataToBot();
+    }
+};

@@ -2747,7 +2747,27 @@
         </div>
     </div>
 
-    
+    <!-- نافذة نقل طالب لمجموعة أخرى من داخل الجدول -->
+<div id="moveGroupModal" class="modal" style="z-index: 1000000;">
+    <div class="modal-content" style="width: 400px; border-top: 5px solid #3b82f6;">
+        <span class="close-btn" onclick="closeModal('moveGroupModal')">&times;</span>
+        <h2 style="color: #3b82f6; margin-bottom: 15px;">🔄 نقل الطالب لمجموعة أخرى</h2>
+        
+        <div style="background: var(--hover-bg); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: right;">
+            <p style="margin: 0 0 5px 0;">اسم الطالب: <strong id="moveStName" style="color: var(--primary-color);"></strong></p>
+            <p style="margin: 0;">المجموعة الحالية: <strong id="moveStCurrentGroup" style="color: var(--danger-color);"></strong></p>
+        </div>
+
+        <input type="hidden" id="moveStIndex">
+        
+        <div class="input-group">
+            <label>نقل إلى مجموعة:</label>
+            <select id="moveStNewGroup" class="custom-input"></select>
+        </div>
+
+        <button class="save-btn" style="width: 100%; background: #3b82f6; font-size: 16px;" onclick="confirmMoveGroup()">تأكيد النقل ✅</button>
+    </div>
+</div>
 
 
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
