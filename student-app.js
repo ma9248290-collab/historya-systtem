@@ -241,8 +241,8 @@
                 allOnlineExams = data.onlineExams || [];
                 window.studentCode = code;
 
-                // ==========================================
-                // ✅ تعبئة كارت الطالب الـ VIP الداخلي
+               // ==========================================
+                // ✅ تعبئة كارت الطالب الـ VIP الداخلي + السكور الشامل
                 // ==========================================
                 document.getElementById("top-name").innerText = currentStudent.name;
                 document.getElementById("top-group").innerText = currentStudent.group;
@@ -251,7 +251,30 @@
                 let cLevel = document.getElementById("card-student-level"); if(cLevel) cLevel.innerText = currentStudent.level;
                 let cGroup = document.getElementById("card-student-group-name"); if(cGroup) cGroup.innerText = currentStudent.group;
                 let cCodeNum = document.getElementById("card-student-code-num"); if(cCodeNum) cCodeNum.innerText = code;
-                let cPoints = document.getElementById("card-behavior-points"); if(cPoints) cPoints.innerText = currentStudent.behaviorPoints || 0;
+                
+                // 🌟 حساب المجموع الشامل للطالب في المنصة
+                let totalScore = currentStudent.behaviorPoints || 0;
+                safeClassSessions.filter(s => s && s.group === currentStudent.group).forEach(session => { 
+                    let att = (session.attendance || {})[currentStudent.code] || (session.attendance || {})[currentStudent.phone]; 
+                    if(att === 'present') totalScore += 10; 
+                }); 
+                safeExams.filter(e => e && e.group === currentStudent.group).forEach(exam => { 
+                    let g = (exam.grades || {})[currentStudent.code] !== undefined ? (exam.grades || {})[currentStudent.code] : (exam.grades || {})[currentStudent.phone]; 
+                    if(g !== undefined && exam.maxScore) { totalScore += (parseFloat(g) / parseFloat(exam.maxScore)) * 50; } 
+                }); 
+                safeHomeworks.filter(h => h && h.group === currentStudent.group).forEach(hw => { 
+                    let g = (hw.grades || {})[currentStudent.code] !== undefined ? (hw.grades || {})[currentStudent.code] : (hw.grades || {})[currentStudent.phone]; 
+                    if(g !== undefined && hw.maxScore) { totalScore += (parseFloat(g) / parseFloat(hw.maxScore)) * 20; } 
+                });
+                
+                currentStudent.totalScore = Math.round(totalScore);
+
+                // تغيير التسمية في الشاشة لتعبر عن المجموع الشامل
+                let cPoints = document.getElementById("card-behavior-points"); 
+                if(cPoints) {
+                    cPoints.innerText = currentStudent.totalScore;
+                    cPoints.parentElement.innerHTML = `🏆 مجموع النقاط الشامل: <span id="card-behavior-points" style="color: var(--accent); font-size: 20px; font-weight: 900;">${currentStudent.totalScore}</span>`;
+                }
 
                 if (typeof JsBarcode !== 'undefined' && document.getElementById("digitalIdBarcode")) {
                     JsBarcode("#digitalIdBarcode", currentStudent.code, { format: "CODE128", lineColor: "#0f172a", width: 2, height: 45, displayValue: false });
@@ -676,11 +699,16 @@
         window.purchaseStoreItem = async function(itemId, itemName, price, currency) {
             price = parseFloat(price);
             if (currency === 'points') {
-                if ((currentStudent.behaviorPoints || 0) < price) return alert("النقاط لا تكفي.");
-                if (!confirm("تأكيد العملية؟")) return; currentStudent.behaviorPoints -= price;
+                if ((currentStudent.totalScore || 0) < price) return alert("مجموع النقاط الشامل لا يكفي لتنفيذ العملية.");
+                if (!confirm("تأكيد العملية؟ سيتم خصم النقاط من مجموعك الشامل.")) return; 
+                
+                // 💡 نقوم بالخصم من نقاط السلوك الأساسية لكي يتم تقليل المجموع الشامل نهائياً
+                currentStudent.behaviorPoints -= price; 
+                currentStudent.totalScore -= price;
             } else {
-                if ((currentStudent.walletBalance || 0) < price) return alert("الرصيد لا يكفي.");
-                if (!confirm("تأكيد العملية؟")) return; currentStudent.walletBalance -= price;
+                if ((currentStudent.walletBalance || 0) < price) return alert("الرصيد في المحفظة لا يكفي.");
+                if (!confirm("تأكيد العملية؟")) return; 
+                currentStudent.walletBalance -= price;
             }
             try {
                 let dataRes = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data.json`);
@@ -690,9 +718,9 @@
                     let updates = currency === 'points' ? { behaviorPoints: currentStudent.behaviorPoints } : { walletBalance: currentStudent.walletBalance };
                     await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data/students/${sIdx}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
                     await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/store/logs/${"order_" + Date.now()}.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: "order_" + Date.now(), date: new Date().toLocaleString('ar-EG'), studentName: currentStudent.name, studentCode: currentStudent.code, itemName: itemName, price: price, currency: currency }) });
-                    alert("تم الشراء بنجاح!"); location.reload(); 
+                    alert("تم إتمام العملية بنجاح!"); location.reload(); 
                 }
-            } catch (e) { alert("حدث خطأ."); }
+            } catch (e) { alert("حدث خطأ أثناء تنفيذ العملية."); }
         };
 
         window.submitForumQuestion = async function() {

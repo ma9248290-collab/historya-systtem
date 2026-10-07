@@ -1137,7 +1137,8 @@ function deleteStudentFromProfile() {
     }); 
 }
 
-function changeBehaviorPoints(points) { const student = students.find(s => s.code === currentStudentProfileCode); if(student) { student.behaviorPoints = (student.behaviorPoints || 0) + points; localStorage.setItem("students", JSON.stringify(students)); document.getElementById("profile-behavior-points").innerText = student.behaviorPoints; showToast(points > 0 ? "تم إضافة نقاط تميز 🌟" : "تم خصم نقاط 🤫"); } }
+
+
 
 window.openEditStudentModal = function() { 
     const student = students.find(s => s.code === currentStudentProfileCode); 
@@ -6085,6 +6086,16 @@ window.backToStudents = function(fromHistory = false) {
     }
 };
 
+function changeBehaviorPoints(points) { 
+    const student = students.find(s => s.code === currentStudentProfileCode); 
+    if(student) { 
+        student.behaviorPoints = (student.behaviorPoints || 0) + points; 
+        localStorage.setItem("students", JSON.stringify(students)); 
+        showToast(points > 0 ? "تم إضافة نقاط 🌟" : "تم خصم نقاط 🤫"); 
+        openStudentProfile(student.code); // إعادة رسم الملف لتحديث المجموع الشامل
+    } 
+}
+
 window.openStudentProfile = function(code) {
     const student = students.find(s => s.code === code); if(!student) return;
     
@@ -6095,13 +6106,10 @@ window.openStudentProfile = function(code) {
     document.getElementById("student-profile-view").style.display = "block";
     
     let specialBadge = student.isSpecialCase ? `<span style="font-size: 14px; margin-right: 5px;" title="حالة خاصة: ${student.specialAmount > 0 ? 'يدفع ' + student.specialAmount + ' ج.م' : 'إعفاء تام'}">⭐</span>` : '';
-    
-    // البادج الجديد بتاع الإيقاف
     let suspendBadge = student.isSuspended ? `<span style="background:#ef4444; color:white; padding:4px 10px; border-radius:8px; font-size:12px; font-weight:bold; margin-right:10px; box-shadow:0 2px 5px rgba(239,68,68,0.3);">موقوف ⛔</span>` : '';
     
     document.getElementById("profile-name").innerHTML = student.name + specialBadge + suspendBadge; 
 
-    // تظبيط شكل زرار الإيقاف/التفعيل
     let suspendBtn = document.getElementById("suspend-student-btn");
     if(suspendBtn) {
         if(student.isSuspended) {
@@ -6118,7 +6126,6 @@ window.openStudentProfile = function(code) {
     }
     document.getElementById("profile-code-group").innerText = `${student.code} | المجموعة: ${student.group}`;
     
-    // 💡 التحديث هنا لعرض الملاحظة
     if (document.getElementById("profile-student-note")) {
         document.getElementById("profile-student-note").innerText = student.note ? student.note : "لا توجد ملاحظات مسجلة.";
     }
@@ -6129,7 +6136,33 @@ window.openStudentProfile = function(code) {
     if(document.getElementById("profile-parent")) document.getElementById("profile-parent").innerText = student.parentPhone;
     if(document.getElementById("profile-level")) document.getElementById("profile-level").innerText = student.level;
     if(document.getElementById("profile-gender")) document.getElementById("profile-gender").innerText = student.gender;
-    document.getElementById("profile-behavior-points").innerText = student.behaviorPoints || 0; 
+
+    // ==========================================
+    // 🌟 حساب المجموع الشامل زي لوحة الشرف بالضبط
+    // ==========================================
+    let totalScore = student.behaviorPoints || 0;
+    classSessions.filter(s => s.group === student.group).forEach(session => { 
+        let att = (session.attendance || {})[student.code] || (session.attendance || {})[student.phone]; 
+        if(att === 'present') totalScore += 10; 
+    }); 
+    exams.filter(e => e.group === student.group).forEach(exam => { 
+        let g = (exam.grades || {})[student.code] !== undefined ? (exam.grades || {})[student.code] : (exam.grades || {})[student.phone]; 
+        if(g !== undefined && exam.maxScore) { totalScore += (parseFloat(g) / parseFloat(exam.maxScore)) * 50; } 
+    }); 
+    homeworks.filter(h => h.group === student.group).forEach(hw => { 
+        let g = (hw.grades || {})[student.code] !== undefined ? (hw.grades || {})[student.code] : (hw.grades || {})[student.phone]; 
+        if(g !== undefined && hw.maxScore) { totalScore += (parseFloat(g) / parseFloat(hw.maxScore)) * 20; } 
+    });
+    totalScore = Math.round(totalScore);
+
+    document.getElementById("profile-behavior-points").innerText = totalScore; 
+
+    // تغيير المسميات في واجهة الإدارة ديناميكياً لتصبح (مجموع النقاط الشامل)
+    let behaviorTitle = document.querySelector("#student-profile-view .stat-card h3");
+    if(behaviorTitle && behaviorTitle.innerText.includes("السلوكي")) {
+        behaviorTitle.innerHTML = "🏆 مجموع النقاط الشامل";
+        behaviorTitle.nextElementSibling.innerText = "يعكس المستوى الأكاديمي والحضور والسلوك معاً";
+    }
 
     let waStudentBtn = document.getElementById("wa-student-btn");
     if (waStudentBtn) waStudentBtn.onclick = function() { if(student.phone && student.phone !== "0" && student.phone !== "") window.open(`https://wa.me/20${student.phone.replace(/^0+/, '')}`, '_blank'); else showToast("رقم هاتف الطالب غير مسجل!", "error"); };
@@ -6140,7 +6173,7 @@ window.openStudentProfile = function(code) {
     const groupSessions = classSessions.filter(s => s.group === student.group).sort((a,b) => new Date(b.date) - new Date(a.date));
     let attended = 0; const attTbody = document.getElementById("profile-attendance-list"); if(attTbody) attTbody.innerHTML = "";
     groupSessions.forEach(s => { 
-        const st = s.attendance[student.code] || s.attendance[student.phone]; 
+        const st = (s.attendance || {})[student.code] || (s.attendance || {})[student.phone]; 
         if(st === 'present' || st === 'late') attended++; 
         const badge = st === 'present' ? `<span style="color:var(--success-color); font-weight:bold;">حاضر ✓</span>` : st === 'late' ? `<span style="color:#f59e0b; font-weight:bold;">متأخر ⏳</span>` : st === 'absent' ? `<span style="color:var(--danger-color); font-weight:bold;">غائب ✗</span>` : `<span style="color:var(--text-muted); font-weight:bold;">لم يسجل</span>`; 
         if(attTbody) attTbody.innerHTML += `<tr><td>${s.date}</td><td>${badge}</td></tr>`; 
@@ -6149,12 +6182,12 @@ window.openStudentProfile = function(code) {
 
     const groupExams = exams.filter(e => e.group === student.group).sort((a,b) => new Date(b.date) - new Date(a.date));
     let tExam = 0, sExam = 0; const exTbody = document.getElementById("profile-exams-list"); if(exTbody) exTbody.innerHTML = "";
-    groupExams.forEach(e => { let g = e.grades[student.code] !== undefined ? e.grades[student.code] : e.grades[student.phone]; if(g !== undefined) { tExam += parseFloat(e.maxScore); sExam += parseFloat(g); } if(exTbody) exTbody.innerHTML += `<tr><td>${e.name}</td><td>${e.date}</td><td><strong>${g !== undefined ? g : '--'}</strong> / ${e.maxScore}</td></tr>`; });
+    groupExams.forEach(e => { let g = (e.grades || {})[student.code] !== undefined ? (e.grades || {})[student.code] : (e.grades || {})[student.phone]; if(g !== undefined) { tExam += parseFloat(e.maxScore); sExam += parseFloat(g); } if(exTbody) exTbody.innerHTML += `<tr><td>${e.name}</td><td>${e.date}</td><td><strong>${g !== undefined ? g : '--'}</strong> / ${e.maxScore}</td></tr>`; });
     document.getElementById("profile-exams").innerText = `${tExam > 0 ? Math.round((sExam / tExam) * 100) : 0}%`;
 
     const groupHw = homeworks.filter(h => h.group === student.group).sort((a,b) => new Date(b.date) - new Date(a.date));
     let tHw = 0, sHw = 0; const hwTbody = document.getElementById("profile-hw-list"); if(hwTbody) hwTbody.innerHTML = "";
-    groupHw.forEach(h => { let g = h.grades[student.code] !== undefined ? h.grades[student.code] : h.grades[student.phone]; if(g !== undefined) { tHw += parseFloat(h.maxScore); sHw += parseFloat(g); } if(hwTbody) hwTbody.innerHTML += `<tr><td>${h.name}</td><td>${h.date}</td><td><strong>${g !== undefined ? g : '--'}</strong> / ${h.maxScore}</td></tr>`; });
+    groupHw.forEach(h => { let g = (h.grades || {})[student.code] !== undefined ? (h.grades || {})[student.code] : (h.grades || {})[student.phone]; if(g !== undefined) { tHw += parseFloat(h.maxScore); sHw += parseFloat(g); } if(hwTbody) hwTbody.innerHTML += `<tr><td>${h.name}</td><td>${h.date}</td><td><strong>${g !== undefined ? g : '--'}</strong> / ${h.maxScore}</td></tr>`; });
     document.getElementById("profile-hw").innerText = `${tHw > 0 ? Math.round((sHw / tHw) * 100) : 0}%`;
 };
 
