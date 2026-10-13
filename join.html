@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بوابة الانضمام للمجموعات | هيستوريا</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3b82f6;
+            --secondary-color: #0f172a;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --whatsapp: #25D366;
+            --danger: #ef4444;
+        }
+        * { box-sizing: border-box; font-family: 'Cairo', sans-serif; }
+        body { margin: 0; padding: 0; background: var(--bg-color); min-height: 100vh; display: flex; align-items: center; justify-content: center; background-image: radial-gradient(circle at top right, rgba(59, 130, 246, 0.1), transparent 40%); }
+        
+        /* كارت تسجيل الدخول للطالب */
+        .login-card { background: var(--card-bg); width: 420px; max-width: 95%; padding: 40px 30px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.08); border-top: 6px solid var(--primary-color); text-align: center; position: relative; animation: slideUp 0.5s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .logo-img { width: 80px; height: auto; margin-bottom: 10px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); }
+        .title { color: var(--secondary-color); font-weight: 900; font-size: 24px; margin: 0 0 5px 0; }
+        .subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 30px; font-weight: bold; }
+        
+        .custom-input { width: 100%; padding: 15px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 15px; font-weight: bold; margin-bottom: 15px; background: #f8fafc; outline: none; transition: 0.3s; text-align: center; }
+        .custom-input:focus { border-color: var(--primary-color); background: #ffffff; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+        
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 12px; font-size: 16px; font-weight: 900; cursor: pointer; transition: 0.3s; color: white; display: flex; justify-content: center; align-items: center; gap: 10px; }
+        .btn-primary { background: var(--primary-color); box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4); }
+        .btn-whatsapp { background: var(--whatsapp); box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3); text-decoration: none; margin-top: 15px; }
+        .btn-whatsapp:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 211, 102, 0.4); }
+        
+        /* رسالة النتيجة */
+        #result-box { display: none; background: rgba(16, 185, 129, 0.05); border: 2px dashed #10b981; padding: 20px; border-radius: 16px; margin-top: 20px; animation: slideUp 0.3s ease-out; }
+        .st-name { color: var(--secondary-color); font-size: 18px; font-weight: 900; margin: 0 0 5px 0; }
+        .st-group { color: var(--primary-color); font-size: 14px; font-weight: bold; margin: 0; background: rgba(59, 130, 246, 0.1); display: inline-block; padding: 4px 12px; border-radius: 20px; }
+
+        /* زر الإدارة المخفي */
+        .admin-btn { position: absolute; top: 15px; left: 15px; background: none; border: none; font-size: 20px; cursor: pointer; opacity: 0.2; transition: 0.3s; }
+        .admin-btn:hover { opacity: 1; }
+
+        /* نافذة الإدارة (Modal) */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .modal-content { background: var(--card-bg); width: 500px; max-width: 95%; max-height: 90vh; overflow-y: auto; padding: 30px; border-radius: 20px; border-top: 5px solid #8b5cf6; box-shadow: 0 20px 50px rgba(0,0,0,0.2); position: relative; }
+        .close-btn { position: absolute; top: 15px; left: 15px; font-size: 24px; cursor: pointer; color: var(--danger); font-weight: bold; }
+        .group-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #f8fafc; padding: 10px 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #e2e8f0; }
+        .group-name { font-weight: bold; color: var(--secondary-color); width: 30%; }
+        .group-link-input { flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; outline: none; font-family: 'Courier New', Courier, monospace; text-align: left; direction: ltr; }
+    </style>
+</head>
+<body>
+
+    <!-- الكارت الخاص بالطالب -->
+    <div class="login-card" id="studentCard">
+        <button class="admin-btn" onclick="openAdminPanel()" title="إدارة الروابط">⚙️</button>
+        <img src="logo.png" alt="Logo" class="logo-img" onerror="this.src='https://cdn-icons-png.flaticon.com/512/4762/4762311.png'"> <!-- شعار بديل لو اللوجو مش موجود -->
+        <h2 class="title">بوابة المجموعات</h2>
+        <p class="subtitle">أدخل بياناتك للحصول على الرابط الخاص بمجموعتك</p>
+
+        <div id="input-section">
+            <input type="text" id="studentCode" class="custom-input" placeholder="أدخل كود الطالب الخاص بك">
+            <input type="text" id="parentPhone" class="custom-input" placeholder="أدخل رقم هاتف ولي الأمر (للتأكيد)">
+            <button class="btn btn-primary" onclick="verifyStudent()">التحقق من البيانات 🔍</button>
+            <p id="errorMsg" style="color: var(--danger); font-size: 13px; font-weight: bold; margin-top: 15px; display: none;">البيانات غير صحيحة أو غير مسجلة!</p>
+        </div>
+
+        <div id="result-box">
+            <p style="font-size: 12px; color: #10b981; font-weight: bold; margin-bottom: 5px;">تم التحقق بنجاح ✅</p>
+            <h3 class="st-name" id="resName">اسم الطالب</h3>
+            <p class="st-group" id="resGroup">المجموعة</p>
+            
+            <div id="linkArea">
+                <!-- الزرار هيترسم هنا بالجافاسكريبت -->
+            </div>
+            
+            <button onclick="resetForm()" style="background: none; border: none; color: var(--text-muted); font-weight: bold; font-size: 12px; margin-top: 15px; cursor: pointer; text-decoration: underline;">🔙 العودة للبحث</button>
+        </div>
+    </div>
+
+    <!-- نافذة تحكم الإدارة (لربط المجموعات باللينكات) -->
+    <div id="adminModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="document.getElementById('adminModal').style.display='none'">&times;</span>
+            <h2 style="color: #8b5cf6; margin-top: 0;">⚙️ إدارة روابط المجموعات</h2>
+            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 20px; font-weight: bold;">ضع رابط جروب الواتساب أو التليجرام أمام كل مجموعة.</p>
+            
+            <div id="adminGroupsList">
+                <!-- المجموعات هتترسم هنا -->
+            </div>
+            
+            <button class="btn btn-primary" style="background: #8b5cf6; margin-top: 20px;" onclick="saveGroupLinks()">💾 حفظ الروابط</button>
+        </div>
+    </div>
+
+    <script>
+        // 1. جلب البيانات الأساسية من الـ localStorage (المشتركة مع السيستم)
+        let students = JSON.parse(localStorage.getItem("students")) || [];
+        let groups = JSON.parse(localStorage.getItem("groups")) || [];
+        // متغير جديد هنحفظ فيه الروابط (مثال: {"مجموعة السبت": "https://chat.whatsapp...", ...})
+        let groupLinks = JSON.parse(localStorage.getItem("groupLinks")) || {};
+
+        // 2. دالة تحقق الطالب
+        function verifyStudent() {
+            let code = document.getElementById("studentCode").value.trim();
+            let pPhone = document.getElementById("parentPhone").value.trim();
+            let errorMsg = document.getElementById("errorMsg");
+            
+            if(!code || !pPhone) {
+                errorMsg.innerText = "يرجى ملء جميع الخانات!";
+                errorMsg.style.display = "block";
+                return;
+            }
+
+            // البحث عن الطالب المطابق
+            let student = students.find(s => s.code == code && (s.parentPhone == pPhone || s.phone == pPhone));
+            
+            if (student) {
+                errorMsg.style.display = "none";
+                document.getElementById("input-section").style.display = "none";
+                
+                document.getElementById("resName").innerText = student.name;
+                document.getElementById("resGroup").innerText = student.group;
+                
+                // البحث عن رابط المجموعة الخاصة به
+                let link = groupLinks[student.group];
+                let linkArea = document.getElementById("linkArea");
+                
+                if (link && link.trim() !== "") {
+                    linkArea.innerHTML = `<a href="${link}" target="_blank" class="btn btn-whatsapp">💬 الانضمام لجروب المجموعة</a>`;
+                } else {
+                    linkArea.innerHTML = `<p style="color: var(--danger); font-weight: bold; font-size: 13px; margin-top: 15px; background: rgba(239,68,68,0.1); padding: 10px; border-radius: 8px;">عذراً، الإدارة لم تقم بإضافة رابط لهذه المجموعة بعد.</p>`;
+                }
+                
+                document.getElementById("result-box").style.display = "block";
+            } else {
+                errorMsg.innerText = "تأكد من الكود ورقم الهاتف (يجب أن يكونا مطابقين لما تم تسجيله في السنتر)!";
+                errorMsg.style.display = "block";
+            }
+        }
+
+        function resetForm() {
+            document.getElementById("studentCode").value = "";
+            document.getElementById("parentPhone").value = "";
+            document.getElementById("result-box").style.display = "none";
+            document.getElementById("input-section").style.display = "block";
+        }
+
+        // ==========================================
+        // أدوات لوحة الإدارة
+        // ==========================================
+        function openAdminPanel() {
+            // طلب الرقم السري للإدارة للتحقق
+            const currentAdminPin = localStorage.getItem("adminPin") || "1234";
+            let pin = prompt("🔒 هذه المنطقة مخصصة للإدارة.\nيرجى إدخال الرقم السري (PIN):");
+            
+            if (pin === currentAdminPin) {
+                renderAdminGroups();
+                document.getElementById("adminModal").style.display = "flex";
+            } else if (pin !== null) {
+                alert("الرقم السري غير صحيح!");
+            }
+        }
+
+        function renderAdminGroups() {
+            let container = document.getElementById("adminGroupsList");
+            if (groups.length === 0) {
+                container.innerHTML = "<p style='text-align:center; color:gray; font-weight:bold;'>لا توجد مجموعات مسجلة في النظام بعد!</p>";
+                return;
+            }
+            
+            container.innerHTML = "";
+            groups.forEach(g => {
+                let currentLink = groupLinks[g.name] || "";
+                container.innerHTML += `
+                    <div class="group-row">
+                        <span class="group-name">${g.name}</span>
+                        <input type="url" class="group-link-input" id="link_${g.name}" value="${currentLink}" placeholder="https://chat.whatsapp.com/...">
+                    </div>
+                `;
+            });
+        }
+
+        async function saveGroupLinks() {
+            let btn = document.querySelector("#adminModal .btn-primary");
+            btn.innerText = "جاري الحفظ... ⏳";
+            
+            // جمع الروابط من الخانات
+            groups.forEach(g => {
+                let inputVal = document.getElementById(`link_${g.name}`).value.trim();
+                groupLinks[g.name] = inputVal;
+            });
+
+            // حفظ محلياً
+            localStorage.setItem("groupLinks", JSON.stringify(groupLinks));
+
+            // اختياري: رفع الروابط للفايربيز إذا أردت (ليكون متزامناً مع السيستم)
+            let licenseKey = localStorage.getItem("licenseKey");
+            if (licenseKey) {
+                try {
+                    await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${licenseKey}/data/groupLinks.json`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(groupLinks)
+                    });
+                } catch(e) { console.log("لم يتم الرفع السحابي، محفوظ محلياً فقط."); }
+            }
+
+            btn.innerText = "تم الحفظ بنجاح! ✅";
+            setTimeout(() => {
+                btn.innerText = "💾 حفظ الروابط";
+                document.getElementById("adminModal").style.display = "none";
+            }, 1500);
+        }
+    </script>
+</body>
+</html>
