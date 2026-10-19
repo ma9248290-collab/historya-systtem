@@ -5953,10 +5953,14 @@ window.renderSessionCards = function() {
                     ${isClosed ? 'الحصة مغلقة للرصد 🔒' : 'الدخول للرصد 📠'}
                 </button>
                 
+                
                 <div style="display: flex; gap: 8px; justify-content: space-between;" class="admin-only">
+                    <!-- الزرار الجديد للإحصائيات 👇 -->
+                    <button onclick="openSessionAnalytics('${session.id}')" style="flex: 1; background: #f3e8ff; color: #7c3aed; border: 1px solid #d8b4fe; border-radius: 8px; padding: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='#e9d5ff';" onmouseout="this.style.background='#f3e8ff';">📊 إحصائيات</button>
+                    
                     <button onclick="openEditSessionModal('${session.id}')" style="flex: 1; background: #f8fafc; color: var(--text-main); border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='#e2e8f0';" onmouseout="this.style.background='#f8fafc';">✏️ تعديل</button>
                     
-                    <button onclick="toggleSessionStatus('${session.id}')" style="flex: 2; background: ${lockBtnColor}15; color: ${lockBtnColor}; border: 1px solid ${lockBtnColor}40; border-radius: 8px; padding: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='${lockBtnColor}30';" onmouseout="this.style.background='${lockBtnColor}15';">${lockBtnIcon}</button>
+                    <button onclick="toggleSessionStatus('${session.id}')" style="flex: 1; background: ${lockBtnColor}15; color:${lockBtnColor}; border: 1px solid ${lockBtnColor}40; border-radius: 8px; padding: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='${lockBtnColor}30';" onmouseout="this.style.background='${lockBtnColor}15';">${lockBtnIcon}</button>
                     
                     <button onclick="deleteSession('${session.id}')" style="flex: 1; background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; border-radius: 8px; padding: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='#fecaca';" onmouseout="this.style.background='#fee2e2';">🗑️ حذف</button>
                 </div>
@@ -8133,64 +8137,6 @@ window.closeModal = function(modalId) {
     }
 };
 
-window.checkWhatsappServer = async function() {
-    const nodeStatus = document.getElementById('nodeStatus');
-    const waStatus = document.getElementById('waStatus');
-    const qrContainer = document.getElementById('qrContainer');
-    const qrImage = document.getElementById('qrImage');
-
-    if (!nodeStatus || !waStatus) return;
-
-    if (!nodeStatus.innerHTML.includes('✅')) {
-        nodeStatus.innerHTML = "جاري الفحص... ⏳";
-        waStatus.innerHTML = "جاري الفحص... ⏳";
-        if (qrContainer) qrContainer.style.display = "none";
-    }
-
-    try {
-        // 👈 نرجع لمسار status عشان هو اللي بيدينا الحالة الحقيقية للسيرفر
-        let statusUrl = `${WHATSAPP_SERVER_URL}/status?clientId=${getSafeUid()}&t=${Date.now()}`;
-        let response = await fetch(statusUrl, { mode: 'cors' });
-        
-        if (!response.ok) throw new Error("Server returned " + response.status);
-        
-        nodeStatus.innerHTML = "<span style='color: #10b981; font-weight: bold;'>متصل ويعمل بنجاح ✅</span>";
-        let data = await response.json();
-        
-        if (data.status === "connected") {
-            waStatus.innerHTML = "<span style='color: #10b981; font-weight: bold;'>الرقم مربوط وجاهز للعمل 📱</span>";
-            if (qrContainer) qrContainer.style.display = "none";
-            if (window.waCheckInterval) clearInterval(window.waCheckInterval); // وقف العداد
-            
-        } else if (data.status === "need_scan") {
-            waStatus.innerHTML = "<span style='color: #f59e0b; font-weight: bold;'>في انتظار مسح الباركود ⚠️</span>";
-            
-            // 👈 جلب الباركود فقط لما السيرفر يطلبه
-            let qrUrl = `${WHATSAPP_SERVER_URL}/qr?clientId=${getSafeUid()}&t=${Date.now()}`;
-            let qrRes = await fetch(qrUrl, { mode: 'cors' });
-            let qrData = await qrRes.json();
-
-            if (qrData.qr && qrContainer && qrImage) {
-                if (qrContainer.getAttribute('data-last-qr') !== qrData.qr) {
-                    qrContainer.style.display = "block";
-                    qrImage.innerHTML = ""; 
-                    if (typeof QRCode !== 'undefined') {
-                        new QRCode(qrImage, { text: qrData.qr, width: 200, height: 200 });
-                        qrContainer.setAttribute('data-last-qr', qrData.qr);
-                    }
-                }
-            }
-        } else {
-            // الحالة دي بتظهر في أول 10 لـ 15 ثانية والسيرفر بيحمل الواتساب
-            waStatus.innerHTML = "<span style='color: #f59e0b; font-weight: bold;'>جاري تهيئة محرك الواتساب (انتظر 15 ثانية)... ⏳</span>";
-            if (qrContainer) qrContainer.style.display = "none";
-        }
-    } catch (error) {
-        console.error("الفحص فشل:", error);
-        nodeStatus.innerHTML = "<span style='color: #ef4444; font-weight: bold;'>متوقف (Offline) ❌</span>";
-        waStatus.innerHTML = "<span style='color: #ef4444; font-weight: bold;'>غير متصل ❌</span>";
-    }
-};
 
 
 
@@ -9438,4 +9384,137 @@ window.confirmMoveGroup = function() {
         if (typeof renderGroupCards === "function") renderGroupCards();
         if (typeof syncDataToBot === "function") syncDataToBot();
     }
+};
+
+
+
+// ==========================================
+// 🎨 دالة الفحص اللحظي لأرقام الهواتف (ألوان تفاعلية ومنع الحروف)
+// ==========================================
+window.validatePhoneUI = function(input) {
+    // 1. إجبار المستخدم على إدخال أرقام فقط (يمسح أي حرف أو مسافة فوراً)
+    input.value = input.value.replace(/[^0-9]/g, '');
+
+    let val = input.value.trim();
+
+    // لو الخانة فاضية نرجعها للونها الطبيعي
+    if (val === "") {
+        input.classList.remove('input-success', 'input-error');
+        return;
+    }
+
+    // استثناء: لو كتب 0 (معناها لا يوجد هاتف)، ننور أخضر
+    if (val === "0") {
+        input.classList.remove('input-error');
+        input.classList.add('input-success');
+        return;
+    }
+
+    // التحقق من الصيغة المصرية (11 رقم تبدأ بـ 010, 011, 012, 015)
+    const regex = /^(010|011|012|015)\d{8}$/;
+
+    if (regex.test(val)) {
+        // لو الرقم سليم 100% -> نور أخضر
+        input.classList.remove('input-error');
+        input.classList.add('input-success');
+    } else {
+        // لو الرقم لسه بيكتب أو غلط (مثلاً 10 أرقام أو بيبدأ بـ 016) -> نور أحمر
+        input.classList.remove('input-success');
+        input.classList.add('input-error');
+    }
+};
+
+
+// ==========================================
+// 📊 محرك الإحصائيات التحليلية الذكية للحصص
+// ==========================================
+window.openSessionAnalytics = function(sessionId) {
+    const session = classSessions.find(s => s.id === sessionId);
+    if (!session) return;
+
+    // جلب كل حصص هذه المجموعة وترتيبها زمنياً
+    const groupSessions = classSessions.filter(s => s.group === session.group).sort((a,b) => new Date(a.date) - new Date(b.date));
+    const currentIndex = groupSessions.findIndex(s => s.id === sessionId);
+    const prevSession = currentIndex > 0 ? groupSessions[currentIndex - 1] : null;
+    const allPrevSessions = groupSessions.slice(0, currentIndex);
+
+    document.getElementById("analyticsModalSubtitle").innerText = `مجموعة: ${session.group} | بتاريخ: ${session.date}`;
+
+    let presentCount = 0, lateCount = 0, absentCount = 0;
+    let targetGroupStudentsCount = students.filter(s => s.group === session.group).length;
+
+    let lists = { dropped: [], consecAbsent: [], guests: [], newcomers: [] };
+
+    // دالة مساعدة لمعرفة هل الطالب حضر في حصة معينة أم لا
+    const didAttend = (stat) => (stat === 'present' || stat === 'late' || (typeof stat === 'object' && stat.status === 'makeup'));
+    const isAbsent = (stat) => (!stat || stat === 'absent' || stat === 'none');
+
+    // الدوران على جميع الطلاب المسجلين لاستخراج البيانات
+    students.forEach(st => {
+        let currStat = session.attendance[st.code] || session.attendance[st.phone];
+        let prevStat = prevSession ? (prevSession.attendance[st.code] || prevSession.attendance[st.phone]) : null;
+
+        // 1. حساب الملخص العام (لطلاب المجموعة الأساسيين فقط)
+        if (st.group === session.group) {
+            if (currStat === 'present' || (typeof currStat === 'object' && !currStat.isLate)) presentCount++;
+            if (currStat === 'late' || (typeof currStat === 'object' && currStat.isLate)) lateCount++;
+            if (isAbsent(currStat)) absentCount++;
+
+            let currAttended = didAttend(currStat);
+            let prevAttended = prevSession ? didAttend(prevStat) : false;
+            let currAbsentBool = isAbsent(currStat);
+            let prevAbsentBool = prevSession ? isAbsent(prevStat) : false;
+
+            // 📉 غابوا هذه الحصة وكانوا حاضرين السابقة
+            if (prevAttended && currAbsentBool) lists.dropped.push(st);
+
+            // 🚨 غياب متتالي
+            if (prevAbsentBool && currAbsentBool && prevSession) lists.consecAbsent.push(st);
+
+            // ✨ طلاب جدد (حضروا اليوم ومفيش ليهم أي حضور سابق في نفس المجموعة)
+            if (currAttended && allPrevSessions.length > 0) {
+                let attendedBefore = allPrevSessions.some(oldS => didAttend(oldS.attendance[st.code] || oldS.attendance[st.phone]));
+                if (!attendedBefore) lists.newcomers.push(st);
+            }
+        } 
+        // 2. حساب الضيوف (طلاب من مجموعة أخرى ولكن حضروا اليوم)
+        else {
+            if (didAttend(currStat)) {
+                lists.guests.push(st);
+                presentCount++; // يضافوا للحضور الفعلي للحصة
+            }
+        }
+    });
+
+    // تحديث الأرقام
+    document.getElementById("sa-total").innerText = targetGroupStudentsCount;
+    document.getElementById("sa-present").innerText = presentCount;
+    document.getElementById("sa-late").innerText = lateCount;
+    document.getElementById("sa-absent").innerText = absentCount;
+
+    document.getElementById("sa-dropped-count").innerText = lists.dropped.length;
+    document.getElementById("sa-consec-count").innerText = lists.consecAbsent.length;
+    document.getElementById("sa-guests-count").innerText = lists.guests.length;
+    document.getElementById("sa-newcomers-count").innerText = lists.newcomers.length;
+
+    // دالة مساعدة لطباعة الجداول
+    const renderTableHtml = (studentArray, emptyMsg) => {
+        if (studentArray.length === 0) return `<div style="text-align:center; padding:15px; color:#94a3b8; font-weight:bold;">${emptyMsg}</div>`;
+        let rows = studentArray.map(st => `
+            <tr>
+                <td class="sa-code">${st.code}</td>
+                <td style="font-weight:bold;">${st.name}</td>
+                <td><a href="https://wa.me/20${(st.parentPhone||"").replace(/^0+/, '')}" target="_blank" style="text-decoration:none; filter: grayscale(100%); transition: 0.3s;" onmouseover="this.style.filter='grayscale(0)'">💬 ولي الأمر</a></td>
+            </tr>
+        `).join('');
+        return `<table class="sa-table">${rows}</table>`;
+    };
+
+    // طباعة القوائم
+    document.getElementById("sa-dropped-list").innerHTML = renderTableHtml(lists.dropped, "لا يوجد (استقرار تام 🎉)");
+    document.getElementById("sa-consec-list").innerHTML = renderTableHtml(lists.consecAbsent, "لا يوجد غياب متتالي الحمدلله");
+    document.getElementById("sa-guests-list").innerHTML = renderTableHtml(lists.guests, "لا يوجد ضيوف تعويض");
+    document.getElementById("sa-newcomers-list").innerHTML = renderTableHtml(lists.newcomers, "لا يوجد طلاب جدد");
+
+    openModal('sessionAnalyticsModal');
 };

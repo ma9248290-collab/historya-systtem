@@ -2111,74 +2111,72 @@
         <h2 style="color: var(--primary-color); margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">➕ تسجيل طالب جديد</h2>
         
         <form id="addStudentForm" class="form-grid">
-            <!-- الصف الأول: الكود والاسم -->
-<div class="input-group">
-    <label>كود الطالب (قابل للتعديل)</label>
-    <!-- شيلنا readonly واللون الرصاصي عشان تقدر تكتب براحتك -->
-    <input type="text" id="studentCode" class="custom-input" style="font-weight: bold; color: var(--primary-color);">
-</div>
-<div class="input-group">
-    <label>اسم الطالب رباعي</label>
-    <input type="text" id="studentName" required class="custom-input" placeholder="اكتب اسم الطالب...">
-</div>
+    <!-- الصف الأول: الكود والاسم -->
+    <div class="input-group">
+        <label>🔢 كود الطالب (قابل للتعديل)</label>
+        <input type="text" id="studentCode" class="custom-input" style="font-weight: 900; color: var(--primary-color); letter-spacing: 2px; background: rgba(59, 130, 246, 0.05); text-align: center;">
+    </div>
+    <div class="input-group">
+        <label>👤 اسم الطالب رباعي</label>
+        <input type="text" id="studentName" required class="custom-input" placeholder="اكتب اسم الطالب...">
+    </div>
 
-<!-- الصف الثاني: الصف والمسار -->
-            <div class="input-group">
-                <label>الصف الدراسي</label>
-                <select id="studentLevel" required class="custom-input" onchange="filterGroupsByLevel('studentLevel', 'studentGroup');">
-                    <option value="الأول الثانوي">الأول الثانوي</option>
-                    <option value="الثاني الثانوي">الثاني الثانوي</option>
-                    <option value="الثالث الثانوي">الثالث الثانوي</option>
-                </select>
-            </div>
+    <!-- الصف الثاني: الصف والمجموعة -->
+    <div class="input-group">
+        <label>🎓 الصف الدراسي</label>
+        <select id="studentLevel" required class="custom-input" onchange="filterGroupsByLevel('studentLevel', 'studentGroup');">
+            <option value="الأول الثانوي">الأول الثانوي</option>
+            <option value="الثاني الثانوي">الثاني الثانوي</option>
+            <option value="الثالث الثانوي">الثالث الثانوي</option>
+        </select>
+    </div>
+    <div class="input-group">
+        <label>📚 المجموعة</label>
+        <select id="studentGroup" required class="custom-input">
+            <option value="">اختر الصف أولاً...</option>
+        </select>
+    </div>
 
-            
-            <div class="input-group">
-                <label>المجموعة</label>
-                <select id="studentGroup" required class="custom-input">
-                    <option value="">اختر الصف أولاً...</option>
-                </select>
-            </div>
+    <!-- الصف الثالث: الهواتف (هنا التطوير السحري) -->
+    <div class="input-group">
+        <label>📱 هاتف الطالب <span style="color:var(--text-muted); font-size: 11px;">(اكتب 0 إذا لم يوجد)</span></label>
+        <!-- ضفنا maxlength=11 ودالة الفحص oninput -->
+        <input type="text" id="studentPhone" required class="custom-input" placeholder="01XXXXXXXXX" maxlength="11" oninput="validatePhoneUI(this)">
+    </div>
+    <div class="input-group">
+        <label>👨‍👦 هاتف ولي الأمر</label>
+        <!-- ضفنا الفحصين مع بعض -->
+        <input type="text" id="parentPhone" required class="custom-input" placeholder="01XXXXXXXXX" maxlength="11" oninput="validatePhoneUI(this); checkDuplicateParentPhone()">
+        <p id="parentPhoneWarning" style="color: var(--danger-color); font-size: 12px; font-weight: bold; margin-top: 5px; display: none;"></p>
+    </div>
 
-            <!-- الصف الرابع: الهواتف -->
-            <div class="input-group">
-                <label>هاتف الطالب <span style="color:var(--text-muted); font-size: 11px;">(اكتب 0 إذا لم يوجد)</span></label>
-                <input type="text" id="studentPhone" required class="custom-input" placeholder="01XXXXXXXXX">
-            </div>
-            <div class="input-group">
-    <label>هاتف ولي الأمر</label>
-    <!-- ضفنا onkeyup عشان يفحص الرقم وإنت بتكتب -->
-    <input type="text" id="parentPhone" required class="custom-input" placeholder="01XXXXXXXXX" onkeyup="checkDuplicateParentPhone()">
-    <!-- رسالة التنبيه المخفية -->
-    <p id="parentPhoneWarning" style="color: var(--danger-color); font-size: 12px; font-weight: bold; margin-top: 5px; display: none;"></p>
-</div>
+    <!-- الصف الرابع: الجنس -->
+    <div class="input-group full-width">
+        <label>🚻 الجنس</label>
+        <select id="studentGender" required class="custom-input">
+            <option value="ذكر">ذكر</option>
+            <option value="أنثى">أنثى</option>
+        </select>
+    </div>
 
-            <!-- الصف الخامس: الجنس -->
-            <div class="input-group full-width">
-                <label>الجنس</label>
-                <select id="studentGender" required class="custom-input">
-                    <option value="ذكر">ذكر</option>
-                    <option value="أنثى">أنثى</option>
-                </select>
-            </div>
+    <!-- حقل الحالة الخاصة (الإعفاء) -->
+    <div class="input-group full-width" style="background: rgba(245, 158, 11, 0.05); padding: 12px; border-radius: 8px; border: 1px dashed #f59e0b; margin-top: 10px;">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #f59e0b; font-weight: bold; margin: 0;">
+            <input type="checkbox" id="studentIsSpecial" style="width: 20px; height: 20px; accent-color: #f59e0b; cursor: pointer;" onchange="document.getElementById('studentSpecialAmountDiv').style.display = this.checked ? 'block' : 'none';">
+            طالب حالة خاصة (تسعير مختلف / إعفاء) ⭐
+        </label>
+        <div id="studentSpecialAmountDiv" style="display: none; margin-top: 15px;">
+            <label style="color: var(--text-main);">المبلغ المخصص لهذا الطالب (ج.م): <span style="color:var(--text-muted); font-size:12px;">(اكتب 0 للإعفاء التام)</span></label>
+            <input type="number" id="studentSpecialAmount" class="custom-input" placeholder="مثال: 0 أو 20" min="0">
+        </div>
+    </div>
 
-            <!-- حقل الحالة الخاصة (الإعفاء) -->
-            <div class="input-group full-width" style="background: rgba(245, 158, 11, 0.05); padding: 12px; border-radius: 8px; border: 1px dashed #f59e0b; margin-top: 10px;">
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #f59e0b; font-weight: bold; margin: 0;">
-                    <input type="checkbox" id="studentIsSpecial" style="width: 20px; height: 20px; accent-color: #f59e0b; cursor: pointer;" onchange="document.getElementById('studentSpecialAmountDiv').style.display = this.checked ? 'block' : 'none';">
-                    طالب حالة خاصة (تسعير مختلف / إعفاء) ⭐
-                </label>
-                <div id="studentSpecialAmountDiv" style="display: none; margin-top: 15px;">
-                    <label style="color: var(--text-main);">المبلغ المخصص لهذا الطالب (ج.م): <span style="color:var(--text-muted); font-size:12px;">(اكتب 0 للإعفاء التام)</span></label>
-                    <input type="number" id="studentSpecialAmount" class="custom-input" placeholder="مثال: 0 أو 20" min="0">
-                </div>
-            </div>
-
-            <div style="display: flex; gap: 10px; margin-top: 15px; grid-column: span 2;">
-    <button type="button" class="save-btn" style="flex: 1; background: #f59e0b; margin: 0; font-size: 16px;" onclick="saveAndAddAnotherStudent()">حفظ وإضافة طالب جديد ➕</button>
-    <button type="submit" class="save-btn" style="flex: 1; background: #10b981; margin: 0; font-size: 16px;">حفظ وإنهاء ✅</button>
-</div>
-        </form>
+    <!-- أزرار الحفظ -->
+    <div style="display: flex; gap: 10px; margin-top: 15px; grid-column: span 2;">
+        <button type="button" class="save-btn" style="flex: 1; background: #f59e0b; margin: 0; font-size: 16px;" onclick="saveAndAddAnotherStudent()">حفظ وإضافة آخر ➕</button>
+        <button type="submit" class="save-btn" style="flex: 1; background: #10b981; margin: 0; font-size: 16px;">حفظ وإنهاء ✅</button>
+    </div>
+</form>
     </div>
 </div>
     <div id="editStudentModal" class="modal">
@@ -2187,71 +2185,66 @@
         <h2 style="color: #f59e0b; margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">✏️ تعديل بيانات الطالب</h2>
         
         <form id="editStudentForm" class="form-grid">
-            <input type="hidden" id="editStudentCodeOriginal">
-            
-            <!-- الصف الأول: الكود والاسم -->
-<div class="input-group">
-    <label>كود الطالب</label>
-    <input type="text" id="editStudentCode" class="custom-input" style="font-weight:bold; color:var(--primary-color); background: #f8fafc;">
-</div>
-<div class="input-group">
-    <label>الاسم</label>
-    <input type="text" id="editStudentName" required class="custom-input">
-</div>
+    <input type="hidden" id="editStudentCodeOriginal">
+    
+    <!-- الصف الأول: الكود والاسم -->
+    <div class="input-group">
+        <label>🔢 كود الطالب</label>
+        <input type="text" id="editStudentCode" class="custom-input" style="font-weight:bold; color:var(--primary-color); background: #f8fafc; text-align: center; letter-spacing: 2px;">
+    </div>
+    <div class="input-group">
+        <label>👤 الاسم</label>
+        <input type="text" id="editStudentName" required class="custom-input">
+    </div>
 
-<!-- الصف الثاني: الصف والمسار -->
+    <!-- الصف الثاني: الصف والمسار -->
+    <div class="input-group">
+        <label>🎓 الصف</label>
+        <select id="editStudentLevel" required class="custom-input" onchange="filterGroupsByLevel('editStudentLevel', 'editStudentGroup');">
+            <option value="الأول الثانوي">الأول الثانوي</option>
+            <option value="الثاني الثانوي">الثاني الثانوي</option>
+            <option value="الثالث الثانوي">الثالث الثانوي</option>
+        </select>
+    </div>
+    <div class="input-group" id="editTrackGroup" style="display:none;"></div>
 
-            <!-- الصف الثاني: الصف والمسار (سيبه زي ما هو عندك) -->
+    <!-- الصف الثالث: المجموعة والجنس -->
+    <div class="input-group">
+        <label>📚 المجموعة</label>
+        <select id="editStudentGroup" required class="custom-input"></select>
+    </div>
+    <div class="input-group">
+        <label>🚻 الجنس</label>
+        <select id="editStudentGender" required class="custom-input">
+            <option value="ذكر">ذكر</option>
+            <option value="أنثى">أنثى</option>
+        </select>
+    </div>
 
-            <!-- الصف الثاني: الصف والمسار -->
-            <div class="input-group">
-                <label>الصف</label>
-                <select id="editStudentLevel" required class="custom-input" onchange="filterGroupsByLevel('editStudentLevel', 'editStudentGroup');">
-                    <option value="الثاني الثانوي">الثاني الثانوي</option>
-                    <option value="الثالث الثانوي">الثالث الثانوي</option>
-                </select>
-            </div>
-            <div class="input-group" id="editTrackGroup" style="display:none;">
-                
-            </div>
+    <!-- الصف الرابع: الهواتف (هنا التطوير) -->
+    <div class="input-group">
+        <label>📱 هاتف الطالب <span style="color:var(--text-muted); font-size: 11px;">(اكتب 0 إذا لم يوجد)</span></label>
+        <input type="text" id="editStudentPhone" required class="custom-input" placeholder="01XXXXXXXXX" maxlength="11" oninput="validatePhoneUI(this)">
+    </div>
+    <div class="input-group">
+        <label>👨‍👦 هاتف ولي الأمر</label>
+        <input type="text" id="editParentPhone" required class="custom-input" placeholder="01XXXXXXXXX" maxlength="11" oninput="validatePhoneUI(this)">
+    </div>
 
-            <!-- الصف الثالث: المجموعة والجنس -->
-            <div class="input-group">
-                <label>المجموعة</label>
-                <select id="editStudentGroup" required class="custom-input"></select>
-            </div>
-            <div class="input-group">
-                <label>الجنس</label>
-                <select id="editStudentGender" required class="custom-input">
-                    <option value="ذكر">ذكر</option>
-                    <option value="أنثى">أنثى</option>
-                </select>
-            </div>
+    <!-- حقل الحالة الخاصة (الإعفاء) -->
+    <div class="input-group full-width" style="background: rgba(245, 158, 11, 0.05); padding: 12px; border-radius: 8px; border: 1px dashed #f59e0b; margin-top: 10px;">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #f59e0b; font-weight: bold; margin: 0;">
+            <input type="checkbox" id="editStudentIsSpecial" style="width: 20px; height: 20px; accent-color: #f59e0b; cursor: pointer;" onchange="document.getElementById('editStudentSpecialAmountDiv').style.display = this.checked ? 'block' : 'none';">
+            طالب حالة خاصة (تسعير مختلف / إعفاء) ⭐
+        </label>
+        <div id="editStudentSpecialAmountDiv" style="display: none; margin-top: 15px;">
+            <label style="color: var(--text-main);">المبلغ المخصص (ج.م):</label>
+            <input type="number" id="editStudentSpecialAmount" class="custom-input" min="0">
+        </div>
+    </div>
 
-            <!-- الصف الرابع: الهواتف -->
-            <div class="input-group">
-                <label>هاتف الطالب <span style="color:var(--text-muted); font-size: 11px;">(اكتب 0 إذا لم يوجد)</span></label>
-                <input type="text" id="editStudentPhone" required class="custom-input">
-            </div>
-            <div class="input-group">
-    <label>هاتف ولي الأمر</label>
-    <input type="text" id="editParentPhone" required class="custom-input" placeholder="01XXXXXXXXX">
-</div>
-
-            <!-- حقل الحالة الخاصة (الإعفاء) -->
-            <div class="input-group full-width" style="background: rgba(245, 158, 11, 0.05); padding: 12px; border-radius: 8px; border: 1px dashed #f59e0b; margin-top: 10px;">
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #f59e0b; font-weight: bold; margin: 0;">
-                    <input type="checkbox" id="editStudentIsSpecial" style="width: 20px; height: 20px; accent-color: #f59e0b; cursor: pointer;" onchange="document.getElementById('editStudentSpecialAmountDiv').style.display = this.checked ? 'block' : 'none';">
-                    طالب حالة خاصة (تسعير مختلف / إعفاء) ⭐
-                </label>
-                <div id="editStudentSpecialAmountDiv" style="display: none; margin-top: 15px;">
-                    <label style="color: var(--text-main);">المبلغ المخصص لهذا الطالب (ج.م):</label>
-                    <input type="number" id="editStudentSpecialAmount" class="custom-input" placeholder="مثال: 0 أو 20" min="0">
-                </div>
-            </div>
-
-            <button type="submit" class="save-btn full-width" style="background: #f59e0b; margin-top: 15px; font-size: 18px;">تحديث بيانات الطالب 💾</button>
-        </form>
+    <button type="submit" class="save-btn full-width" style="background: #f59e0b; margin-top: 15px; font-size: 18px;">تحديث بيانات الطالب 💾</button>
+</form>
     </div>
 </div>
     
@@ -2768,6 +2761,91 @@
         <button class="save-btn" style="width: 100%; background: #3b82f6; font-size: 16px;" onclick="confirmMoveGroup()">تأكيد النقل ✅</button>
     </div>
 </div>
+
+<!-- 📊 نافذة الإحصائيات التحليلية للحصة -->
+<div id="sessionAnalyticsModal" class="modal" style="z-index: 1000000;">
+    <div class="modal-content" style="width: 850px; max-width: 95%; max-height: 90vh; overflow-y: auto; border-top: 5px solid #8b5cf6; background: #f8fafc;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px;">
+            <div>
+                <h2 style="margin: 0; color: #8b5cf6; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 24px;">📊</span> التحليل الذكي للحصة
+                </h2>
+                <p id="analyticsModalSubtitle" style="margin: 5px 0 0 0; color: var(--text-muted); font-size: 14px; font-weight: bold;"></p>
+            </div>
+            <span class="close" onclick="closeModal('sessionAnalyticsModal')" style="font-size: 28px; cursor: pointer; color: var(--danger-color);">&times;</span>
+        </div>
+
+        <!-- ملخص الأرقام السريع -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 25px;">
+            <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; border-bottom: 3px solid var(--primary-color); text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                <p style="margin: 0 0 5px 0; font-size: 12px; color: var(--text-muted); font-weight: bold;">إجمالي المستهدف</p>
+                <h3 id="sa-total" style="margin: 0; font-size: 24px; color: var(--primary-color);">0</h3>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; border-bottom: 3px solid #10b981; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                <p style="margin: 0 0 5px 0; font-size: 12px; color: var(--text-muted); font-weight: bold;">حاضرين</p>
+                <h3 id="sa-present" style="margin: 0; font-size: 24px; color: #10b981;">0</h3>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; border-bottom: 3px solid #f59e0b; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                <p style="margin: 0 0 5px 0; font-size: 12px; color: var(--text-muted); font-weight: bold;">متأخرين</p>
+                <h3 id="sa-late" style="margin: 0; font-size: 24px; color: #f59e0b;">0</h3>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; border-bottom: 3px solid #ef4444; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                <p style="margin: 0 0 5px 0; font-size: 12px; color: var(--text-muted); font-weight: bold;">غائبين</p>
+                <h3 id="sa-absent" style="margin: 0; font-size: 24px; color: #ef4444;">0</h3>
+            </div>
+        </div>
+
+        <!-- الأقسام التحليلية (Grid) -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            
+            <!-- 1. غابوا هذه الحصة وكانوا حاضرين السابقة -->
+            <div style="background: white; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+                <h4 style="margin: 0 0 15px 0; color: #f59e0b; display: flex; justify-content: space-between; align-items: center;">
+                    <span>📉 غابوا (كانوا حاضرين السابقة)</span>
+                    <span id="sa-dropped-count" style="background: #fef3c7; color: #d97706; padding: 2px 8px; border-radius: 10px; font-size: 13px;">0</span>
+                </h4>
+                <div id="sa-dropped-list" style="max-height: 200px; overflow-y: auto; font-size: 13px;"></div>
+            </div>
+
+            <!-- 2. غياب حصتين متتاليتين -->
+            <div style="background: white; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+                <h4 style="margin: 0 0 15px 0; color: #ef4444; display: flex; justify-content: space-between; align-items: center;">
+                    <span>🚨 غياب متتالي (حصتين)</span>
+                    <span id="sa-consec-count" style="background: #fee2e2; color: #b91c1c; padding: 2px 8px; border-radius: 10px; font-size: 13px;">0</span>
+                </h4>
+                <div id="sa-consec-list" style="max-height: 200px; overflow-y: auto; font-size: 13px;"></div>
+            </div>
+
+            <!-- 3. ضيوف (تعويض من مجموعة أخرى) -->
+            <div style="background: white; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+                <h4 style="margin: 0 0 15px 0; color: #3b82f6; display: flex; justify-content: space-between; align-items: center;">
+                    <span>🔄 حضور تعويض (ضيوف)</span>
+                    <span id="sa-guests-count" style="background: #eff6ff; color: #1d4ed8; padding: 2px 8px; border-radius: 10px; font-size: 13px;">0</span>
+                </h4>
+                <div id="sa-guests-list" style="max-height: 200px; overflow-y: auto; font-size: 13px;"></div>
+            </div>
+
+            <!-- 4. طلاب جدد (أول مرة يحضروا) -->
+            <div style="background: white; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+                <h4 style="margin: 0 0 15px 0; color: #10b981; display: flex; justify-content: space-between; align-items: center;">
+                    <span>✨ طلاب جدد (أول حضور)</span>
+                    <span id="sa-newcomers-count" style="background: #d1fae5; color: #047857; padding: 2px 8px; border-radius: 10px; font-size: 13px;">0</span>
+                </h4>
+                <div id="sa-newcomers-list" style="max-height: 200px; overflow-y: auto; font-size: 13px;"></div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    /* تنسيقات الجداول الدخلية للنافذة */
+    .sa-table { width: 100%; border-collapse: collapse; text-align: right; }
+    .sa-table td { padding: 8px 5px; border-bottom: 1px solid #f1f5f9; }
+    .sa-table tr:last-child td { border-bottom: none; }
+    .sa-code { color: var(--primary-color); font-weight: bold; font-family: monospace; }
+</style>
 
 
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
