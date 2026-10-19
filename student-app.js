@@ -19,20 +19,30 @@
             document.getElementById('auth-modal').classList.remove('active');
         }
         function toggleAuthView(type) {
-            document.getElementById('login-form-view').style.display = 'none';
-            document.getElementById('register-form-view').style.display = 'none';
-            
-            let forgotView = document.getElementById('forgot-form-view');
-            if(forgotView) forgotView.style.display = 'none';
+    document.getElementById('login-form-view').style.display = 'none';
+    document.getElementById('register-form-view').style.display = 'none';
+    
+    let forgotView = document.getElementById('forgot-form-view');
+    let guestView = document.getElementById('guest-form-view'); // الواجهة الجديدة
+    
+    if(forgotView) forgotView.style.display = 'none';
+    if(guestView) guestView.style.display = 'none';
 
-            if(type === 'login') {
-                document.getElementById('login-form-view').style.display = 'block';
-            } else if (type === 'register') {
-                document.getElementById('register-form-view').style.display = 'block';
-            } else if (type === 'forgot') {
-                if(forgotView) forgotView.style.display = 'block';
-            }
+    if(type === 'login') {
+        document.getElementById('login-form-view').style.display = 'block';
+    } else if (type === 'register') {
+        document.getElementById('register-form-view').style.display = 'block';
+    } else if (type === 'forgot') {
+        if(forgotView) forgotView.style.display = 'block';
+    } else if (type === 'guest') {
+        if(guestView) {
+            guestView.style.display = 'block';
+            document.getElementById('guest-step-1').style.display = 'block';
+            document.getElementById('guest-step-2').style.display = 'none';
+            document.getElementById('guestChargeCode').value = '';
         }
+    }
+}
         
         function toggleRegFields() {
             let type = document.getElementById("regType").value;
@@ -294,7 +304,7 @@
                     totalItems += myExams.length;
                     myExams.forEach(e => { if (allSubs[e.id] && (allSubs[e.id][currentStudent.code] || allSubs[e.id][currentStudent.phone])) completedItems++; else if (e.status === "open") missingExams++; });
 
-                   let myLectures = window.allLectures.filter(l => {
+                let myLectures = window.allLectures.filter(l => {
                         if (!l) return false;
                         let levelMatch = l.level === "all" || l.level === currentStudent.level;
                         let trackMatch = !l.track || l.track === 'all' || l.track === (currentStudent.track || 'عام');
@@ -320,7 +330,7 @@
                 safeClassSessions.filter(s => s && s.group === currentStudent.group).reverse().forEach(s => {
                     hasAtt = true;
                     let stat = (s.attendance || {})[currentStudent.code] || (s.attendance || {})[currentStudent.phone];
-                  let badge = stat === 'present' ? `<span class="badge badge-present">حاضر ✓</span>` : stat === 'late' ? `<span class="badge" style="background:#fef3c7; color:#d97706;">متأخر ⏳</span>` : stat === 'absent' ? `<span class="badge badge-absent">غائب ✗</span>` : `<span style="color:var(--text-muted); font-weight:bold;">لم يسجل</span>`;
+                let badge = stat === 'present' ? `<span class="badge badge-present">حاضر ✓</span>` : stat === 'late' ? `<span class="badge" style="background:#fef3c7; color:#d97706;">متأخر ⏳</span>` : stat === 'absent' ? `<span class="badge badge-absent">غائب ✗</span>` : `<span style="color:var(--text-muted); font-weight:bold;">لم يسجل</span>`;
                     attHtml += `<tr><td>${s.date}</td><td>${s.topic || 'حصة عادية'}</td><td>${badge}</td></tr>`;
                 });
                 if(!hasAtt) attHtml += `<tr><td colspan="3" style="text-align:center; padding: 30px; font-weight:bold;">لا توجد حصص مسجلة.</td></tr>`;
@@ -1101,10 +1111,10 @@ window.openCoursePlayer = function(courseId, startVideoIndex = 0) {
 
             playlistHtml += `
             <div class="playlist-item" data-index="${idx}" style="${bgStyle} padding:15px; border-radius:8px; margin-bottom:8px; cursor:pointer; transition:0.3s; display: flex; align-items: center; gap: 10px;" 
-                 onmouseover="if(this.getAttribute('data-active') !== 'true') this.style.background='rgba(255,255,255,0.05)'" 
-                 onmouseout="if(this.getAttribute('data-active') !== 'true') this.style.background='transparent'" 
-                 onclick="playCourseVideo('${v.url}', '${safeTitle}', '${course.id}', ${idx}, this)"
-                 data-active="${isActive ? 'true' : 'false'}">
+                    onmouseover="if(this.getAttribute('data-active') !== 'true') this.style.background='rgba(255,255,255,0.05)'" 
+                    onmouseout="if(this.getAttribute('data-active') !== 'true') this.style.background='transparent'" 
+                    onclick="playCourseVideo('${v.url}', '${safeTitle}', '${course.id}', ${idx}, this)"
+                    data-active="${isActive ? 'true' : 'false'}">
                 <span class="vid-icon" style="font-size: 18px;">${icon}</span> 
                 <span style="flex: 1; font-size: 15px;">${v.title}</span>
             </div>`;
@@ -1396,13 +1406,18 @@ window.renderStudentLectures = function() {
     list.innerHTML = "";
     
     let filteredLectures = window.allLectures.filter(lec => {
-    if (!lec || lec.isHidden === true) return false; // 👈 إخفاء الكورسات السرية
-    let levelMatch = (lec.level === "all" || lec.level === currentStudent.level);
-    let trackMatch = (!lec.track || lec.track === 'all' || lec.track === (currentStudent.track || 'عام'));
-    return levelMatch && trackMatch;
-});
+        if (!lec || lec.isHidden === true) return false; 
+        
+        // 🔴 التعديل السحري: لو الطالب ضيف ومربوط بكورس معين، هيشوف الكورس ده بس (ويتجاهل أي فلتر تاني للصف)
+        if (currentStudent.guestCourseOnly) {
+            return lec.id === currentStudent.guestCourseOnly;
+        }
 
-    // لو مفيش كورسات لصف الطالب ده
+        let levelMatch = (lec.level === "all" || lec.level === currentStudent.level);
+        let trackMatch = (!lec.track || lec.track === 'all' || lec.track === (currentStudent.track || 'عام'));
+        return levelMatch && trackMatch;
+    });
+
     if(filteredLectures.length === 0) {
         list.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 40px; font-weight:bold; color:var(--text-muted); background: var(--card-bg); border-radius: 20px; border: 2px dashed var(--border);">لا توجد كورسات متاحة لصفك الدراسي حالياً.</div>`;
         return;
@@ -1833,3 +1848,228 @@ let letter = '';
 }());
 
  
+
+// ==========================================
+// 🚀 نظام دخول الضيوف باستخدام أكواد الشحن والكاميرا
+// ==========================================
+window.validatedGuestCodeAmount = 0;
+window.validatedGuestCodeString = "";
+let guestHtml5QrcodeScanner = null;
+
+// تشغيل الكاميرا
+window.startGuestScanner = function() {
+    document.getElementById('guest-scanner-box').style.display = 'block';
+    if (!guestHtml5QrcodeScanner) {
+        guestHtml5QrcodeScanner = new Html5QrcodeScanner("guest-reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+    }
+    guestHtml5QrcodeScanner.render((decodedText) => {
+        // عند التقاط الكود بنجاح
+        document.getElementById('guestChargeCode').value = decodedText;
+        stopGuestScanner();
+        verifyGuestCode(); // ⚡ تفعيل التحقق التلقائي فوراً
+    }, (error) => { /* تجاهل أخطاء القراءة المستمرة */ });
+};
+
+// إيقاف الكاميرا
+window.stopGuestScanner = function() {
+    if (guestHtml5QrcodeScanner) {
+        guestHtml5QrcodeScanner.clear().then(() => {
+            document.getElementById('guest-scanner-box').style.display = 'none';
+        }).catch(e => {
+            document.getElementById('guest-scanner-box').style.display = 'none';
+        });
+    } else {
+        document.getElementById('guest-scanner-box').style.display = 'none';
+    }
+};
+
+// 1. التحقق من صحة الكود وقيمته
+window.verifyGuestCode = async function() {
+    let code = document.getElementById("guestChargeCode").value.trim().toUpperCase();
+    let errorMsg = document.getElementById("guestErrorMsg1");
+    let btn = document.getElementById("verifyGuestCodeBtn");
+
+    if(!code) {
+        errorMsg.innerText = "يرجى إدخال كود الشحن أولاً!";
+        errorMsg.style.display = "block";
+        return;
+    }
+
+    errorMsg.style.display = "none";
+    btn.innerText = "جاري التحقق... ⏳";
+    btn.disabled = true;
+
+    try {
+        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/chargeCodes/${code}.json`);
+        let codeData = await res.json();
+
+        if(!codeData || codeData.status === 'used') {
+            errorMsg.innerText = "الكود غير صحيح أو تم استخدامه مسبقاً!";
+            errorMsg.style.display = "block";
+        } else {
+            // الكود سليم، ننتقل للخطوة الثانية
+            window.validatedGuestCourseId = codeData.linkedCourseId || null; // 🔴 حفظ مسار الكورس المربوط
+            window.validatedGuestCodeAmount = parseFloat(codeData.amount);
+            window.validatedGuestCodeString = code;
+            document.getElementById("guestCodeValueDisplay").innerText = window.validatedGuestCodeAmount;
+            
+            document.getElementById("guest-step-1").style.display = "none";
+            document.getElementById("guest-step-2").style.display = "block";
+        }
+    } catch(e) {
+        errorMsg.innerText = "خطأ في الاتصال بالإنترنت!";
+        errorMsg.style.display = "block";
+    }
+    btn.innerText = "التحقق من الكود 🔍";
+    btn.disabled = false;
+};
+
+// 2. إنشاء حساب الضيف وتوزيع المجموعة بذكاء
+window.createGuestAccount = async function() {
+    let name = document.getElementById("guestName").value.trim();
+    let level = document.getElementById("guestLevel").value;
+    let phone = document.getElementById("guestPhone").value.trim(); // 🔴 سحب رقم الهاتف الجديد
+    let errorMsg = document.getElementById("guestErrorMsg2");
+    let btn = document.getElementById("createGuestAccountBtn");
+
+    if(!name || !phone) {
+        errorMsg.innerText = "يرجى كتابة الاسم ورقم الهاتف!";
+        errorMsg.style.display = "block";
+        return;
+    }
+    
+    if(phone.length < 10) {
+        errorMsg.innerText = "رقم الهاتف غير صحيح!";
+        errorMsg.style.display = "block";
+        return;
+    }
+
+    errorMsg.style.display = "none";
+    btn.innerText = "جاري التجهيز... ⏳";
+    btn.disabled = true;
+
+    try {
+        // تحديد اسم المجموعة بناءً على الصف
+        let targetGroup = "ضيوف أونلاين";
+        if (level.includes("الأول")) targetGroup = "ضيف 1ث";
+        else if (level.includes("الثاني")) targetGroup = "ضيف 2ث";
+        else if (level.includes("الثالث")) targetGroup = "ضيف 3ث";
+
+        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data/students.json`);
+        let studentsArray = await res.json() || [];
+        studentsArray = Array.isArray(studentsArray) ? studentsArray : Object.values(studentsArray).filter(s => s !== null);
+
+        // توليد كود طالب مميز (ضيف)
+        let randomNum = Math.floor(10000 + Math.random() * 90000);
+        let guestCode = "GUEST-" + randomNum;
+
+        let newStudent = {
+            code: guestCode,
+            name: name + " (ضيف)",
+            level: level,
+            group: targetGroup, 
+            phone: phone, // 🔴 تسجيل رقم الهاتف الفعلي
+            parentPhone: phone, // 🔴 استخدام نفس الرقم ككلمة مرور (خانة ولي الأمر)
+            gender: "غير محدد",
+            track: "عام",
+            walletBalance: window.validatedGuestCodeAmount, 
+            behaviorPoints: 0,
+            guestCourseOnly: window.validatedGuestCourseId,
+            timestamp: new Date().toISOString()
+        };
+
+        studentsArray.push(newStudent);
+
+        // إنشاء المجموعة إن لم تكن موجودة مسبقاً
+        let groupsRes = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data/groups.json`);
+        let groupsArray = await groupsRes.json() || [];
+        groupsArray = Array.isArray(groupsArray) ? groupsArray : Object.values(groupsArray).filter(g => g !== null);
+
+        let groupExists = groupsArray.some(g => g.name === targetGroup);
+        if (!groupExists) {
+            groupsArray.push({ name: targetGroup, level: level, payType: "session", price: 0 });
+            await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data/groups.json`, {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(groupsArray)
+            });
+        }
+
+        // حفظ الطالب الجديد + حرق كود الشحن
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data/students.json`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(studentsArray)
+        });
+
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/chargeCodes/${window.validatedGuestCodeString}/status.json`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify("used")
+        });
+
+        // الدخول الفوري
+        document.getElementById("studentCode").value = guestCode;
+        document.getElementById("parentPhone").value = phone; // 🔴 الدخول برقم الهاتف
+        document.getElementById('auth-modal').classList.remove('active');
+        
+        let successModal = document.getElementById('successOnlineModal');
+        if(successModal) {
+            // 🔴 تعديل رسالة النجاح لتنبيه الطالب بطريقة الدخول المستقبلية
+            successModal.innerHTML = `
+                <div style="text-align: center; color: white; animation: fadeIn 0.5s ease;">
+                    <div style="font-size: 80px; margin-bottom: 20px;">🎉</div>
+                    <h1 style="font-size: 35px; margin-bottom: 10px; font-weight: 900;">تم إنشاء الحساب بنجاح!</h1>
+                    <p style="font-size: 18px; margin-bottom: 30px;">تم إيداع <strong style="color:var(--accent); font-size:24px;">${window.validatedGuestCodeAmount} ج.م</strong> في محفظتك.<br><br>💡 <strong>ملاحظة هامة: للدخول لاحقاً:</strong><br>استخدم الكود بالأسفل، واكتب رقم هاتفك ككلمة مرور.</p>
+                    <div style="background: white; color: var(--success); font-size: 35px; font-weight: 900; padding: 15px 40px; border-radius: 20px; letter-spacing: 5px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); display: inline-block;">${guestCode}</div>
+                    <br>
+                    <button class="btn-solid" style="background: var(--secondary); margin-top: 30px; width: auto; padding: 15px 40px; display: inline-block;" onclick="document.getElementById('successOnlineModal').style.display='none'; fetchStudentData(true);">الدخول للمنصة الآن ➡</button>
+                </div>
+            `;
+            successModal.style.display = 'flex';
+        } else {
+            fetchStudentData(true);
+        }
+
+    } catch(e) {
+        errorMsg.innerText = "حدث خطأ أثناء الإنشاء!";
+        errorMsg.style.display = "block";
+        btn.innerText = "إنشاء الحساب والدخول 🚀";
+        btn.disabled = false;
+    }
+};
+
+
+// ==========================================
+// 📷 نظام الكاميرا لشحن المحفظة من داخل المنصة
+// ==========================================
+let walletHtml5QrcodeScanner = null;
+
+// تشغيل كاميرا المحفظة
+window.startWalletScanner = function() {
+    document.getElementById('wallet-scanner-box').style.display = 'block';
+    
+    if (!walletHtml5QrcodeScanner) {
+        walletHtml5QrcodeScanner = new Html5QrcodeScanner(
+            "wallet-reader", 
+            { fps: 10, qrbox: { width: 250, height: 250 } }, 
+            false
+        );
+    }
+    
+    walletHtml5QrcodeScanner.render((decodedText) => {
+        // عند التقاط الكود بنجاح:
+        document.getElementById('rechargeCodeInput').value = decodedText; // 1. وضع الكود في الخانة
+        stopWalletScanner(); // 2. قفل الكاميرا
+        redeemCode(); // 3. ⚡ تنفيذ الشحن فوراً وتلقائياً
+    }, (error) => { 
+        // تجاهل أخطاء القراءة المستمرة أثناء البحث عن الـ QR
+    });
+};
+
+// إيقاف كاميرا المحفظة
+window.stopWalletScanner = function() {
+    if (walletHtml5QrcodeScanner) {
+        walletHtml5QrcodeScanner.clear().then(() => {
+            document.getElementById('wallet-scanner-box').style.display = 'none';
+        }).catch(e => {
+            document.getElementById('wallet-scanner-box').style.display = 'none';
+        });
+    } else {
+        document.getElementById('wallet-scanner-box').style.display = 'none';
+    }
+};

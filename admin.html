@@ -1114,6 +1114,12 @@
                     <label style="font-weight: bold; color: var(--text-main);">عدد الأكواد المطلوبة</label>
                     <input type="number" id="codeCount" class="custom-input" placeholder="مثال: 10" style="margin: 5px 0 0 0;">
                 </div>
+                <div class="input-group" style="flex: 2; min-width: 250px; margin: 0;">
+    <label style="font-weight: bold; color: var(--text-main);">ربط بكورس معين (اختياري)</label>
+    <select id="codeLinkedCourse" class="custom-input" style="margin: 5px 0 0 0; border-color: #8b5cf6;">
+        <option value="">بدون ربط (جميع الكورسات متاحة للطالب)</option>
+    </select>
+</div>
                 <button class="save-btn" style="width: auto; height: 50px; padding: 0 30px; margin: 0; font-size: 16px; background: var(--primary-color); box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);" onclick="generateChargeCodes()">توليد الأكواد 🚀</button>
             </div>
         </div>

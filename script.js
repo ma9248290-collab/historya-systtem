@@ -3973,6 +3973,7 @@ window.generateChargeCodes = async function() {
     let uid = getSafeUid();
     let amount = parseInt(document.getElementById("codeAmount").value);
     let count = parseInt(document.getElementById("codeCount").value);
+    let linkedCourseId = document.getElementById("codeLinkedCourse").value; // 🔴 سحب الكورس المربوط
     
     if(!amount || !count || count <= 0) {
         if(typeof showToast === 'function') showToast("يرجى إدخال القيمة والعدد بشكل صحيح!", "error");
@@ -3981,7 +3982,7 @@ window.generateChargeCodes = async function() {
     }
 
     let newCodes = {};
-    window.latestGeneratedCodes = []; // تصفير المصفوفة القديمة
+    window.latestGeneratedCodes = []; 
     
     let btn = document.querySelector('#platform-codes .save-btn');
     let originalText = btn.innerText;
@@ -3990,8 +3991,12 @@ window.generateChargeCodes = async function() {
 
     for(let i=0; i<count; i++) {
         let codeStr = "EDU-" + Math.random().toString(36).substr(2, 7).toUpperCase();
-        newCodes[codeStr] = { amount: amount, status: "unused", createdAt: new Date().toISOString().split('T')[0] };
-        // حفظ الكود في المصفوفة المؤقتة لعرضها في النافذة
+        let codeObj = { amount: amount, status: "unused", createdAt: new Date().toISOString().split('T')[0] };
+        
+        // 🔴 حفظ الكورس المربوط لو المدرس اختار واحد
+        if (linkedCourseId) codeObj.linkedCourseId = linkedCourseId; 
+        
+        newCodes[codeStr] = codeObj;
         window.latestGeneratedCodes.push({ code: codeStr, amount: amount });
     }
 
@@ -4002,9 +4007,8 @@ window.generateChargeCodes = async function() {
         
         document.getElementById("codeAmount").value = "";
         document.getElementById("codeCount").value = "";
-        renderChargeCodes(); // تحديث الجدول الأساسي في الخلفية
+        renderChargeCodes(); 
         
-        // عرض البيانات في النافذة المنبثقة
         document.getElementById("newCodesCountDisplay").innerText = count;
         document.getElementById("newCodesAmountDisplay").innerText = amount;
         document.getElementById("newCodesListDisplay").innerHTML = window.latestGeneratedCodes.map(c => `<div>${c.code}</div>`).join('');
@@ -4608,7 +4612,22 @@ window.switchPlatformTab = function(tabName) {
     if(targetSec) targetSec.style.display = 'block';
     if(targetBtn) targetBtn.style.background = 'var(--primary-color)';
 
-    if(tabName === 'codes') renderChargeCodes();
+    if(tabName === 'codes') {
+        renderChargeCodes();
+        // 🔴 جلب الكورسات لوضعها في قائمة الربط
+        fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/lectures.json`)
+        .then(res => res.json())
+        .then(data => {
+            let select = document.getElementById("codeLinkedCourse");
+            if(!select) return;
+            select.innerHTML = '<option value="">بدون ربط (جميع الكورسات متاحة للطالب)</option>';
+            if(data) {
+                Object.values(data).forEach(lec => {
+                    if(lec) select.innerHTML += `<option value="${lec.id}">${lec.title} (${lec.level})</option>`;
+                });
+            }
+        }).catch(e => console.log(e));
+    }
     
     if(tabName === 'lectures') {
         renderLectures();
@@ -4618,12 +4637,8 @@ window.switchPlatformTab = function(tabName) {
             selectLevel.innerHTML = '<option value="all">كل الصفوف (عام)</option>';
             activeLevels.forEach(lvl => { selectLevel.innerHTML += `<option value="${lvl}">${lvl}</option>`; });
         }
-        
-        // 🔥 التعديل هنا: لو الكونتينر فاضي، ارسم أول صف أوتوماتيك
         let vContainer = document.getElementById("courseVideosContainer");
-        if (vContainer && vContainer.innerHTML.trim() === "") {
-            addCourseVideoRow();
-        }
+        if (vContainer && vContainer.innerHTML.trim() === "") addCourseVideoRow();
     }
     
     if(tabName === 'exams') renderOnlineExams();

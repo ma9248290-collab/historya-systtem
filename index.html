@@ -18,7 +18,7 @@
     
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
     <meta name="google-site-verification" content="drZjRuAbbW_q44f7L9jwYfN19uJqpcbithI-6bMrOZg" />
-    
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
         /* ========================================== */
         /* 🎨 الهوية البصرية الجديدة (Premium VIP) */
@@ -303,8 +303,77 @@
     <!-- زر تسجيل الدخول الأساسي -->
     <button class="btn-solid" style="width: 100%; margin-top: 15px;" id="login-btn-action" onclick="fetchStudentData()">تسجيل الدخول 🚀</button>
     
-    <!-- زر الحصول على الكود (تم تصميمه كزر بارز بدلاً من نص صغير) -->
-    <button class="btn-outline" style="width: 100%; margin-top: 15px;" onclick="toggleAuthView('forgot')">احصل على الكود 🔍</button>
+    <div style="display: flex; gap: 10px;">
+        <button class="btn-outline" style="flex: 1; margin-top: 15px;" onclick="toggleAuthView('forgot')">نسيت الكود؟ 🔍</button>
+        <!-- 🔥 الزر الجديد للدخول كضيف -->
+        <button class="btn-outline" style="flex: 2; margin-top: 15px; border-color: var(--success); color: var(--success);" onclick="toggleAuthView('guest')">دخول كضيف (بكود شحن) 👤</button>
+    </div>
+</div>
+
+<!-- 🔥 واجهة الدخول كضيف (المطورة بالكاميرا والتعليمات) -->
+<div id="guest-form-view" style="display: none;">
+    <h2 style="color: var(--success); margin: 0 0 8px 0; font-weight: 900; font-size: 28px;">الدخول السريع 🚀</h2>
+    
+    <!-- 💡 صندوق التعليمات -->
+    <div style="background: rgba(16, 185, 129, 0.05); border: 1px dashed #10b981; padding: 15px; border-radius: 12px; margin-bottom: 20px; text-align: right;">
+        <h4 style="color: #10b981; margin: 0 0 10px 0; font-size: 15px;">💡 تعليمات الدخول السريع:</h4>
+        <ul style="margin: 0; padding-right: 20px; color: var(--text-muted); font-size: 13px; font-weight: bold; line-height: 1.6;">
+            <li>قم بتوجيه الكاميرا نحو الـ QR Code الموجود في الكارت عبر زر "كاميرا 📷".</li>
+            <li>بمجرد التقاط الكود، سيتم التحقق منه تلقائياً.</li>
+            <li>أدخل اسمك وصفك الدراسي ليتم فتح المنصة وإيداع الرصيد بحسابك فوراً.</li>
+        </ul>
+    </div>
+    
+    <!-- الخطوة 1: التحقق من الكود -->
+    <div id="guest-step-1">
+        <div class="auth-input-group" style="margin-bottom: 15px;">
+            <label>💳 كود الشحن</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="guestChargeCode" placeholder="أدخل الكود يدوياً..." style="flex: 2; text-align: center; letter-spacing: 2px; font-weight: 900; font-size: 16px; color: var(--primary);">
+                <button class="btn-solid" style="flex: 1; padding: 10px; background: #334155; box-shadow: none; font-size: 14px;" onclick="startGuestScanner()">📷 كاميرا</button>
+            </div>
+        </div>
+
+        <!-- 📷 حاوية الكاميرا (تظهر عند الضغط) -->
+        <div id="guest-scanner-box" style="display: none; margin-bottom: 15px; border-radius: 12px; overflow: hidden; border: 2px dashed var(--success);">
+            <div id="guest-reader" style="width: 100%;"></div>
+            <button class="btn-outline" style="width: 100%; border-radius: 0; border: none; background: #fee2e2; color: #ef4444; margin-top: 0;" onclick="stopGuestScanner()">إلغاء الكاميرا ❌</button>
+        </div>
+
+        <button class="btn-solid" style="width: 100%; background: linear-gradient(45deg, #10b981, #059669); box-shadow: 0 10px 25px rgba(16,185,129,0.3);" id="verifyGuestCodeBtn" onclick="verifyGuestCode()">التحقق من الكود 🔍</button>
+        <button class="btn-outline" style="width: 100%; margin-top: 15px;" onclick="stopGuestScanner(); toggleAuthView('login');">العودة لتسجيل الدخول</button>
+        <p id="guestErrorMsg1" style="color: white; background: var(--danger); padding: 10px; border-radius: 8px; margin-top: 15px; display: none; font-size: 14px; text-align: center;"></p>
+    </div>
+
+    <!-- الخطوة 2: إدخال الاسم والصف ورقم الهاتف -->
+<div id="guest-step-2" style="display: none;">
+    <div style="background: rgba(16, 185, 129, 0.1); border: 1px dashed #10b981; padding: 15px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
+        <span style="color: #10b981; font-weight: 900; font-size: 16px;">✅ كود صالح بقيمة: <span id="guestCodeValueDisplay" style="font-size: 20px;">0</span> ج.م</span>
+    </div>
+    
+    <div class="auth-input-group">
+        <label>👤 اسم الطالب (ثلاثي)</label>
+        <input type="text" id="guestName" placeholder="اكتب اسمك هنا...">
+    </div>
+    
+    <!-- 🔥 الخانة الجديدة لرقم الهاتف (الباسورد) -->
+    <div class="auth-input-group">
+        <label>📱 رقم الهاتف <span style="color:var(--danger); font-size: 11px;">(ستستخدمه ككلمة مرور للدخول لاحقاً)</span></label>
+        <input type="text" id="guestPhone" placeholder="01XXXXXXXXX" maxlength="11" oninput="this.value = this.value.replace(/[^0-9]/g, '')" style="text-align: center; letter-spacing: 2px; font-weight: 900;">
+    </div>
+
+    <div class="auth-input-group">
+        <label>🎓 الصف الدراسي (لتحديد الكورسات المتاحة لك)</label>
+        <select id="guestLevel">
+            <option value="الصف الأول الثانوي">الصف الأول الثانوي</option>
+            <option value="الصف الثاني الثانوي">الصف الثاني الثانوي</option>
+            <option value="الصف الثالث الثانوي">الصف الثالث الثانوي</option>
+        </select>
+    </div>
+    
+    <button class="btn-solid" style="width: 100%; background: linear-gradient(45deg, #3b82f6, #2563eb); box-shadow: 0 10px 25px rgba(59,130,246,0.3);" id="createGuestAccountBtn" onclick="createGuestAccount()">إنشاء الحساب والدخول 🚀</button>
+    <p id="guestErrorMsg2" style="color: white; background: var(--danger); padding: 10px; border-radius: 8px; margin-top: 15px; display: none; font-size: 14px; text-align: center;"></p>
+</div>
 </div>
                 
                 <div id="forgot-form-view" style="display: none;">
@@ -467,10 +536,24 @@
                     </div>
                     <div style="background: white; padding: 30px; border-radius: 24px; border: 1px solid var(--border);">
                         <h3 style="color: var(--secondary); margin: 0 0 10px 0;">💳 شحن الرصيد بكود التفعيل</h3>
-                        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                            <input type="text" id="rechargeCodeInput" placeholder="أدخل الكود" style="flex: 1; padding: 15px; font-size: 18px; text-align: center; border: 2px solid var(--border); border-radius: 16px;">
-                            <button class="btn" style="width: auto; padding: 0 40px;" onclick="redeemCode()">شحن الآن 🚀</button>
-                        </div>
+                        <!-- 📷 شريط إدخال الكود والكاميرا -->
+<div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+    <input type="text" id="rechargeCodeInput" placeholder="أدخل الكود يدوياً..." style="flex: 2; padding: 15px; font-size: 18px; text-align: center; border: 2px solid var(--border); border-radius: 16px; font-weight: bold; letter-spacing: 2px; color: var(--primary);">
+    
+    <button class="btn-secondary" style="flex: 1; border-radius: 16px; font-size: 15px; padding: 0 15px; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="startWalletScanner()">
+        <span style="font-size: 20px;">📷</span> مسح الـ QR
+    </button>
+    
+    <button class="btn" style="flex: 1; padding: 0 20px; border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="redeemCode()">
+        شحن الآن 🚀
+    </button>
+</div>
+
+<!-- 📷 حاوية الكاميرا للمحفظة (مخفية وتظهر عند الضغط) -->
+<div id="wallet-scanner-box" style="display: none; width: 100%; max-width: 400px; margin: 0 auto 20px auto; border-radius: 16px; overflow: hidden; border: 2px dashed var(--success); box-shadow: 0 10px 25px rgba(16, 185, 129, 0.15);">
+    <div id="wallet-reader" style="width: 100%;"></div>
+    <button class="btn-outline" style="width: 100%; border-radius: 0; border: none; background: #fee2e2; color: #ef4444; margin-top: 0; padding: 12px; font-weight: bold;" onclick="stopWalletScanner()">إلغاء الكاميرا ❌</button>
+</div>
                     </div>
                 </div>
 
