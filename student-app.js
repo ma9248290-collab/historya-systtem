@@ -123,14 +123,30 @@
             }
         };      
 
-        // ==========================================
+// ==========================================
 // 🛡️ نظام الخزنة المستقلة لحماية الرصيد والمشتريات من الضياع
 // ==========================================
 window.isProcessingTransaction = false;
 
+// دالة موحدة لتحديث الرصيد في جميع أماكن الشاشة فوراً
+window.updateWalletUI = function() {
+    if (!currentStudent) return;
+    let balance = parseFloat(currentStudent.walletBalance) || 0;
+    
+    let topBal = document.getElementById("top-balance");
+    if (topBal) topBal.innerText = balance;
+    
+    let homeBal = document.getElementById("walletBalanceDisplay");
+    if (homeBal) homeBal.innerText = balance;
+    
+    let pageBal = document.getElementById("wallet-page-balance");
+    if (pageBal) pageBal.innerHTML = `${balance} <span style="font-size: 24px; color: rgba(255,255,255,0.7);">ج.م</span>`;
+};
+
 // 1. دالة استرجاع ودمج الرصيد والكورسات المحمية للطالب
 window.syncStudentSafeVault = async function() {
     if (!currentStudent || !currentStudent.code) return;
+    window.currentStudent = currentStudent; // ربط المتغير بالـ window لمنع أي تعارض
     let stCode = String(currentStudent.code).trim();
 
     try {
@@ -142,11 +158,9 @@ window.syncStudentSafeVault = async function() {
             : Object.values(currentStudent.purchasedCourses || {});
 
         if (vault) {
-            // أخذ الرصيد الأحدث من الخزنة المحمية
-            if (vault.walletBalance !== undefined) {
+            if (vault.walletBalance !== undefined && vault.walletBalance !== null) {
                 currentStudent.walletBalance = parseFloat(vault.walletBalance) || 0;
             }
-            // دمج الكورسات المشترية من الخزنة مع بيانات الطالب لضمان عدم ضياع أي فيديو قديم أو جديد
             let vaultCourses = Array.isArray(vault.purchasedCourses) 
                 ? vault.purchasedCourses 
                 : Object.values(vault.purchasedCourses || {});
@@ -158,9 +172,10 @@ window.syncStudentSafeVault = async function() {
             }
         } else {
             currentStudent.purchasedCourses = currentCourses;
-            // إنشاء خزنة للطالب لأول مرة ببياناته الحالية
             await window.saveToStudentSafeVault();
         }
+
+        window.updateWalletUI();
     } catch (e) {
         console.error("Vault Sync Error:", e);
     }
@@ -169,6 +184,7 @@ window.syncStudentSafeVault = async function() {
 // 2. دالة الحفظ الآمن في الخزنة المستقلة + تحديث ملف الطالب الأساسي
 window.saveToStudentSafeVault = async function() {
     if (!currentStudent || !currentStudent.code) return;
+    window.currentStudent = currentStudent;
     let stCode = String(currentStudent.code).trim();
 
     let safeCourses = Array.isArray(currentStudent.purchasedCourses) 
@@ -182,14 +198,14 @@ window.saveToStudentSafeVault = async function() {
         lastUpdated: new Date().toISOString()
     };
 
-    // أ. الحفظ في الخزنة المستقلة (مستحيل تتمسح من لوحة الإدارة)
+    // أ. الحفظ في الخزنة المستقلة
     await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/student_vault/${stCode}.json`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(vaultData)
     });
 
-    // ب. تحديث ملف الطالب الأساسي بالبحث عن المفتاح الحقيقي في الفايربيز بدون فلترة تغير الترتيب
+    // ب. تحديث ملف الطالب الأساسي في مصفوفة الطلاب
     try {
         let stRes = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data/students.json`);
         let rawStudents = await stRes.json();
@@ -210,7 +226,7 @@ window.saveToStudentSafeVault = async function() {
 };
 
 // ==========================================
-// 🌟 دالة تسجيل الدخول وجلب بيانات الطالب (بعد ربطها بالخزنة)
+// 🌟 دالة تسجيل الدخول وجلب بيانات الطالب
 // ==========================================
 async function fetchStudentData(isAutoLogin = false) {
     const code = document.getElementById("studentCode").value.trim();
@@ -279,6 +295,7 @@ async function fetchStudentData(isAutoLogin = false) {
         }
 
         currentStudent = safeStudents.find(s => s && String(s.code).trim() === String(code).trim() && String(s.parentPhone).trim() === String(phone).trim());
+        window.currentStudent = currentStudent;
         
         if (!currentStudent) {
             errorMsg.style.display = "block"; errorMsg.innerText = "البيانات غير مسجلة!";
@@ -286,7 +303,6 @@ async function fetchStudentData(isAutoLogin = false) {
             return;
         }
 
-        // 🚨 فحص الإيقاف 🚨
         if (currentStudent.isSuspended) {
             if(isAutoLogin) {
                 document.getElementById("landing-page").style.display = "flex";
@@ -309,7 +325,7 @@ async function fetchStudentData(isAutoLogin = false) {
             return;
         }
 
-        // 🛡️ استدعاء الخزنة المحمية لاسترجاع الرصيد والكورسات المشترية قبل رسم الواجهة
+        // 🛡️ استدعاء الخزنة المحمية لاسترجاع الرصيد والكورسات المشترية
         await window.syncStudentSafeVault();
 
         let studentGroupObj = safeGroups.find(g => typeof g === 'object' && g.name === currentStudent.group);
@@ -331,7 +347,6 @@ async function fetchStudentData(isAutoLogin = false) {
         allOnlineExams = data.onlineExams || [];
         window.studentCode = code;
 
-        // ✅ تعبئة كارت الطالب الـ VIP الداخلي + السكور الشامل
         document.getElementById("top-name").innerText = currentStudent.name;
         document.getElementById("top-group").innerText = currentStudent.group;
         
@@ -366,12 +381,8 @@ async function fetchStudentData(isAutoLogin = false) {
             JsBarcode("#digitalIdBarcode", currentStudent.code, { format: "CODE128", lineColor: "#0f172a", width: 2, height: 45, displayValue: false });
         }
 
-        let balance = currentStudent.walletBalance || 0;
-        document.getElementById("top-balance").innerText = balance;
-        if(document.getElementById("walletBalanceDisplay")) document.getElementById("walletBalanceDisplay").innerText = balance;
-        if(document.getElementById("wallet-page-balance")) document.getElementById("wallet-page-balance").innerHTML = `${balance} <span style="font-size: 24px; color: rgba(255,255,255,0.7);">ج.م</span>`;
+        window.updateWalletUI();
 
-        // حسابات الخطط والحضور
         let totalItems = 0; let completedItems = 0; let missingLectures = 0; let missingExams = 0;
         try {
             let subRes = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/onlineSubmissions.json`);
@@ -451,7 +462,6 @@ window.purchaseVideo = async function(courseId, videoIndex, price, videoTitle) {
     if (window.isProcessingTransaction) return;
     if(!confirm(`تأكيد خصم ${price} ج.م من محفظتك لشراء محاضرة (${videoTitle})؟`)) return;
     
-    // جلب أحدث رصيد من الخزنة للتأكد قبل الشراء
     await window.syncStudentSafeVault();
 
     if((currentStudent.walletBalance || 0) < price) { 
@@ -472,24 +482,17 @@ window.purchaseVideo = async function(courseId, videoIndex, price, videoTitle) {
         let specificVideoId = `${courseId}_v${videoIndex}`;
         currentStudent.purchasedCourses = Array.isArray(currentStudent.purchasedCourses) ? currentStudent.purchasedCourses : [];
 
-        // إذا لم يكن مشترياً لها بالفعل، نخصم السعر ونضيفها
         if(!currentStudent.purchasedCourses.includes(specificVideoId)) {
             currentStudent.walletBalance = (parseFloat(currentStudent.walletBalance) || 0) - parseFloat(price);
             currentStudent.purchasedCourses.push(specificVideoId);
         }
 
-        // 🚀 حفظ فوري في الخزنة المحمية + ملف الطالب
         await window.saveToStudentSafeVault();
+        window.updateWalletUI();
         
         if(typeof showToast === 'function') showToast("تم شراء المحاضرة بنجاح! 🎉", "success");
         else alert("تم شراء المحاضرة بنجاح! 🎉");
-        
-        // تحديث الواجهة فوراً
-        document.getElementById("top-balance").innerText = currentStudent.walletBalance;
-        if(document.getElementById("walletBalanceDisplay")) document.getElementById("walletBalanceDisplay").innerText = currentStudent.walletBalance;
-        if(document.getElementById("wallet-page-balance")) document.getElementById("wallet-page-balance").innerHTML = `${currentStudent.walletBalance} <span style="font-size: 24px; color: rgba(255,255,255,0.7);">ج.م</span>`;
 
-        // إعادة رسم محتوى الكورس لتفعيل زر "تشغيل المحاضرة" بدلاً من الشراء
         openStudentCourseDetails(courseId);
     } catch(e) { 
         if(typeof showToast === 'function') showToast("حدث خطأ أثناء الشراء! تأكد من الإنترنت.", "error"); 
@@ -501,13 +504,14 @@ window.purchaseVideo = async function(courseId, videoIndex, price, videoTitle) {
 };
 
 // ==========================================
-// 💳 دالة شحن الكود (محمية من تكرار الكاميرا والمسافات)
+// 💳 دالة شحن الكود (تضيف الرصيد فوراً وتحفظه بأمان)
 // ==========================================
 window.redeemCode = async function() {
     if (window.isProcessingTransaction) return;
 
     const codeInput = document.getElementById("rechargeCodeInput");
-    // تنظيف الكود من أي مسافات مخفية وتوحيد الحروف الكبيرة
+    if (!codeInput) return;
+
     const code = codeInput.value.replace(/\s+/g, '').replace(/_/g, '-').toUpperCase();
     
     const notify = (msg, type) => {
@@ -516,13 +520,14 @@ window.redeemCode = async function() {
     };
 
     if(!code) return notify("أدخل الكود أولاً!", "error");
+    if(!currentStudent || !currentStudent.code) return notify("يرجى تسجيل الدخول أولاً!", "error");
 
     window.isProcessingTransaction = true;
     let btn = document.querySelector('button[onclick="redeemCode()"]');
-    let origText = btn ? btn.innerText : "شحن الآن 🚀";
+    let origText = btn ? btn.innerHTML : "شحن الآن 🚀";
     
     if(btn) {
-        btn.innerText = "جاري الشحن... ⏳";
+        btn.innerHTML = "جاري الشحن... ⏳";
         btn.disabled = true;
         btn.style.opacity = "0.7";
     }
@@ -543,12 +548,14 @@ window.redeemCode = async function() {
 
         let amount = parseFloat(codeData.amount) || 0;
 
-        // 1. جلب آخر رصيد من الخزنة المحمية ثم إضافة مبلغ الكود وحفظه
+        // 1. مزامنة أحدث رصيد من الخزنة ثم إضافة قيمة الكود
         await window.syncStudentSafeVault();
         currentStudent.walletBalance = (parseFloat(currentStudent.walletBalance) || 0) + amount;
+        
+        // 2. حفظ الرصيد الجديد في الخزنة المحمية وملف الطالب
         await window.saveToStudentSafeVault();
 
-        // 2. تحويل حالة الكود إلى مستخدم مع تسجيل اسم الطالب وتاريخ الشحن
+        // 3. تحديث حالة الكود إلى مستخدم
         await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/chargeCodes/${code}.json`, { 
             method: 'PATCH', 
             headers: { 'Content-Type': 'application/json' }, 
@@ -559,20 +566,18 @@ window.redeemCode = async function() {
             }) 
         });
 
-        notify(`تم شحن ${amount} ج.م بنجاح! 🎉`, "success");
+        // 4. تحديث الأرقام في الشاشة فوراً وتفريغ الحقل
+        window.updateWalletUI();
         codeInput.value = ""; 
-        
-        // تحديث الرصيد في الشاشة فوراً
-        document.getElementById("top-balance").innerText = currentStudent.walletBalance;
-        if(document.getElementById("walletBalanceDisplay")) document.getElementById("walletBalanceDisplay").innerText = currentStudent.walletBalance;
-        if(document.getElementById("wallet-page-balance")) document.getElementById("wallet-page-balance").innerHTML = `${currentStudent.walletBalance} <span style="font-size: 24px; color: rgba(255,255,255,0.7);">ج.م</span>`;
+        notify(`🎉 تم شحن ${amount} ج.م بنجاح! رصيدك الآن ${currentStudent.walletBalance} ج.م`, "success");
 
     } catch (e) { 
+        console.error(e);
         notify("حدث خطأ في الاتصال بالإنترنت!", "error"); 
     } finally {
         window.isProcessingTransaction = false;
         if(btn) {
-            btn.innerText = origText;
+            btn.innerHTML = origText;
             btn.disabled = false;
             btn.style.opacity = "1";
         }
@@ -2163,141 +2168,3 @@ window.stopWalletScanner = function() {
     }
 };
 
-
-// ==========================================
-// 🛡️ نظام الحماية الفائقة للمحفظة والكورسات وأكواد الشحن
-// ==========================================
-window.globalTeacherId = "Historia_System_Master"; // توحيد المسار مع لوحة الإدارة
-window.isProcessingTransaction = false; // قفل لمنع تكرار الكاميرا أو الضغط المزدوج
-
-// 1. دالة مزامنة خزنة الطالب المستقلة (تُستدعى فور تسجيل دخول الطالب)
-window.syncStudentSafeVault = async function() {
-    if (!window.currentStudent || !currentStudent.code) return;
-    let stCode = String(currentStudent.code).trim();
-
-    try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/student_vault/${stCode}.json`);
-        let vault = await res.json();
-
-        if (vault) {
-            // استرجاع الرصيد والكورسات من الخزنة المحمية
-            if (vault.walletBalance !== undefined) {
-                currentStudent.walletBalance = parseFloat(vault.walletBalance) || 0;
-            }
-            if (vault.purchasedCourses) {
-                currentStudent.purchasedCourses = Array.isArray(vault.purchasedCourses) ? vault.purchasedCourses : Object.values(vault.purchasedCourses);
-            }
-            if (vault.purchasedVideos) {
-                currentStudent.purchasedVideos = Array.isArray(vault.purchasedVideos) ? vault.purchasedVideos : Object.values(vault.purchasedVideos);
-            }
-            if (vault.unlockedLectures) {
-                currentStudent.unlockedLectures = Array.isArray(vault.unlockedLectures) ? vault.unlockedLectures : Object.values(vault.unlockedLectures);
-            }
-        } else {
-            // إذا لم يكن له خزنة بعد، ننشئها ببياناته الحالية
-            await saveToStudentSafeVault();
-        }
-
-        // تحديث رقم المحفظة في الشاشة
-        let walletEls = document.querySelectorAll('#walletBalanceDisplay, .wallet-balance-text, #headerWalletBalance');
-        walletEls.forEach(el => el.innerText = `${currentStudent.walletBalance || 0} ج.م`);
-        
-        if (typeof renderStudentLectures === 'function') renderStudentLectures();
-    } catch (e) {
-        console.error("Vault Sync Error:", e);
-    }
-};
-
-// 2. دالة الحفظ المزدوج (تحفظ في الخزنة المحمية + في بيانات الطالب)
-window.saveToStudentSafeVault = async function() {
-    if (!window.currentStudent || !currentStudent.code) return;
-    let stCode = String(currentStudent.code).trim();
-
-    let vaultData = {
-        walletBalance: parseFloat(currentStudent.walletBalance) || 0,
-        purchasedCourses: currentStudent.purchasedCourses || [],
-        purchasedVideos: currentStudent.purchasedVideos || [],
-        unlockedLectures: currentStudent.unlockedLectures || [],
-        lastUpdated: new Date().toISOString()
-    };
-
-    // أ. الحفظ في الخزنة المستقلة (مستحيل تتمسح من لوحة الإدارة)
-    await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/student_vault/${stCode}.json`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(vaultData)
-    });
-
-    // ب. تحديث الطالب داخل مصفوفة الطلاب بالبحث عن الكود بدقة
-    try {
-        let stRes = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data/students.json`);
-        let allSt = await stRes.json() || [];
-        let stIndex = allSt.findIndex(s => s && String(s.code).trim() === stCode);
-        if (stIndex > -1) {
-            await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data/students/${stIndex}.json`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(vaultData)
-            });
-        }
-    } catch(e) {}
-};
-
-// 3. دالة شحن الكود المطورة والمحمية من الخطأ أو التكرار
-window.redeemCode = async function() {
-    if (window.isProcessingTransaction) return; // منع التنفيذ المزدوج من الكاميرا
-
-    let inputEl = document.getElementById("rechargeCodeInput");
-    if (!inputEl) return;
-
-    // تنظيف الكود من أي مسافات مخفية وتوحيد الحروف والشرطة
-    let code = inputEl.value.replace(/\s+/g, '').replace(/_/g, '-').toUpperCase();
-    if (!code) {
-        alert("يرجى إدخال كود الشحن أولاً!");
-        return;
-    }
-
-    window.isProcessingTransaction = true;
-    let btn = document.querySelector('button[onclick="redeemCode()"]');
-    let origText = btn ? btn.innerHTML : "شحن الآن 🚀";
-    if (btn) { btn.innerHTML = "جاري الشحن... ⏳"; btn.disabled = true; }
-
-    try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/chargeCodes/${code}.json`);
-        let codeData = await res.json();
-
-        // تفريق رسائل الخطأ بدقة
-        if (!codeData) {
-            alert(`❌ الكود (${code}) غير موجود بالنظام! تأكد من نقل الحروف بشكل صحيح.`);
-        } else if (codeData.status === 'used') {
-            alert(`⚠️ هذا الكود تم شحنه واستخدامه مسبقاً!`);
-        } else {
-            let amount = parseFloat(codeData.amount) || 0;
-
-            // 1. إضافة الرصيد للطالب وحفظه في الخزنة المحمية أولاً قبل حرق الكود
-            await syncStudentSafeVault(); // جلب آخر رصيد للتأكيد
-            currentStudent.walletBalance = (parseFloat(currentStudent.walletBalance) || 0) + amount;
-            await saveToStudentSafeVault();
-
-            // 2. حرق الكود وتسجيل اسم وكود الطالب الذي شحنه
-            await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/chargeCodes/${code}.json`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    status: "used",
-                    usedBy: `${currentStudent.name} (${currentStudent.code})`,
-                    usedAt: new Date().toLocaleString('ar-EG')
-                })
-            });
-
-            inputEl.value = "";
-            await syncStudentSafeVault(); // تحديث الواجهة
-            alert(`🎉 تم شحن الرصيد بنجاح! تمت إضافة ${amount} ج.م إلى محفظتك.`);
-        }
-    } catch (e) {
-        alert("حدث خطأ في الاتصال بالإنترنت، يرجى المحاولة مرة أخرى.");
-    } finally {
-        window.isProcessingTransaction = false;
-        if (btn) { btn.innerHTML = origText; btn.disabled = false; }
-    }
-};
