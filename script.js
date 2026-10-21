@@ -4077,11 +4077,11 @@ window.renderChargeCodes = async function() {
     table.innerHTML = `
         <thead>
             <tr>
-                <th style="width:30%;">الكود</th>
+                <th style="width:25%;">الكود</th>
                 <th style="width:15%;">القيمة</th>
-                <th style="width:15%;">الحالة</th>
-                <th style="width:20%;">تاريخ الإنشاء</th>
-                <th style="width:10%;">إجراء</th>
+                <th style="width:25%;">الحالة / المستخدم</th>
+                <th style="width:15%;">تاريخ الإنشاء</th>
+                <th style="width:20%;">إجراء</th>
             </tr>
         </thead>
         <tbody id="codes-tbody">
@@ -4093,7 +4093,7 @@ window.renderChargeCodes = async function() {
         let codes = await res.json() || {};
         let tbody = document.getElementById("codes-tbody");
         tbody.innerHTML = "";
-        let keys = Object.keys(codes).reverse(); // الأحدث فوق
+        let keys = Object.keys(codes).reverse();
         
         if(keys.length === 0) {
             tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: var(--text-muted); font-weight: bold; padding: 30px;">لم تقم بإنشاء أي أكواد شحن حتى الآن. 💳</td></tr>`;
@@ -4103,30 +4103,53 @@ window.renderChargeCodes = async function() {
         keys.forEach(codeStr => {
             let data = codes[codeStr];
             let isUsed = data.status === 'used';
+            let usedByInfo = data.usedBy ? `<div style="font-size:11px; color:var(--text-main); margin-top:4px;">👤 ${data.usedBy}</div>` : '';
+            
             let statusBadge = !isUsed 
                 ? '<span class="status-badge" style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 5px 12px;">متاح ✅</span>' 
-                : '<span class="status-badge" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 5px 12px;">مستخدم ❌</span>';
+                : `<span class="status-badge" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 5px 12px;">مستخدم ❌</span>${usedByInfo}`;
             
+            let reactivateBtn = isUsed 
+                ? `<button class="icon-btn" style="background:#f59e0b; color:white; border:none; padding:5px 10px; font-size:12px;" onclick="reactivateChargeCode('${codeStr}')" title="إعادة تفعيل الكود">🔄 تفعيل</button>` 
+                : '';
+
             tbody.innerHTML += `
-            <tr style="${isUsed ? 'opacity: 0.6;' : ''}">
+            <tr style="${isUsed ? 'background: rgba(239,68,68,0.02);' : ''}">
                 <td style="direction: ltr; text-align: right;">
                     <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
                         <span style="color: var(--primary-color); font-family: monospace; font-size: 16px; font-weight: 900; letter-spacing: 2px;">${codeStr}</span>
-                        <button onclick="navigator.clipboard.writeText('${codeStr}'); showToast('تم نسخ الكود! 📋');" style="background:var(--hover-bg); border:1px solid var(--border-color); border-radius:6px; cursor:pointer; font-size:14px; padding:4px 8px; transition:0.2s;" title="نسخ الكود" onmouseover="this.style.background='rgba(59, 130, 246, 0.1)'" onmouseout="this.style.background='var(--hover-bg)'">📋</button>
+                        <button onclick="navigator.clipboard.writeText('${codeStr}'); showToast('تم نسخ الكود! 📋');" style="background:var(--hover-bg); border:1px solid var(--border-color); border-radius:6px; cursor:pointer; font-size:14px; padding:4px 8px;">📋</button>
                     </div>
                 </td>
                 <td><strong style="color: #f59e0b; font-size: 17px;">${data.amount} ج.م</strong></td>
                 <td>${statusBadge}</td>
                 <td style="font-size:13px; color:var(--text-muted); font-weight: bold;">${data.createdAt}</td>
                 <td>
-                    <button class="icon-btn danger" style="margin: 0 auto; display: block;" onclick="deleteChargeCode('${codeStr}')" title="حذف">🗑️</button>
+                    <div style="display: flex; gap: 5px; justify-content: center;">
+                        ${reactivateBtn}
+                        <button class="icon-btn danger" onclick="deleteChargeCode('${codeStr}')" title="حذف">🗑️</button>
+                    </div>
                 </td>
             </tr>`;
         });
     } catch(e) { 
-         let tbody = document.getElementById("codes-tbody");
-         if(tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: red; font-weight: bold;">حدث خطأ في تحميل الأكواد. أعد المحاولة!</td></tr>`;
+    let tbody = document.getElementById("codes-tbody");
+    if(tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: red; font-weight: bold;">حدث خطأ في تحميل الأكواد!</td></tr>`;
     }
+};
+
+// 🔄 دالة إعادة تفعيل الكود لو حصلت مشكلة مع طالب
+window.reactivateChargeCode = async function(codeStr) {
+    if(!confirm(`هل تريد إعادة تفعيل الكود (${codeStr}) ليصبح متاحاً للشحن مرة أخرى؟`)) return;
+    try {
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/chargeCodes/${codeStr}.json`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: "unused", usedBy: null, usedAt: null })
+        });
+        renderChargeCodes();
+        showToast("تم إعادة تفعيل الكود بنجاح! ✅");
+    } catch(e) { alert("حدث خطأ أثناء التفعيل"); }
 };
 
 window.deleteChargeCode = async function(codeStr) {
