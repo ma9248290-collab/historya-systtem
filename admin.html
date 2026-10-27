@@ -1100,6 +1100,33 @@
     </div>
 
     <div id="platform-codes" class="platform-section">
+
+        <!-- 📲 كارت طلبات شحن المحفظة الإلكترونية (فودافون كاش / InstaPay) -->
+        <div class="card" style="margin-bottom: 25px; padding: 25px; border-top: 4px solid #10b981; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                <h3 style="color: #10b981; margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 24px;">📲</span> طلبات شحن المحفظة (فودافون كاش / InstaPay)
+                </h3>
+                <button class="theme-btn" style="border-color: #10b981; color: #10b981;" onclick="renderWalletTopupRequests()">🔄 تحديث الطلبات</button>
+            </div>
+            <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                <table class="students-table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>التاريخ</th>
+                            <th>الطالب</th>
+                            <th>الطريقة والرقم المحول</th>
+                            <th>المبلغ</th>
+                            <th>صورة الإيصال</th>
+                            <th>الحالة / الإجراء</th>
+                        </tr>
+                    </thead>
+                    <tbody id="wallet-requests-tbody">
+                        <tr><td colspan="6" style="text-align: center;">جاري جلب الطلبات... ⏳</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
         <div class="card" style="margin-bottom: 20px; padding: 25px; border-top: 4px solid var(--primary-color); box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
             <h3 style="color: var(--primary-color); margin-top: 0; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
                 <span style="font-size: 24px;">💳</span> توليد أكواد شحن جديدة
@@ -2768,48 +2795,60 @@
     </div>
 </div>
 
-<!-- 📊 نافذة الإحصائيات التحليلية للحصة -->
+<!-- 📊 نافذة الإحصائيات التحليلية للحصة (مزودة بتحميل إكسيل لكل قسم) -->
 <div id="sessionAnalyticsModal" class="modal" style="z-index: 1000000;">
-    <div class="modal-content" style="width: 850px; max-width: 95%; max-height: 90vh; overflow-y: auto; border-top: 5px solid #8b5cf6; background: #f8fafc;">
+    <div class="modal-content" style="width: 880px; max-width: 95%; max-height: 90vh; overflow-y: auto; border-top: 5px solid #8b5cf6; background: #f8fafc;">
         
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
             <div>
                 <h2 style="margin: 0; color: #8b5cf6; display: flex; align-items: center; gap: 10px;">
                     <span style="font-size: 24px;">📊</span> التحليل الذكي للحصة
                 </h2>
                 <p id="analyticsModalSubtitle" style="margin: 5px 0 0 0; color: var(--text-muted); font-size: 14px; font-weight: bold;"></p>
             </div>
-            <span class="close" onclick="closeModal('sessionAnalyticsModal')" style="font-size: 28px; cursor: pointer; color: var(--danger-color);">&times;</span>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <button onclick="exportSessionAnalyticsExcel('all_sheets')" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 10px; font-weight: bold; font-family: 'Cairo'; font-size: 13px; cursor: pointer; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.25);">
+                    📥 تحميل التقرير الشامل (Excel)
+                </button>
+                <span class="close" onclick="closeModal('sessionAnalyticsModal')" style="font-size: 28px; cursor: pointer; color: var(--danger-color); line-height: 1;">&times;</span>
+            </div>
         </div>
 
-        <!-- ملخص الأرقام السريع -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 25px;">
+        <!-- ملخص الأرقام السريع (مع زر إكسيل لكل حالة) -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 25px;">
             <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; border-bottom: 3px solid var(--primary-color); text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
                 <p style="margin: 0 0 5px 0; font-size: 12px; color: var(--text-muted); font-weight: bold;">إجمالي المستهدف</p>
-                <h3 id="sa-total" style="margin: 0; font-size: 24px; color: var(--primary-color);">0</h3>
+                <h3 id="sa-total" style="margin: 0 0 10px 0; font-size: 24px; color: var(--primary-color);">0</h3>
+                <button onclick="exportSessionAnalyticsExcel('total')" style="background: rgba(152,0,0,0.08); color: var(--primary-color); border: 1px solid rgba(152,0,0,0.2); padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; width: 100%; font-family: 'Cairo';">📥 تحميل إكسيل</button>
             </div>
             <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; border-bottom: 3px solid #10b981; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
                 <p style="margin: 0 0 5px 0; font-size: 12px; color: var(--text-muted); font-weight: bold;">حاضرين</p>
-                <h3 id="sa-present" style="margin: 0; font-size: 24px; color: #10b981;">0</h3>
+                <h3 id="sa-present" style="margin: 0 0 10px 0; font-size: 24px; color: #10b981;">0</h3>
+                <button onclick="exportSessionAnalyticsExcel('present')" style="background: #d1fae5; color: #047857; border: 1px solid #6ee7b7; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; width: 100%; font-family: 'Cairo';">📥 تحميل إكسيل</button>
             </div>
             <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; border-bottom: 3px solid #f59e0b; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
                 <p style="margin: 0 0 5px 0; font-size: 12px; color: var(--text-muted); font-weight: bold;">متأخرين</p>
-                <h3 id="sa-late" style="margin: 0; font-size: 24px; color: #f59e0b;">0</h3>
+                <h3 id="sa-late" style="margin: 0 0 10px 0; font-size: 24px; color: #f59e0b;">0</h3>
+                <button onclick="exportSessionAnalyticsExcel('late')" style="background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; width: 100%; font-family: 'Cairo';">📥 تحميل إكسيل</button>
             </div>
             <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; border-bottom: 3px solid #ef4444; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
                 <p style="margin: 0 0 5px 0; font-size: 12px; color: var(--text-muted); font-weight: bold;">غائبين</p>
-                <h3 id="sa-absent" style="margin: 0; font-size: 24px; color: #ef4444;">0</h3>
+                <h3 id="sa-absent" style="margin: 0 0 10px 0; font-size: 24px; color: #ef4444;">0</h3>
+                <button onclick="exportSessionAnalyticsExcel('absent')" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; width: 100%; font-family: 'Cairo';">📥 تحميل إكسيل</button>
             </div>
         </div>
 
         <!-- الأقسام التحليلية (Grid) -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px;">
             
             <!-- 1. غابوا هذه الحصة وكانوا حاضرين السابقة -->
             <div style="background: white; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
                 <h4 style="margin: 0 0 15px 0; color: #f59e0b; display: flex; justify-content: space-between; align-items: center;">
                     <span>📉 غابوا (كانوا حاضرين السابقة)</span>
-                    <span id="sa-dropped-count" style="background: #fef3c7; color: #d97706; padding: 2px 8px; border-radius: 10px; font-size: 13px;">0</span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <button onclick="exportSessionAnalyticsExcel('dropped')" style="background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; padding: 3px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; font-family: 'Cairo';">📥 إكسيل</button>
+                        <span id="sa-dropped-count" style="background: #fef3c7; color: #d97706; padding: 2px 8px; border-radius: 10px; font-size: 13px;">0</span>
+                    </div>
                 </h4>
                 <div id="sa-dropped-list" style="max-height: 200px; overflow-y: auto; font-size: 13px;"></div>
             </div>
@@ -2818,7 +2857,10 @@
             <div style="background: white; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
                 <h4 style="margin: 0 0 15px 0; color: #ef4444; display: flex; justify-content: space-between; align-items: center;">
                     <span>🚨 غياب متتالي (حصتين)</span>
-                    <span id="sa-consec-count" style="background: #fee2e2; color: #b91c1c; padding: 2px 8px; border-radius: 10px; font-size: 13px;">0</span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <button onclick="exportSessionAnalyticsExcel('consec')" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 3px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; font-family: 'Cairo';">📥 إكسيل</button>
+                        <span id="sa-consec-count" style="background: #fee2e2; color: #b91c1c; padding: 2px 8px; border-radius: 10px; font-size: 13px;">0</span>
+                    </div>
                 </h4>
                 <div id="sa-consec-list" style="max-height: 200px; overflow-y: auto; font-size: 13px;"></div>
             </div>
@@ -2827,7 +2869,10 @@
             <div style="background: white; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
                 <h4 style="margin: 0 0 15px 0; color: #3b82f6; display: flex; justify-content: space-between; align-items: center;">
                     <span>🔄 حضور تعويض (ضيوف)</span>
-                    <span id="sa-guests-count" style="background: #eff6ff; color: #1d4ed8; padding: 2px 8px; border-radius: 10px; font-size: 13px;">0</span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <button onclick="exportSessionAnalyticsExcel('guests')" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 3px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; font-family: 'Cairo';">📥 إكسيل</button>
+                        <span id="sa-guests-count" style="background: #eff6ff; color: #1d4ed8; padding: 2px 8px; border-radius: 10px; font-size: 13px;">0</span>
+                    </div>
                 </h4>
                 <div id="sa-guests-list" style="max-height: 200px; overflow-y: auto; font-size: 13px;"></div>
             </div>
@@ -2836,7 +2881,10 @@
             <div style="background: white; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
                 <h4 style="margin: 0 0 15px 0; color: #10b981; display: flex; justify-content: space-between; align-items: center;">
                     <span>✨ طلاب جدد (أول حضور)</span>
-                    <span id="sa-newcomers-count" style="background: #d1fae5; color: #047857; padding: 2px 8px; border-radius: 10px; font-size: 13px;">0</span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <button onclick="exportSessionAnalyticsExcel('newcomers')" style="background: #d1fae5; color: #047857; border: 1px solid #6ee7b7; padding: 3px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; font-family: 'Cairo';">📥 إكسيل</button>
+                        <span id="sa-newcomers-count" style="background: #d1fae5; color: #047857; padding: 2px 8px; border-radius: 10px; font-size: 13px;">0</span>
+                    </div>
                 </h4>
                 <div id="sa-newcomers-list" style="max-height: 200px; overflow-y: auto; font-size: 13px;"></div>
             </div>

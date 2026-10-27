@@ -4335,196 +4335,6 @@ window.loadSentNotifications = async function() {
     }
 };
 
-window.addCourseVideoRow = function(title = "", url = "", linkedSessions = [], requiredExam = "", type = "free", price = "") {
-    let container = document.getElementById("courseVideosContainer");
-    let level = document.getElementById("lecLevel").value;
-    let validGroups = groups.filter(g => level === 'all' || g.level === level).map(g => g.name);
-    let validSessions = classSessions.filter(s => validGroups.includes(s.group)).reverse();
-    
-    // التأكد أن linkedSessions مصفوفة دائماً
-    if (!Array.isArray(linkedSessions)) {
-        linkedSessions = linkedSessions ? [linkedSessions] : [];
-    }
-
-    let sessionsCheckboxes = '';
-    if (validSessions.length === 0) {
-        sessionsCheckboxes = `<span style="color: var(--danger-color); font-size: 12px; font-weight: bold;">لا توجد حصص مسجلة لهذا الصف!</span>`;
-    } else {
-        validSessions.forEach(s => {
-            let isChecked = linkedSessions.includes(s.id) ? "checked" : "";
-            sessionsCheckboxes += `
-            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; background: white; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 12px; font-weight: bold; margin-bottom: 4px;">
-                <input type="checkbox" value="${s.id}" ${isChecked} class="vid-session-cb" style="accent-color: var(--success-color); width: 16px; height: 16px;">
-                ${s.date} - ${s.topic || 'حصة'} (${s.group})
-            </label>`;
-        });
-    }
-
-    let examsToSelect = JSON.parse(localStorage.getItem("onlineExams")) || [];
-    let examOpts = '<option value="">بدون شرط امتحان</option>';
-    examsToSelect.forEach(e => { examOpts += `<option value="${e.id}" ${requiredExam === e.id ? 'selected' : ''}>${e.title}</option>`; });
-
-    let div = document.createElement("div"); div.className = "video-row";
-    div.style.cssText = "background: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02); margin-bottom: 15px; position: relative;";
-    
-    div.innerHTML = `
-        <button type="button" onclick="this.parentElement.remove()" style="position: absolute; top: 15px; left: 15px; background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; width: 35px; height: 35px; cursor: pointer;">🗑️</button>
-        <div style="display: flex; gap: 15px; margin-bottom: 15px; padding-left: 45px;">
-            <div style="flex: 1;"><label style="font-size: 12px; font-weight: bold;">عنوان المحاضرة</label><input type="text" class="custom-input vid-title" value="${title}" style="margin: 0; background: #f8fafc;"></div>
-            <div style="flex: 1;"><label style="font-size: 12px; font-weight: bold;">الرابط (YouTube/Drive)</label><input type="url" class="custom-input vid-url" value="${url}" style="margin: 0; background: #f8fafc; direction: ltr;"></div>
-        </div>
-        <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #cbd5e1; flex-wrap: wrap;">
-            <div style="flex: 1; min-width: 150px;">
-                <label style="font-size: 12px; color: #3b82f6; font-weight: bold;">نوع المحاضرة:</label>
-                <select class="custom-input vid-type" style="margin: 0;" onchange="this.nextElementSibling.style.display = this.value === 'paid' ? 'block' : 'none'">
-                    <option value="free" ${type === 'free' ? 'selected' : ''}>محتوى مجاني</option><option value="paid" ${type === 'paid' ? 'selected' : ''}>محتوى مدفوع</option>
-                </select>
-                <input type="number" class="custom-input vid-price" placeholder="السعر (ج.م)" value="${price}" style="margin-top: 5px; display: ${type === 'paid' ? 'block' : 'none'};">
-            </div>
-            <div style="flex: 2; min-width: 250px;">
-                <label style="font-size: 12px; color: #10b981; font-weight: 900; margin-bottom: 5px; display: block;">🔓 يُفتح مجاناً لمن حضر حصص (اختر حصة أو أكثر):</label>
-                <div style="max-height: 120px; overflow-y: auto; background: var(--bg-color); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
-                    ${sessionsCheckboxes}
-                </div>
-            </div>
-            <div style="flex: 1; min-width: 150px;"><label style="font-size: 12px; color: #f59e0b; font-weight: bold;">شرط الفتح (اجتياز امتحان):</label><select class="custom-input vid-exam" style="margin: 0;">${examOpts}</select></div>
-        </div>
-    `;
-    document.getElementById("courseVideosContainer").appendChild(div);
-};
-
-window.addEditCourseVideoRow = function(title = "", url = "", linkedSessions = [], requiredExam = "", type = "free", price = "") {
-    let container = document.getElementById("editCourseVideosContainer");
-    let level = document.getElementById("editLecLevel").value;
-    let validGroups = groups.filter(g => level === 'all' || g.level === level).map(g => g.name);
-    let validSessions = classSessions.filter(s => validGroups.includes(s.group)).reverse();
-    
-    if (!Array.isArray(linkedSessions)) {
-        linkedSessions = linkedSessions ? [linkedSessions] : [];
-    }
-
-    let sessionsCheckboxes = '';
-    if (validSessions.length === 0) {
-        sessionsCheckboxes = `<span style="color: var(--danger-color); font-size: 12px; font-weight: bold;">لا توجد حصص مسجلة لهذا الصف!</span>`;
-    } else {
-        validSessions.forEach(s => {
-            let isChecked = linkedSessions.includes(s.id) ? "checked" : "";
-            sessionsCheckboxes += `
-            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; background: white; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 12px; font-weight: bold; margin-bottom: 4px;">
-                <input type="checkbox" value="${s.id}" ${isChecked} class="vid-session-cb" style="accent-color: var(--success-color); width: 16px; height: 16px;">
-                ${s.date} - ${s.topic || 'حصة'} (${s.group})
-            </label>`;
-        });
-    }
-
-    let examsToSelect = JSON.parse(localStorage.getItem("onlineExams")) || [];
-    let examOpts = '<option value="">بدون شرط امتحان</option>';
-    examsToSelect.forEach(e => {
-        examOpts += `<option value="${e.id}" ${requiredExam === e.id ? 'selected' : ''}>${e.title}</option>`;
-    });
-
-    let div = document.createElement("div");
-    div.className = "video-row-edit";
-    div.style.cssText = "background: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02); margin-bottom: 15px; position: relative; transition: 0.3s;";
-    
-    div.innerHTML = `
-        <button type="button" onclick="this.parentElement.remove()" style="position: absolute; top: 15px; left: 15px; background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; width: 35px; height: 35px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px;">🗑️</button>
-        <div style="display: flex; gap: 15px; margin-bottom: 15px; padding-left: 45px;">
-            <div style="flex: 1;">
-                <label style="font-size: 13px; font-weight: bold; color: var(--text-main); margin-bottom: 5px; display: block;">عنوان الفيديو</label>
-                <input type="text" class="custom-input vid-title" placeholder="مثال: الجزء الأول" value="${title}" style="margin: 0; background: #f8fafc; border-color: #cbd5e1;">
-            </div>
-            <div style="flex: 2;">
-                <label style="font-size: 13px; font-weight: bold; color: var(--text-main); margin-bottom: 5px; display: block;">رابط الفيديو (YouTube / Drive)</label>
-                <input type="url" class="custom-input vid-url" placeholder="https://..." value="${url}" style="margin: 0; background: #f8fafc; text-align: left; direction: ltr; border-color: #cbd5e1;">
-            </div>
-        </div>
-        <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #cbd5e1; align-items: center; flex-wrap: wrap;">
-            <div style="flex: 1; min-width: 150px;">
-                <label style="font-size: 12px; color: #3b82f6; font-weight: bold;">نوع المحاضرة:</label>
-                <select class="custom-input vid-type" style="margin: 0;" onchange="this.nextElementSibling.style.display = this.value === 'paid' ? 'block' : 'none'">
-                    <option value="free" ${type === 'free' ? 'selected' : ''}>محتوى مجاني</option>
-                    <option value="paid" ${type === 'paid' ? 'selected' : ''}>محتوى مدفوع</option>
-                </select>
-                <input type="number" class="custom-input vid-price" placeholder="السعر (ج.م)" value="${price}" style="margin-top: 5px; display: ${type === 'paid' ? 'block' : 'none'};">
-            </div>
-            <div style="flex: 2; min-width: 250px;">
-                <label style="font-size: 13px; color: #10b981; font-weight: 900; margin-bottom: 5px; display: block;"><span>🔓</span> يُفتح مجاناً لمن حضر حصص:</label>
-                <div style="max-height: 120px; overflow-y: auto; background: white; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
-                    ${sessionsCheckboxes}
-                </div>
-            </div>
-            <div style="flex: 1; min-width: 200px;">
-                <label style="font-size: 13px; color: #f59e0b; font-weight: 900; margin-bottom: 8px; display: block;"><span>🔐</span> شرط الفتح (اجتياز امتحان):</label>
-                <select class="custom-input vid-exam" style="margin: 0; border-color: #f59e0b; font-weight: bold;">${examOpts}</select>
-            </div>
-        </div>
-    `;
-    container.appendChild(div);
-};
-
-
-
-window.saveLecture = async function() {
-    let title = document.getElementById("lecTitle").value.trim();
-    let level = document.getElementById("lecLevel").value;
-    let desc = document.getElementById("lecDesc").value.trim();
-    let maxViews = parseInt(document.getElementById("lecMaxViews").value) || 0;
-    let isHidden = document.getElementById("lecVisibility").value === "hidden";
-
-    let videos = [];
-    document.querySelectorAll(".video-row").forEach(row => {
-        let vTitle = row.querySelector(".vid-title").value.trim();
-        let vUrl = row.querySelector(".vid-url").value.trim();
-        let vSessions = Array.from(row.querySelectorAll(".vid-session-cb:checked")).map(cb => cb.value);
-        let vExam = row.querySelector(".vid-exam").value;
-        let vType = row.querySelector(".vid-type").value;
-        let vPrice = row.querySelector(".vid-price") ? parseFloat(row.querySelector(".vid-price").value) || 0 : 0;
-        
-        if(vUrl) videos.push({ title: vTitle || "فيديو", url: vUrl, linkedSessions: vSessions, requiredExam: vExam, type: vType, price: vPrice });
-    });
-
-    if(!title || videos.length === 0) return showToast("يرجى إدخال اسم الكورس وفيديو واحد على الأقل!", "error");
-
-    let btn = document.querySelector('#platform-lectures .save-btn');
-    let originalText = btn.innerText; 
-    btn.innerText = "جاري النشر... ⏳";
-
-    try {
-        let imageBase64 = await window.readFileAsBase64("lecImageFile").catch(() => null);
-        let defaultImage = "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=600&auto=format&fit=crop";
-
-        let newLecture = { 
-            id: "lec_" + Date.now(), 
-            title: title, 
-            level: level, 
-            type: "mixed", 
-            price: 0, 
-            maxViews: maxViews, 
-            desc: desc, 
-            videos: videos, 
-            track: document.getElementById("lecTrack").value,
-            isHidden: isHidden,
-            image: imageBase64 || defaultImage, 
-            date: new Date().toISOString().split('T')[0] 
-        };
-
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/lectures/${newLecture.id}.json`, { 
-            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newLecture) 
-        });
-        
-        showToast("تم نشر الكورس بنجاح! 🎬");
-        document.getElementById("lecTitle").value = ""; 
-        document.getElementById("lecMaxViews").value = "0";
-        document.getElementById("courseVideosContainer").innerHTML = ""; 
-        addCourseVideoRow();
-        btn.innerText = originalText; 
-        renderLectures();
-    } catch(e) { 
-        alert("حدث خطأ أثناء النشر!"); 
-        btn.innerText = originalText; 
-    }
-};
 
 window.openEditCourseModal = function(id) {
     let lec = window.fetchedLectures.find(l => l.id === id);
@@ -4562,61 +4372,6 @@ window.openEditCourseModal = function(id) {
     openModal("editCourseModal");
 };
 
-window.saveEditedCourse = async function() {
-    let id = document.getElementById("editLecId").value;
-    let title = document.getElementById("editLecTitle").value.trim();
-    let maxViews = parseInt(document.getElementById("editLecMaxViews").value) || 0;
-    let isHidden = document.getElementById("editLecVisibility").value === "hidden";
-    
-    let videos = [];
-    document.querySelectorAll(".video-row-edit").forEach(row => {
-        let vTitle = row.querySelector(".vid-title").value.trim();
-        let vUrl = row.querySelector(".vid-url").value.trim();
-        let vSessions = Array.from(row.querySelectorAll(".vid-session-cb:checked")).map(cb => cb.value);
-        let vExam = row.querySelector(".vid-exam").value;
-        let vType = row.querySelector(".vid-type").value;
-        let vPrice = row.querySelector(".vid-price") ? parseFloat(row.querySelector(".vid-price").value) || 0 : 0;
-        
-        if(vUrl) videos.push({ title: vTitle || "فيديو", url: vUrl, linkedSessions: vSessions, requiredExam: vExam, type: vType, price: vPrice });
-    });
-
-    if(!title || videos.length === 0) return alert("يرجى إدخال اسم الكورس وفيديو واحد على الأقل!");
-
-    let btn = document.querySelector('#editCourseModal .save-btn');
-    let originalText = btn.innerText; btn.innerText = "جاري حفظ التعديلات... ⏳";
-
-    try {
-        let newImageBase64 = await window.readFileAsBase64("editLecImageFile");
-        let oldImage = document.getElementById("editLecImageBase64").value;
-        let lec = window.fetchedLectures.find(l => l.id === id);
-        
-        let updatedLecture = { 
-            ...lec, 
-            title: title, 
-            level: document.getElementById("editLecLevel").value,
-            track: document.getElementById("editLecTrack").value,
-            type: "mixed", 
-            price: 0, 
-            image: newImageBase64 || oldImage, 
-            maxViews: maxViews,
-            desc: document.getElementById("editLecDesc").value.trim(), 
-            videos: videos,
-            isHidden: isHidden,
-            linkedSessions: null, 
-            linkedSession: null 
-        };
-
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/lectures/${id}.json`, { 
-            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedLecture) 
-        });
-        showToast("تم حفظ التعديلات! 💾"); 
-        closeModal("editCourseModal"); 
-        renderLectures();
-    } catch(e) { 
-        alert("حدث خطأ أثناء الحفظ!"); 
-    }
-    btn.innerText = originalText;
-};
 
 
 
@@ -5227,8 +4982,121 @@ window.renderOnlineExams = async function() {
     } catch(e) { container.innerHTML = `<div style="grid-column: 1/-1; color:red; text-align:center;">حدث خطأ في جلب الامتحانات</div>`; }
 };
 
+// ==========================================
+// 📄 1. تطوير إضافة وتعديل الفيديوهات لدعم ملازم الـ PDF
+// ==========================================
+window.addCourseVideoRow = function(title = "", url = "", linkedSessions = [], requiredExam = "", type = "free", price = "", pdfUrl = "") {
+    let container = document.getElementById("courseVideosContainer");
+    let level = document.getElementById("lecLevel").value;
+    let validGroups = groups.filter(g => level === 'all' || g.level === level).map(g => g.name);
+    let validSessions = classSessions.filter(s => validGroups.includes(s.group)).reverse();
+    
+    if (!Array.isArray(linkedSessions)) linkedSessions = linkedSessions ? [linkedSessions] : [];
+
+    let sessionsCheckboxes = validSessions.length === 0 
+        ? `<span style="color: var(--danger-color); font-size: 12px; font-weight: bold;">لا توجد حصص مسجلة لهذا الصف!</span>`
+        : validSessions.map(s => `
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; background: white; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 12px; font-weight: bold; margin-bottom: 4px;">
+                <input type="checkbox" value="${s.id}" ${linkedSessions.includes(s.id) ? "checked" : ""} class="vid-session-cb" style="accent-color: var(--success-color); width: 16px; height: 16px;">
+                ${s.date} - ${s.topic || 'حصة'} (${s.group})
+            </label>`).join('');
+
+    let examsToSelect = JSON.parse(localStorage.getItem("onlineExams")) || [];
+    let examOpts = '<option value="">بدون شرط امتحان</option>' + examsToSelect.map(e => `<option value="${e.id}" ${requiredExam === e.id ? 'selected' : ''}>${e.title}</option>`).join('');
+
+    let div = document.createElement("div"); 
+    div.className = "video-row";
+    div.style.cssText = "background: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02); margin-bottom: 15px; position: relative;";
+    
+    div.innerHTML = `
+        <button type="button" onclick="this.parentElement.remove()" style="position: absolute; top: 15px; left: 15px; background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; width: 35px; height: 35px; cursor: pointer;">🗑️</button>
+        <div style="display: flex; gap: 15px; margin-bottom: 15px; padding-left: 45px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 180px;"><label style="font-size: 12px; font-weight: bold;">عنوان المحاضرة</label><input type="text" class="custom-input vid-title" value="${title}" style="margin: 0; background: #f8fafc;"></div>
+            <div style="flex: 1; min-width: 180px;"><label style="font-size: 12px; font-weight: bold;">رابط الفيديو (YouTube)</label><input type="url" class="custom-input vid-url" value="${url}" style="margin: 0; background: #f8fafc; direction: ltr;"></div>
+            <div style="flex: 1; min-width: 180px;"><label style="font-size: 12px; font-weight: bold; color: #8b5cf6;">📄 رابط الملزمة PDF (اختياري)</label><input type="url" class="custom-input vid-pdf" placeholder="رابط Google Drive أو PDF..." value="${pdfUrl || ''}" style="margin: 0; background: #f8fafc; direction: ltr; border-color: #c4b5fd;"></div>
+        </div>
+        <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #cbd5e1; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 150px;">
+                <label style="font-size: 12px; color: #3b82f6; font-weight: bold;">نوع المحاضرة:</label>
+                <select class="custom-input vid-type" style="margin: 0;" onchange="this.nextElementSibling.style.display = this.value === 'paid' ? 'block' : 'none'">
+                    <option value="free" ${type === 'free' ? 'selected' : ''}>محتوى مجاني</option>
+                    <option value="paid" ${type === 'paid' ? 'selected' : ''}>محتوى مدفوع</option>
+                </select>
+                <input type="number" class="custom-input vid-price" placeholder="السعر (ج.م)" value="${price}" style="margin-top: 5px; display: ${type === 'paid' ? 'block' : 'none'};">
+            </div>
+            <div style="flex: 2; min-width: 250px;">
+                <label style="font-size: 12px; color: #10b981; font-weight: 900; margin-bottom: 5px; display: block;">🔓 يُفتح مجاناً لمن حضر حصص:</label>
+                <div style="max-height: 120px; overflow-y: auto; background: var(--bg-color); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">${sessionsCheckboxes}</div>
+            </div>
+            <div style="flex: 1; min-width: 150px;"><label style="font-size: 12px; color: #f59e0b; font-weight: bold;">شرط الفتح (اجتياز امتحان):</label><select class="custom-input vid-exam" style="margin: 0;">${examOpts}</select></div>
+        </div>`;
+    container.appendChild(div);
+};
+
+window.addEditCourseVideoRow = function(title = "", url = "", linkedSessions = [], requiredExam = "", type = "free", price = "", pdfUrl = "") {
+    let container = document.getElementById("editCourseVideosContainer");
+    let level = document.getElementById("editLecLevel").value;
+    let validGroups = groups.filter(g => level === 'all' || g.level === level).map(g => g.name);
+    let validSessions = classSessions.filter(s => validGroups.includes(s.group)).reverse();
+    
+    if (!Array.isArray(linkedSessions)) linkedSessions = linkedSessions ? [linkedSessions] : [];
+
+    let sessionsCheckboxes = validSessions.length === 0 
+        ? `<span style="color: var(--danger-color); font-size: 12px; font-weight: bold;">لا توجد حصص مسجلة لهذا الصف!</span>`
+        : validSessions.map(s => `
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; background: white; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 12px; font-weight: bold; margin-bottom: 4px;">
+                <input type="checkbox" value="${s.id}" ${linkedSessions.includes(s.id) ? "checked" : ""} class="vid-session-cb" style="accent-color: var(--success-color); width: 16px; height: 16px;">
+                ${s.date} - ${s.topic || 'حصة'} (${s.group})
+            </label>`).join('');
+
+    let examsToSelect = JSON.parse(localStorage.getItem("onlineExams")) || [];
+    let examOpts = '<option value="">بدون شرط امتحان</option>' + examsToSelect.map(e => `<option value="${e.id}" ${requiredExam === e.id ? 'selected' : ''}>${e.title}</option>`).join('');
+
+    let div = document.createElement("div");
+    div.className = "video-row-edit";
+    div.style.cssText = "background: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02); margin-bottom: 15px; position: relative;";
+    
+    div.innerHTML = `
+        <button type="button" onclick="this.parentElement.remove()" style="position: absolute; top: 15px; left: 15px; background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; width: 35px; height: 35px; cursor: pointer;">🗑️</button>
+        <div style="display: flex; gap: 15px; margin-bottom: 15px; padding-left: 45px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 180px;"><label style="font-size: 12px; font-weight: bold;">عنوان الفيديو</label><input type="text" class="custom-input vid-title" value="${title}" style="margin: 0; background: #f8fafc;"></div>
+            <div style="flex: 1; min-width: 180px;"><label style="font-size: 12px; font-weight: bold;">رابط الفيديو</label><input type="url" class="custom-input vid-url" value="${url}" style="margin: 0; background: #f8fafc; direction: ltr;"></div>
+            <div style="flex: 1; min-width: 180px;"><label style="font-size: 12px; font-weight: bold; color: #8b5cf6;">📄 رابط الملزمة PDF (اختياري)</label><input type="url" class="custom-input vid-pdf" placeholder="https://..." value="${pdfUrl || ''}" style="margin: 0; background: #f8fafc; direction: ltr; border-color: #c4b5fd;"></div>
+        </div>
+        <div style="display: flex; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #cbd5e1; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 150px;">
+                <label style="font-size: 12px; color: #3b82f6; font-weight: bold;">نوع المحاضرة:</label>
+                <select class="custom-input vid-type" style="margin: 0;" onchange="this.nextElementSibling.style.display = this.value === 'paid' ? 'block' : 'none'">
+                    <option value="free" ${type === 'free' ? 'selected' : ''}>محتوى مجاني</option>
+                    <option value="paid" ${type === 'paid' ? 'selected' : ''}>محتوى مدفوع</option>
+                </select>
+                <input type="number" class="custom-input vid-price" placeholder="السعر (ج.م)" value="${price}" style="margin-top: 5px; display: ${type === 'paid' ? 'block' : 'none'};">
+            </div>
+            <div style="flex: 2; min-width: 250px;">
+                <label style="font-size: 12px; color: #10b981; font-weight: 900; margin-bottom: 5px; display: block;">🔓 يُفتح مجاناً لمن حضر حصص:</label>
+                <div style="max-height: 120px; overflow-y: auto; background: white; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">${sessionsCheckboxes}</div>
+            </div>
+            <div style="flex: 1; min-width: 150px;"><label style="font-size: 12px; color: #f59e0b; font-weight: bold;">شرط الفتح (اجتياز امتحان):</label><select class="custom-input vid-exam" style="margin: 0;">${examOpts}</select></div>
+        </div>`;
+    container.appendChild(div);
+};
+
+// ==========================================
+// 🗺️ 2. تطوير صانع الامتحانات لدعم الخرائط والصور وتفسير الإجابة
+// ==========================================
 window.addQuestionBlock = function(type = 'mcq') {
-    currentQuestions.push({ id: "q_" + Date.now(), type: type, text: "", points: 1, options: ["", "", "", ""], correctAnswerIndex: 0, correctAnswerText: "", correctAnswerTF: "true" });
+    currentQuestions.push({ 
+        id: "q_" + Date.now() + "_" + Math.floor(Math.random()*1000), 
+        type: type, 
+        text: "", 
+        imageUrl: "", // 🖼️ رابط صورة أو خريطة السؤال
+        explanation: "", // 💡 تفسير الإجابة وناتج التعلم
+        points: 1, 
+        options: ["", "", "", ""], 
+        correctAnswerIndex: 0, 
+        correctAnswerText: "", 
+        correctAnswerTF: "true" 
+    });
     renderQuestionBlocks();
     setTimeout(() => { let sa = document.getElementById('examBuilderScrollArea'); if(sa) sa.scrollTop = sa.scrollHeight; }, 100);
 };
@@ -5239,7 +5107,31 @@ window.renderQuestionBlocks = function() {
     if(currentQuestions.length === 0) return container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px; border: 2px dashed var(--border-color); border-radius: 12px;">لم تقم بإضافة أي أسئلة بعد.</div>`;
     container.innerHTML = "";
     currentQuestions.forEach((q, index) => {
-        let html = `<div class="question-block" style="background: var(--bg-color); padding: 20px; border: 1px solid var(--border-color); border-radius: 12px; position: relative; margin-bottom: 15px;"><button type="button" onclick="removeQuestion(${index})" style="position: absolute; top: 10px; left: 10px; background: #ef4444; color: #fff; border: none; border-radius: 6px; padding: 5px 10px; cursor: pointer;">حذف</button><div style="display: flex; gap: 15px; margin-bottom: 15px;"><div style="flex: 3;"><label style="color: var(--primary-color); font-weight: bold;">نص السؤال ${index + 1}:</label><textarea class="custom-input" rows="2" required oninput="updateQuestion(${index}, 'text', this.value)">${q.text}</textarea></div><div style="flex: 1;"><label style="color: var(--exam-color); font-weight: bold;">الدرجة:</label><input type="number" class="custom-input" value="${q.points}" min="1" required oninput="updateQuestion(${index}, 'points', parseFloat(this.value))"></div></div><div id="q_options_${index}">${generateOptionsHtml(q, index)}</div></div>`;
+        let html = `
+        <div class="question-block" style="background: var(--bg-color); padding: 20px; border: 1px solid var(--border-color); border-radius: 12px; position: relative; margin-bottom: 15px;">
+            <button type="button" onclick="removeQuestion(${index})" style="position: absolute; top: 10px; left: 10px; background: #ef4444; color: #fff; border: none; border-radius: 6px; padding: 5px 10px; cursor: pointer;">حذف 🗑️</button>
+            <div style="display: flex; gap: 15px; margin-bottom: 12px; flex-wrap: wrap;">
+                <div style="flex: 3; min-width: 240px;">
+                    <label style="color: var(--primary-color); font-weight: bold;">نص السؤال ${index + 1}:</label>
+                    <textarea class="custom-input" rows="2" required oninput="updateQuestion(${index}, 'text', this.value)">${q.text || ''}</textarea>
+                </div>
+                <div style="flex: 1; min-width: 100px;">
+                    <label style="color: var(--exam-color); font-weight: bold;">الدرجة:</label>
+                    <input type="number" class="custom-input" value="${q.points}" min="1" required oninput="updateQuestion(${index}, 'points', parseFloat(this.value))">
+                </div>
+            </div>
+            <div style="display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="font-size: 12px; font-weight: bold; color: #3b82f6;">🗺️ رابط صورة / خريطة للسؤال (اختياري):</label>
+                    <input type="url" class="custom-input" placeholder="https://..." value="${q.imageUrl || ''}" oninput="updateQuestion(${index}, 'imageUrl', this.value)" style="direction: ltr;">
+                </div>
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="font-size: 12px; font-weight: bold; color: #10b981;">💡 تفسير الإجابة / ناتج التعلم (يظهر بعد الحل):</label>
+                    <input type="text" class="custom-input" placeholder="مثال: لأن معاهدة 1936 نصت على..." value="${q.explanation || ''}" oninput="updateQuestion(${index}, 'explanation', this.value)">
+                </div>
+            </div>
+            <div id="q_options_${index}">${generateOptionsHtml(q, index)}</div>
+        </div>`;
         container.innerHTML += html;
     });
 };
@@ -9800,4 +9692,325 @@ window.openSessionAnalytics = function(sessionId) {
     document.getElementById("sa-newcomers-list").innerHTML = renderTableHtml(lists.newcomers, "لا يوجد طلاب جدد");
 
     openModal('sessionAnalyticsModal');
+};
+
+
+// ==========================================
+// 📲 إدارة طلبات شحن المحفظة (فودافون كاش / InstaPay) في لوحة التحكم
+// ==========================================
+window.renderWalletTopupRequests = async function() {
+    let tbody = document.getElementById("wallet-requests-tbody");
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center;">جاري التحميل... ⏳</td></tr>`;
+
+    try {
+        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/wallet_requests.json`);
+        let reqs = await res.json() || {};
+        let list = Object.values(reqs).filter(r => r !== null).reverse();
+
+        if (list.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 25px; font-weight: bold;">لا توجد طلبات تحويل حالياً 📭</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = list.map(r => {
+            let actionHtml = '';
+            if (r.status === 'pending') {
+                actionHtml = `
+                    <div style="display: flex; gap: 6px; justify-content: center;">
+                        <button class="save-btn" style="background: #10b981; width: auto; padding: 6px 14px; margin: 0; font-size: 13px;" onclick="approveWalletTopupRequest('${r.id}')">✅ قبول وشحن</button>
+                        <button class="icon-btn danger" style="padding: 6px 12px; font-size: 13px;" onclick="rejectWalletTopupRequest('${r.id}')">❌ رفض</button>
+                    </div>`;
+            } else if (r.status === 'approved') {
+                actionHtml = `<span class="status-badge" style="background: rgba(16,185,129,0.1); color: #10b981;">تم الشحن ✅</span>`;
+            } else {
+                actionHtml = `<span class="status-badge" style="background: rgba(239,68,68,0.1); color: #ef4444;">مرفوض ❌</span>`;
+            }
+
+            return `<tr style="${r.status === 'pending' ? 'background: rgba(245, 158, 11, 0.05);' : ''}">
+                <td style="font-size: 12px; color: var(--text-muted); font-weight: bold;">${r.date}</td>
+                <td><strong>${r.studentName}</strong> <br><span style="font-size: 12px; color: var(--primary-color);">كود: ${r.studentCode} | ${r.studentGroup}</span></td>
+                <td><strong>${r.method}</strong> <br><span style="direction: ltr; font-family: monospace; font-size: 14px; color: #3b82f6;">📞 ${r.senderPhone}</span></td>
+                <td><strong style="color: #10b981; font-size: 18px;">${r.amount} ج.م</strong></td>
+                <td>
+                    <button class="theme-btn" style="padding: 5px 12px; font-size: 12px; border-color: #8b5cf6; color: #8b5cf6;" onclick="viewReceiptImageModal('${r.id}')">🖼️ عرض الإيصال</button>
+                </td>
+                <td>${actionHtml}</td>
+            </tr>`;
+        }).join('');
+
+        window.loadedWalletRequests = reqs;
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: red;">حدث خطأ في جلب الطلبات!</td></tr>`;
+    }
+};
+
+window.viewReceiptImageModal = function(reqId) {
+    let r = window.loadedWalletRequests ? window.loadedWalletRequests[reqId] : null;
+    if (!r || !r.receiptImage) return alert("لا توجد صورة مرفقة!");
+    let w = window.open("", "_blank", "width=500,height=700");
+    w.document.write(`<body style="margin:0; background:#0f172a; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; font-family:sans-serif;">
+        <h3 style="margin:15px 0;">إيصال الطالب: ${r.studentName} (${r.amount} ج.م)</h3>
+        <img src="${r.receiptImage}" style="max-width:95%; max-height:85vh; border-radius:12px; border:3px solid #10b981;">
+    </body>`);
+};
+
+window.approveWalletTopupRequest = async function(reqId) {
+    let r = window.loadedWalletRequests ? window.loadedWalletRequests[reqId] : null;
+    if (!r) return;
+    if (!confirm(`تأكيد قبول الإيصال وإضافة مبلغ (${r.amount} ج.م) إلى محفظة الطالب: ${r.studentName}؟`)) return;
+
+    let uid = getSafeUid();
+    let stCode = String(r.studentCode).trim();
+    let amount = parseFloat(r.amount) || 0;
+
+    try {
+        // 1. جلب خزنة الطالب المحمية وإضافة المبلغ إليها
+        let vaultRes = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/student_vault/${stCode}.json`);
+        let vault = await vaultRes.json() || {};
+        let newBalance = (parseFloat(vault.walletBalance) || 0) + amount;
+
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/student_vault/${stCode}.json`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ walletBalance: newBalance, lastUpdated: new Date().toISOString() })
+        });
+
+        // 2. تحديث رصيد الطالب في المصفوفة المحلية والسحابية
+        let stIdx = students.findIndex(s => s && String(s.code).trim() === stCode);
+        if (stIdx > -1) {
+            students[stIdx].walletBalance = newBalance;
+            localStorage.setItem("students", JSON.stringify(students));
+        }
+
+        // 3. تحديث حالة الطلب إلى مقبول
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/wallet_requests/${reqId}.json`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: "approved", approvedAt: new Date().toLocaleString('ar-EG') })
+        });
+
+        // 4. إرسال إشعار فوري للطالب على منصته
+        if (typeof sendPlatformNotification === "function") {
+            await sendPlatformNotification(stCode, "تم شحن محفظتك بنجاح! 💰", `تم قبول إيصال التحويل وإضافة ${amount} ج.م إلى محفظتك. رصيدك الحالي: ${newBalance} ج.م.`);
+        }
+
+        showToast(`تم شحن ${amount} ج.م للطالب ${r.studentName} بنجاح! 🎉`, "success");
+        renderWalletTopupRequests();
+    } catch (e) {
+        alert("حدث خطأ أثناء اعتماد الشحن!");
+    }
+};
+
+window.rejectWalletTopupRequest = async function(reqId) {
+    if (!confirm("هل أنت متأكد من رفض طلب الشحن هذا؟")) return;
+    try {
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/wallet_requests/${reqId}.json`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: "rejected" })
+        });
+        showToast("تم رفض الطلب ❌", "warning");
+        renderWalletTopupRequests();
+    } catch (e) {}
+};
+
+
+
+// ==========================================
+// 📊 نظام التحليل الذكي للحصة + تصدير الإكسيل لكل فئة
+// ==========================================
+window.currentSessionAnalyticsData = null;
+
+window.openSessionAnalytics = function(sessionId) {
+    const session = classSessions.find(s => s.id === sessionId);
+    if (!session) return;
+
+    document.getElementById("analyticsModalSubtitle").innerText = `مجموعة: ${session.group} | بتاريخ: ${session.date}`;
+
+    // ترتيب حصص هذه المجموعة زمنياً لمعرفة الحصة السابقة
+    const groupSessions = classSessions
+        .filter(s => s.group === session.group)
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    const currentIndex = groupSessions.findIndex(s => s.id === session.id);
+    const prevSession = currentIndex > 0 ? groupSessions[currentIndex - 1] : null;
+    const earlierSessions = currentIndex > 0 ? groupSessions.slice(0, currentIndex) : [];
+
+    // طلاب المجموعة الأساسيين
+    const groupStudents = students.filter(s => s.group === session.group);
+
+    let lists = {
+        total: [...groupStudents],
+        present: [],
+        late: [],
+        absent: [],
+        dropped: [],    // غابوا وكانوا حاضرين الحصة السابقة
+        consec: [],     // غياب حصتين متتاليتين
+        guests: [],     // حضور تعويض (ضيوف)
+        newcomers: []   // طلاب جدد (أول حضور)
+    };
+
+    groupStudents.forEach(st => {
+        const att = (session.attendance || {})[st.code] || (session.attendance || {})[st.phone];
+        const isMakeup = typeof att === 'object' && att !== null && att.status === 'makeup';
+        const isPresent = att === 'present' || (isMakeup && !att.isLate);
+        const isLate = att === 'late' || (isMakeup && att.isLate);
+        const isAttended = isPresent || isLate;
+
+        if (isPresent) lists.present.push(st);
+        else if (isLate) lists.late.push(st);
+        else lists.absent.push(st);
+
+        // فحص الحصة السابقة
+        if (prevSession) {
+            const prevAtt = (prevSession.attendance || {})[st.code] || (prevSession.attendance || {})[st.phone];
+            const wasPresentPrev = prevAtt === 'present' || prevAtt === 'late' || (typeof prevAtt === 'object' && prevAtt !== null && prevAtt.status === 'makeup');
+
+            if (!isAttended && wasPresentPrev) {
+                lists.dropped.push(st);
+            } else if (!isAttended && !wasPresentPrev) {
+                lists.consec.push(st);
+            }
+        }
+
+        // فحص الطلاب الجدد (حضر هذه الحصة ولم يحضر أي حصة سابقة)
+        if (isAttended && earlierSessions.length > 0) {
+            const attendedBefore = earlierSessions.some(oldSess => {
+                const oldAtt = (oldSess.attendance || {})[st.code] || (oldSess.attendance || {})[st.phone];
+                return oldAtt === 'present' || oldAtt === 'late' || (typeof oldAtt === 'object' && oldAtt !== null && oldAtt.status === 'makeup');
+            });
+            if (!attendedBefore) {
+                lists.newcomers.push(st);
+            }
+        }
+    });
+
+    // فحص الضيوف (طلاب من خارج المجموعة تم تحضيرهم في هذه الحصة)
+    Object.keys(session.attendance || {}).forEach(key => {
+        const att = session.attendance[key];
+        const isAttended = att === 'present' || att === 'late' || (typeof att === 'object' && att !== null && att.status === 'makeup');
+        if (!isAttended) return;
+
+        const st = students.find(s => String(s.code) === String(key) || (s.phone && s.phone !== "0" && String(s.phone) === String(key)));
+        if (st && st.group !== session.group) {
+            if (!lists.guests.some(g => g.code === st.code)) {
+                lists.guests.push(st);
+            }
+        }
+    });
+
+    // حفظ القوائم لاستخدامها عند الضغط على زر تحميل الإكسيل
+    window.currentSessionAnalyticsData = {
+        session: session,
+        lists: lists
+    };
+
+    // تحديث الأعداد في الشاشة
+    document.getElementById("sa-total").innerText = lists.total.length;
+    document.getElementById("sa-present").innerText = lists.present.length;
+    document.getElementById("sa-late").innerText = lists.late.length;
+    document.getElementById("sa-absent").innerText = lists.absent.length;
+
+    document.getElementById("sa-dropped-count").innerText = lists.dropped.length;
+    document.getElementById("sa-consec-count").innerText = lists.consec.length;
+    document.getElementById("sa-guests-count").innerText = lists.guests.length;
+    document.getElementById("sa-newcomers-count").innerText = lists.newcomers.length;
+
+    // دالة رسم الجدول الداخلي لكل قسم
+    const renderMiniList = (arr, emptyMsg) => {
+        if (arr.length === 0) {
+            return `<div style="text-align:center; padding:20px; color:var(--text-muted); font-weight:bold;">${emptyMsg}</div>`;
+        }
+        return `<table class="sa-table"><tbody>` + arr.map(st => {
+            let pPhone = (st.parentPhone && st.parentPhone !== "0") ? st.parentPhone : st.phone;
+            let waLink = (pPhone && pPhone !== "0") 
+                ? `<a href="https://wa.me/20${String(pPhone).trim().replace(/^0+/, '')}" target="_blank" style="color:#64748b; text-decoration:none; font-size:12px; font-weight:bold;">💬 ولي الأمر</a>` 
+                : `<span style="color:#cbd5e1; font-size:11px;">بدون رقم</span>`;
+            return `<tr>
+                <td class="sa-code" style="width:20%;">${st.code}</td>
+                <td style="font-weight:bold; color:var(--secondary-color);">${st.name}</td>
+                <td style="text-align:left; width:28%;">${waLink}</td>
+            </tr>`;
+        }).join('') + `</tbody></table>`;
+    };
+
+    document.getElementById("sa-dropped-list").innerHTML = renderMiniList(lists.dropped, "لا يوجد طلاب في هذه الفئة 🎉");
+    document.getElementById("sa-consec-list").innerHTML = renderMiniList(lists.consec, "لا يوجد غياب متتالي 🎉");
+    document.getElementById("sa-guests-list").innerHTML = renderMiniList(lists.guests, "لا يوجد طلاب تعويض في هذه الحصة");
+    document.getElementById("sa-newcomers-list").innerHTML = renderMiniList(lists.newcomers, "لا يوجد طلاب جدد في هذه الحصة");
+
+    openModal("sessionAnalyticsModal");
+};
+
+// 📥 دالة تصدير الإكسيل بالاسم والكود ورقم الطالب ورقم ولي الأمر
+window.exportSessionAnalyticsExcel = function(category) {
+    if (!window.currentSessionAnalyticsData) {
+        return showToast("يرجى فتح إحصائيات الحصة أولاً!", "error");
+    }
+
+    const { session, lists } = window.currentSessionAnalyticsData;
+
+    const categoryTitles = {
+        total: "إجمالي_المستهدف",
+        present: "الحاضرين",
+        late: "المتأخرين",
+        absent: "الغائبين",
+        dropped: "غابوا_بعد_حضور",
+        consec: "غياب_متتالي_حصتين",
+        guests: "حضور_تعويض_ضيوف",
+        newcomers: "طلاب_جدد_أول_حضور"
+    };
+
+    // تجهيز بيانات الطلاب بالترتيب المطلوب (الكود، الاسم، رقم الطالب، رقم ولي الأمر، المجموعة)
+    const formatStudentRows = (arr, label) => {
+        return arr.map((st, idx) => ({
+            "م": idx + 1,
+            "كود الطالب": st.code || "--",
+            "اسم الطالب": st.name || "--",
+            "رقم هاتف الطالب": (st.phone && String(st.phone).trim() !== "0") ? st.phone : "غير مسجل",
+            "رقم هاتف ولي الأمر": (st.parentPhone && String(st.parentPhone).trim() !== "0") ? st.parentPhone : "غير مسجل",
+            "المجموعة الأصلية": st.group || "--",
+            "التصنيف": label
+        }));
+    };
+
+    const wb = XLSX.utils.book_new();
+    const colWidths = [{ wch: 6 }, { wch: 15 }, { wch: 30 }, { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 24 }];
+
+    // لو ضغط على "تحميل التقرير الشامل" -> ينشئ ملف إكسيل واحد بداخله شيت مستقل لكل فئة
+    if (category === 'all_sheets') {
+        let addedSheets = 0;
+        Object.keys(categoryTitles).forEach(key => {
+            if (lists[key] && lists[key].length > 0) {
+                let sheetName = categoryTitles[key].replace(/_/g, ' ').substring(0, 30);
+                let ws = XLSX.utils.json_to_sheet(formatStudentRows(lists[key], sheetName));
+                ws['!cols'] = colWidths;
+                XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                addedSheets++;
+            }
+        });
+
+        if (addedSheets === 0) return showToast("لا توجد بيانات لتصديرها في هذه الحصة!", "error");
+
+        let safeGroupName = session.group.replace(/[\\/?*[\]]/g, '');
+        XLSX.writeFile(wb, `التقرير_الشامل_${safeGroupName}_${session.date}.xlsx`);
+        showToast("تم تحميل ملف الإكسيل الشامل بجميع الأقسام بنجاح! 📥", "success");
+        return;
+    }
+
+    // لو ضغط على زر إكسيل خاص بقسم واحد محدد
+    const targetList = lists[category] || [];
+    if (targetList.length === 0) {
+        return showToast("لا يوجد طلاب في هذا القسم لتحميلهم!", "warning");
+    }
+
+    const titleAr = categoryTitles[category] || "تقرير";
+    const ws = XLSX.utils.json_to_sheet(formatStudentRows(targetList, titleAr.replace(/_/g, ' ')));
+    ws['!cols'] = colWidths;
+
+    XLSX.utils.book_append_sheet(wb, ws, titleAr.substring(0, 30));
+    let safeGroupName = session.group.replace(/[\\/?*[\]]/g, '');
+    XLSX.writeFile(wb, `${titleAr}_${safeGroupName}_${session.date}.xlsx`);
+    showToast(`تم تحميل شيت (${titleAr.replace(/_/g, ' ')}) بنجاح! 📥`, "success");
 };
