@@ -6029,11 +6029,66 @@ function changeBehaviorPoints(points) {
     } 
 }
 
+// ==========================================
+// ✏️ دالة تعديل حالة الحضور مباشرة من ملف الطالب وتحديث الحصة الأصلية
+// ==========================================
+window.updateAttendanceFromProfile = function(sessionId, studentCode, newStatus) {
+    const session = classSessions.find(s => String(s.id) === String(sessionId));
+    const student = students.find(s => String(s.code) === String(studentCode));
+    if (!session || !student) return;
+
+    if (!session.attendance) session.attendance = {};
+    let oldStatus = session.attendance[student.code] || (student.phone && student.phone !== "0" ? session.attendance[student.phone] : undefined);
+
+    // 1. تعديل نقاط السلوك تلقائياً بناءً على تغيير الحالة
+    let oldPts = (oldStatus === 'present' || (typeof oldStatus === 'object' && oldStatus?.status === 'makeup' && !oldStatus?.isLate)) ? 5 : (oldStatus === 'late' || (typeof oldStatus === 'object' && oldStatus?.isLate) ? 2 : 0);
+    let newPts = newStatus === 'present' ? 5 : (newStatus === 'late' ? 2 : 0);
+    student.behaviorPoints = (student.behaviorPoints || 0) - oldPts + newPts;
+
+    // 2. تحديث حالة الطالب داخل الحصة نفسها
+    if (newStatus === 'none') {
+        delete session.attendance[student.code];
+        if (student.phone && student.phone !== "0") delete session.attendance[student.phone];
+        if (session.attendanceLog) delete session.attendanceLog[student.code];
+    } else {
+        session.attendance[student.code] = newStatus;
+        if (!session.attendanceLog) session.attendanceLog = {};
+        let now = new Date();
+        session.attendanceLog[student.code] = {
+            time: typeof formatTime12 === "function" ? formatTime12(`${now.getHours()}:${now.getMinutes()}`) : now.toLocaleTimeString('ar-EG'),
+            ts: now.getTime(),
+            isManual: true
+        };
+    }
+
+    // 3. حفظ التعديلات في التخزين المحلي والسحابي
+    localStorage.setItem("classSessions", JSON.stringify(classSessions));
+    localStorage.setItem("students", JSON.stringify(students));
+
+    if (typeof addSystemLog === "function") {
+        let statusAr = newStatus === 'present' ? 'حاضر ✅' : newStatus === 'late' ? 'متأخر ⏳' : newStatus === 'absent' ? 'غائب ❌' : 'إلغاء التسجيل';
+        addSystemLog("تعديل حضور من الملف ✏️", `تعديل حالة الطالب ${student.name} في حصة (${session.date} - ${session.group}) إلى: ${statusAr}`);
+    }
+
+    // 4. تحديث الجداول المفتوحة وملف الطالب فوراً
+    openStudentProfile(student.code);
+    if (currentActiveSessionId === sessionId && typeof renderAttendanceTable === "function") {
+        renderAttendanceTable(session);
+    }
+    if (typeof showToast === "function") showToast("تم تحديث حالة الحضور في الحصة والملف بنجاح! ✅", "success");
+    if (typeof syncDataToBot === "function") syncDataToBot();
+};
+
+// ==========================================
+// 👤 فتح ملف الطالب (يدعم حفظ سجل المجموعات القديمة + أزرار تعديل الحضور)
+// ==========================================
 window.openStudentProfile = function(code) {
-    const student = students.find(s => s.code === code); if(!student) return;
+    const student = students.find(s => String(s.code) === String(code)); 
+    if(!student) return;
     
     window.profileSourceView = document.getElementById("group-details-view")?.style.display === "block" ? 'group' : 'students';
-    switchPage('students'); currentStudentProfileCode = code;
+    switchPage('students'); 
+    currentStudentProfileCode = student.code;
     document.getElementById("students-overview").style.display = "none"; 
     document.getElementById("group-details-view").style.display = "none";
     document.getElementById("student-profile-view").style.display = "block";
@@ -6070,27 +6125,37 @@ window.openStudentProfile = function(code) {
     if(document.getElementById("profile-level")) document.getElementById("profile-level").innerText = student.level;
     if(document.getElementById("profile-gender")) document.getElementById("profile-gender").innerText = student.gender;
 
-    // ==========================================
-    // 🌟 حساب المجموع الشامل زي لوحة الشرف بالضبط
-    // ==========================================
+    // دالة مساعدة لفحص هل الطالب مسجل في حصة/امتحان قديم قبل النقل
+    const hasStudentRecord = (recordObj) => {
+        if (!recordObj) return false;
+        if (recordObj[student.code] !== undefined) return true;
+        if (student.phone && String(student.phone).trim() !== "0" && recordObj[student.phone] !== undefined) return true;
+        return false;
+    };
+
+    // 🌟 جلب كل حصص وامتحانات وواجبات الطالب (في مجموعته الحالية + أي مجموعة سابقة له سجل بها)
+    const studentSessions = classSessions.filter(s => s && (s.group === student.group || hasStudentRecord(s.attendance))).sort((a,b) => new Date(b.date) - new Date(a.date));
+    const studentExams = exams.filter(e => e && (e.group === student.group || hasStudentRecord(e.grades))).sort((a,b) => new Date(b.date) - new Date(a.date));
+    const studentHw = homeworks.filter(h => h && (h.group === student.group || hasStudentRecord(h.grades))).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+    // حساب المجموع الشامل (يشمل سجل الطالب القديم والجديد)
     let totalScore = student.behaviorPoints || 0;
-    classSessions.filter(s => s.group === student.group).forEach(session => { 
-        let att = (session.attendance || {})[student.code] || (session.attendance || {})[student.phone]; 
-        if(att === 'present') totalScore += 10; 
+    studentSessions.forEach(session => { 
+        let att = (session.attendance || {})[student.code] || (student.phone !== "0" ? (session.attendance || {})[student.phone] : undefined); 
+        if(att === 'present' || (typeof att === 'object' && att?.status === 'makeup')) totalScore += 10; 
     }); 
-    exams.filter(e => e.group === student.group).forEach(exam => { 
-        let g = (exam.grades || {})[student.code] !== undefined ? (exam.grades || {})[student.code] : (exam.grades || {})[student.phone]; 
+    studentExams.forEach(exam => { 
+        let g = (exam.grades || {})[student.code] !== undefined ? (exam.grades || {})[student.code] : (student.phone !== "0" ? (exam.grades || {})[student.phone] : undefined); 
         if(g !== undefined && exam.maxScore) { totalScore += (parseFloat(g) / parseFloat(exam.maxScore)) * 50; } 
     }); 
-    homeworks.filter(h => h.group === student.group).forEach(hw => { 
-        let g = (hw.grades || {})[student.code] !== undefined ? (hw.grades || {})[student.code] : (hw.grades || {})[student.phone]; 
+    studentHw.forEach(hw => { 
+        let g = (hw.grades || {})[student.code] !== undefined ? (hw.grades || {})[student.code] : (student.phone !== "0" ? (hw.grades || {})[student.phone] : undefined); 
         if(g !== undefined && hw.maxScore) { totalScore += (parseFloat(g) / parseFloat(hw.maxScore)) * 20; } 
     });
     totalScore = Math.round(totalScore);
 
     document.getElementById("profile-behavior-points").innerText = totalScore; 
 
-    // تغيير المسميات في واجهة الإدارة ديناميكياً لتصبح (مجموع النقاط الشامل)
     let behaviorTitle = document.querySelector("#student-profile-view .stat-card h3");
     if(behaviorTitle && behaviorTitle.innerText.includes("السلوكي")) {
         behaviorTitle.innerHTML = "🏆 مجموع النقاط الشامل";
@@ -6103,24 +6168,60 @@ window.openStudentProfile = function(code) {
     let waParentBtn = document.getElementById("wa-parent-btn");
     if (waParentBtn) waParentBtn.onclick = function() { if(student.parentPhone && student.parentPhone !== "0" && student.parentPhone !== "") window.open(`https://wa.me/20${student.parentPhone.replace(/^0+/, '')}`, '_blank'); else showToast("رقم ولي الأمر غير مسجل!", "error"); };
 
-    const groupSessions = classSessions.filter(s => s.group === student.group).sort((a,b) => new Date(b.date) - new Date(a.date));
-    let attended = 0; const attTbody = document.getElementById("profile-attendance-list"); if(attTbody) attTbody.innerHTML = "";
-    groupSessions.forEach(s => { 
-        const st = (s.attendance || {})[student.code] || (s.attendance || {})[student.phone]; 
-        if(st === 'present' || st === 'late') attended++; 
-        const badge = st === 'present' ? `<span style="color:var(--success-color); font-weight:bold;">حاضر ✓</span>` : st === 'late' ? `<span style="color:#f59e0b; font-weight:bold;">متأخر ⏳</span>` : st === 'absent' ? `<span style="color:var(--danger-color); font-weight:bold;">غائب ✗</span>` : `<span style="color:var(--text-muted); font-weight:bold;">لم يسجل</span>`; 
-        if(attTbody) attTbody.innerHTML += `<tr><td>${s.date}</td><td>${badge}</td></tr>`; 
-    });
-    document.getElementById("profile-attendance").innerText = `${groupSessions.length > 0 ? Math.round((attended / groupSessions.length) * 100) : 0}%`;
+    // 1. رسم جدول الحصص مع قائمة منسدلة لتعديل الحالة مباشرة
+    let attended = 0; 
+    const attTbody = document.getElementById("profile-attendance-list"); 
+    if(attTbody) attTbody.innerHTML = "";
+    
+    studentSessions.forEach(s => { 
+        const rawSt = (s.attendance || {})[student.code] || (student.phone !== "0" ? (s.attendance || {})[student.phone] : undefined); 
+        const isMakeup = typeof rawSt === 'object' && rawSt !== null && rawSt.status === 'makeup';
+        const st = isMakeup ? (rawSt.isLate ? 'late' : 'present') : (rawSt || 'none');
 
-    const groupExams = exams.filter(e => e.group === student.group).sort((a,b) => new Date(b.date) - new Date(a.date));
-    let tExam = 0, sExam = 0; const exTbody = document.getElementById("profile-exams-list"); if(exTbody) exTbody.innerHTML = "";
-    groupExams.forEach(e => { let g = (e.grades || {})[student.code] !== undefined ? (e.grades || {})[student.code] : (e.grades || {})[student.phone]; if(g !== undefined) { tExam += parseFloat(e.maxScore); sExam += parseFloat(g); } if(exTbody) exTbody.innerHTML += `<tr><td>${e.name}</td><td>${e.date}</td><td><strong>${g !== undefined ? g : '--'}</strong> / ${e.maxScore}</td></tr>`; });
+        if(st === 'present' || st === 'late') attended++; 
+
+        let selectBg = st === 'present' ? '#d1fae5' : st === 'late' ? '#fef3c7' : st === 'absent' ? '#fee2e2' : '#f1f5f9';
+        let selectColor = st === 'present' ? '#047857' : st === 'late' ? '#b45309' : st === 'absent' ? '#b91c1c' : '#64748b';
+        let selectBorder = st === 'present' ? '#10b981' : st === 'late' ? '#f59e0b' : st === 'absent' ? '#ef4444' : '#cbd5e1';
+
+        let oldGroupTag = s.group !== student.group 
+            ? `<br><span style="font-size:10px; background:rgba(59,130,246,0.1); color:#3b82f6; padding:2px 6px; border-radius:6px; font-weight:bold;">من مجموعة: ${s.group}</span>` 
+            : `<br><span style="font-size:11px; color:var(--text-muted);">${s.topic || 'حصة'}</span>`;
+
+        let controlHtml = `
+            <select onchange="updateAttendanceFromProfile('${s.id}', '${student.code}', this.value)" class="no-print" style="background:${selectBg}; color:${selectColor}; border:1px solid ${selectBorder}; padding:5px 10px; border-radius:8px; font-weight:900; font-family:'Cairo'; font-size:13px; cursor:pointer; outline:none;">
+                <option value="present" ${st === 'present' ? 'selected' : ''}>حاضر ✓</option>
+                <option value="late" ${st === 'late' ? 'selected' : ''}>متأخر ⏳</option>
+                <option value="absent" ${st === 'absent' ? 'selected' : ''}>غائب ✗</option>
+                <option value="none" ${st === 'none' ? 'selected' : ''}>لم يسجل --</option>
+            </select>`;
+
+        if(attTbody) attTbody.innerHTML += `<tr><td><strong>${s.date}</strong>${oldGroupTag}</td><td>${controlHtml}</td></tr>`; 
+    });
+    document.getElementById("profile-attendance").innerText = `${studentSessions.length > 0 ? Math.round((attended / studentSessions.length) * 100) : 0}%`;
+
+    // 2. رسم جدول الامتحانات (الحالية والسابقة)
+    let tExam = 0, sExam = 0; 
+    const exTbody = document.getElementById("profile-exams-list"); 
+    if(exTbody) exTbody.innerHTML = "";
+    studentExams.forEach(e => { 
+        let g = (e.grades || {})[student.code] !== undefined ? (e.grades || {})[student.code] : (student.phone !== "0" ? (e.grades || {})[student.phone] : undefined); 
+        if(g !== undefined) { tExam += parseFloat(e.maxScore); sExam += parseFloat(g); } 
+        let grpNote = e.group !== student.group ? ` <span style="font-size:10px; color:#3b82f6;">(${e.group})</span>` : '';
+        if(exTbody) exTbody.innerHTML += `<tr><td>${e.name}${grpNote}</td><td>${e.date}</td><td><strong>${g !== undefined ? g : '--'}</strong> / ${e.maxScore}</td></tr>`; 
+    });
     document.getElementById("profile-exams").innerText = `${tExam > 0 ? Math.round((sExam / tExam) * 100) : 0}%`;
 
-    const groupHw = homeworks.filter(h => h.group === student.group).sort((a,b) => new Date(b.date) - new Date(a.date));
-    let tHw = 0, sHw = 0; const hwTbody = document.getElementById("profile-hw-list"); if(hwTbody) hwTbody.innerHTML = "";
-    groupHw.forEach(h => { let g = (h.grades || {})[student.code] !== undefined ? (h.grades || {})[student.code] : (h.grades || {})[student.phone]; if(g !== undefined) { tHw += parseFloat(h.maxScore); sHw += parseFloat(g); } if(hwTbody) hwTbody.innerHTML += `<tr><td>${h.name}</td><td>${h.date}</td><td><strong>${g !== undefined ? g : '--'}</strong> / ${h.maxScore}</td></tr>`; });
+    // 3. رسم جدول الواجبات (الحالية والسابقة)
+    let tHw = 0, sHw = 0; 
+    const hwTbody = document.getElementById("profile-hw-list"); 
+    if(hwTbody) hwTbody.innerHTML = "";
+    studentHw.forEach(h => { 
+        let g = (h.grades || {})[student.code] !== undefined ? (h.grades || {})[student.code] : (student.phone !== "0" ? (h.grades || {})[student.phone] : undefined); 
+        if(g !== undefined) { tHw += parseFloat(h.maxScore); sHw += parseFloat(g); } 
+        let grpNote = h.group !== student.group ? ` <span style="font-size:10px; color:#3b82f6;">(${h.group})</span>` : '';
+        if(hwTbody) hwTbody.innerHTML += `<tr><td>${h.name}${grpNote}</td><td>${h.date}</td><td><strong>${g !== undefined ? g : '--'}</strong> / ${h.maxScore}</td></tr>`; 
+    });
     document.getElementById("profile-hw").innerText = `${tHw > 0 ? Math.round((sHw / tHw) * 100) : 0}%`;
 };
 
@@ -6229,7 +6330,6 @@ window.renderGroupStudentsTable = function() {
 
     let sortedGroupStudents = [...groupStudentsFiltered].sort((a, b) => smartCompare(a, b, window.groupStudentsSortState.column, window.groupStudentsSortState.direction));
 
-    let last4Sessions = classSessions.filter(s => s.group === currentActiveGroup).sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-4);
     let htmlContent = ""; 
 
     sortedGroupStudents.forEach((student) => { 
@@ -6237,7 +6337,7 @@ window.renderGroupStudentsTable = function() {
         let trackBadge = `<span style="font-size: 11px; background: rgba(59, 130, 246, 0.1); color: var(--primary-color); padding: 3px 8px; border-radius: 12px; border: 1px solid rgba(59, 130, 246, 0.2); margin-top: 5px; display: inline-block; font-weight: bold;">🎓 ${trackName}</span>`;
         let specialBadge = student.isSpecialCase ? `<span style="cursor: help; margin-right: 5px; font-size: 13px;" title="حالة خاصة: ${student.specialAmount > 0 ? 'يدفع ' + student.specialAmount + ' ج.م' : 'إعفاء تام'}">⭐</span>` : '';
         let noteIcon = student.note && student.note.trim() !== "" ? `<span style="cursor: pointer; margin-right: 8px; font-size: 16px; filter: drop-shadow(0 2px 4px rgba(139,92,246,0.4));" title="يوجد ملاحظة (اضغط للعرض)" onclick="openStudentNoteModal('${student.code}')">📝</span>` : `<span style="cursor: pointer; margin-right: 8px; font-size: 14px; opacity: 0.3;" title="إضافة ملاحظة" onclick="openStudentNoteModal('${student.code}')">📝</span>`;
-
+        let last4Sessions = classSessions.filter(s => s && (s.group === currentActiveGroup || (s.attendance && (s.attendance[student.code] || (student.phone !== "0" && s.attendance[student.phone]))))).sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-4);
         let attendanceDotsHtml = `<div style="display: flex; gap: 6px; justify-content: center; align-items: center;" dir="rtl">`;
         for(let i = 0; i < 4; i++) {
             let session = last4Sessions[i];
