@@ -30,7 +30,6 @@ let html5QrcodeScanner = null, currentScannerTarget = '';
 // ==========================================
 // 1. قواعد البيانات والتهيئة الأساسية
 // ==========================================
-const WHATSAPP_SERVER_URL = "https://edutrack-api.duckdns.org";
 
 const NOTIFICATIONS_SERVER_URL = "https://infections-muscles-letting-pee.trycloudflare.com";
 
@@ -2918,91 +2917,169 @@ document.getElementById('editBookForm')?.addEventListener('submit', function(e) 
 
 
 
-// ==========================================
-// ⚙️ فحص حالة السيرفر ونظام الربط برقم الهاتف
-// ==========================================
-setInterval(async () => {
+// 🌐 عنوان سيرفر الواتساب (الافتراضي: لوكال على جهاز المدرس لسرعة وثبات 100%)
+let WHATSAPP_SERVER_URL = localStorage.getItem("wa_server_url") || "http://localhost:3000";
+
+// التبديل بين السيرفر المحلي على الكمبيوتر وسيرفر الـ VPS
+window.switchWaServerMode = function(mode) {
+    if (mode === 'local') {
+        WHATSAPP_SERVER_URL = "http://localhost:3000";
+    } else {
+        WHATSAPP_SERVER_URL = "https://edutrack-api.duckdns.org";
+    }
+    localStorage.setItem("wa_server_url", WHATSAPP_SERVER_URL);
+    updateServerModeButtonsUI();
+    checkWaServerStatusNow();
+    showToast(mode === 'local' ? "تم التبديل إلى السيرفر المحلي (Localhost) 💻" : "تم التبديل إلى سيرفر الاستضافة (VPS) ☁️", "info");
+};
+
+function updateServerModeButtonsUI() {
+    const isLocal = WHATSAPP_SERVER_URL.includes("localhost") || WHATSAPP_SERVER_URL.includes("127.0.0.1");
+    const localBtn = document.getElementById("modeLocalBtn");
+    const vpsBtn = document.getElementById("modeVpsBtn");
+    if (!localBtn || !vpsBtn) return;
+
+    if (isLocal) {
+        localBtn.style.background = "var(--hero-gradient)";
+        localBtn.style.color = "#ffffff";
+        vpsBtn.style.background = "transparent";
+        vpsBtn.style.color = "var(--text-muted)";
+    } else {
+        vpsBtn.style.background = "var(--hero-gradient)";
+        vpsBtn.style.color = "#ffffff";
+        localBtn.style.background = "transparent";
+        localBtn.style.color = "var(--text-muted)";
+    }
+}
+
+window.launchLocalTerminalServer = function() {
+    window.switchWaServerMode('local');
+    
+    // فتح البروتوكول عبر نافذة مخفية لضمان سماح متصفح Brave و Chrome بفتحه
+    let launcherLink = document.createElement('a');
+    launcherLink.href = "historia-wa://start";
+    document.body.appendChild(launcherLink);
+    launcherLink.click();
+    document.body.removeChild(launcherLink);
+
+    showToast("جاري فتح التيرمينال وتشغيل السيرفر المحلي... ⚡", "info");
+    setTimeout(checkWaServerStatusNow, 3000);
+};
+
+// 🔄 ريستارت المحرك أو تغيير الرقم
+window.restartWaEngine = async function(logout = false) {
+    if (logout && !confirm("هل تريد فصل رقم الواتساب الحالي تماماً لربط رقم جديد؟")) return;
+    try {
+        showToast("جاري إعادة تهيئة محرك الواتساب... ⏳", "info");
+        await fetch(`${WHATSAPP_SERVER_URL}/restart-client`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clientId: getSafeUid(), logout: logout })
+        });
+        document.getElementById("pairingCodeDisplay").style.display = "none";
+        document.getElementById("requestPairBtn").style.display = "inline-block";
+        document.getElementById("requestPairBtn").disabled = false;
+        setTimeout(checkWaServerStatusNow, 1500);
+    } catch (e) {
+        showToast("تأكد من تشغيل السيرفر أولاً!", "error");
+    }
+};
+
+// 📡 دالة فحص حالة السيرفر الفورية
+window.checkWaServerStatusNow = async function() {
+    updateServerModeButtonsUI();
     const nodeStatus = document.getElementById("nodeStatus");
     const waStatus = document.getElementById("waStatus");
     const phonePairingContainer = document.getElementById("phonePairingContainer");
-
-    if(!nodeStatus) return; // لو المدرس مش فاتح الشاشة دي، ميعملش حاجة
+    if (!nodeStatus) return;
 
     try {
-        // فحص حالة السيرفر
-        const response = await fetch(`${WHATSAPP_SERVER_URL}/status?clientId=${getSafeUid()}`, {
-            headers: {
-                'ngrok-skip-browser-warning': 'true',
-                'Content-Type': 'application/json'
-            }
-        });
+        const response = await fetch(`${WHATSAPP_SERVER_URL}/status?clientId=${getSafeUid()}`);
         const data = await response.json();
         
-        nodeStatus.innerHTML = '<span style="color: #10b981; font-weight: bold;">● يعمل (Online)</span>';
+        nodeStatus.innerHTML = '<span style="color: var(--success-color);">● متصل يعمل (Online)</span>';
         
         if (data.status === 'connected') {
-            waStatus.innerHTML = '<span style="color: #10b981; font-weight: bold;">متصل ✅</span>';
-            if(phonePairingContainer) phonePairingContainer.style.display = "none";
+            let phoneBadge = data.phone ? ` (+${data.phone})` : '';
+            waStatus.innerHTML = `<span style="color: var(--success-color);">متصل وجاهز ✅${phoneBadge}</span>`;
+            if (phonePairingContainer) phonePairingContainer.style.display = "none";
         } else if (data.status === 'need_scan') {
-            waStatus.innerHTML = '<span style="color: #ef4444; font-weight: bold;">بانتظار الربط 📱</span>';
-            // إظهار مربع إدخال رقم الهاتف لطلب الكود
-            if(phonePairingContainer) phonePairingContainer.style.display = "block";
+            waStatus.innerHTML = '<span style="color: var(--exam-color);">بانتظار ربط الهاتف 📱</span>';
+            if (phonePairingContainer) phonePairingContainer.style.display = "block";
         } else {
-            waStatus.innerHTML = '<span style="color: #f59e0b; font-weight: bold;">جاري التهيئة... ⏳</span>';
-            if(phonePairingContainer) phonePairingContainer.style.display = "none";
+            waStatus.innerHTML = '<span style="color: #3b82f6;">جاري تهيئة المحرك... ⏳</span>';
+            if (phonePairingContainer) phonePairingContainer.style.display = "none";
         }
     } catch (e) {
-        nodeStatus.innerHTML = '<span style="color: #ef4444; font-weight: bold;">● متوقف (Offline)</span>';
-        waStatus.innerHTML = '---';
-        if(phonePairingContainer) phonePairingContainer.style.display = "none";
+        nodeStatus.innerHTML = '<span style="color: var(--danger-color);">● متوقف (Offline)</span>';
+        waStatus.innerHTML = '<span style="color: var(--text-muted);">---</span>';
+        if (phonePairingContainer) phonePairingContainer.style.display = "none";
     }
-}, 5000);
+};
 
-// دالة طلب رمز الربط من السيرفر
+setInterval(window.checkWaServerStatusNow, 4000);
+
+// 🔢 توليد وعرض كود الربط (8 خانات OTP مضيئة)
+window.lastGeneratedPairingCode = "";
 window.requestWaPairingCode = async function() {
     let phone = document.getElementById("waPairPhone").value.trim();
     let btn = document.getElementById("requestPairBtn");
     let displayBox = document.getElementById("pairingCodeDisplay");
-    let codeLabel = document.getElementById("thePairingCode");
+    let codeContainer = document.getElementById("thePairingCode");
 
-    if (!phone) {
-        showToast("يرجى إدخال رقم الواتساب أولاً!", "error");
-        return;
+    if (!phone || phone.length < 10) {
+        return showToast("يرجى إدخال رقم واتساب صحيح!", "error");
     }
 
-    btn.innerText = "جاري سحب الرمز... ⏳";
+    btn.innerText = "جاري التوليد... ⏳";
     btn.disabled = true;
 
     try {
         let response = await fetch(`${WHATSAPP_SERVER_URL}/pair-phone`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'ngrok-skip-browser-warning': 'true'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ clientId: getSafeUid(), phone: phone })
         });
         
         let data = await response.json();
         
         if (data.success && data.code) {
-            showToast("تم توليد الرمز بنجاح! أدخله في هاتفك الآن.", "success");
-            btn.style.display = "none"; // إخفاء الزر بعد النجاح
-            displayBox.style.display = "block";
+            window.lastGeneratedPairingCode = data.code;
+            let chars = String(data.code).replace(/[^A-Z0-9]/gi, '').split('');
             
-            // تنسيق الكود عشان يظهر بشياكة (فصل الحروف)
-            let formattedCode = data.code.match(/.{1,4}/g).join('-');
-            codeLabel.innerText = formattedCode;
+            // رسم 8 مربعات OTP نيون فخمة مع فاصل في المنتصف
+            let boxesHtml = "";
+            chars.forEach((ch, idx) => {
+                if (idx === 4) {
+                    boxesHtml += `<span style="font-size: 22px; font-weight: 900; color: var(--primary-color); margin: 0 4px;">-</span>`;
+                }
+                boxesHtml += `
+                <div style="width: 42px; height: 50px; border-radius: 12px; background: var(--bg-color); border: 2px solid var(--primary-color); box-shadow: var(--primary-glow); display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 22px; font-weight: 900; color: var(--text-main);">
+                    ${ch}
+                </div>`;
+            });
+
+            codeContainer.innerHTML = boxesHtml;
+            displayBox.style.display = "block";
+            btn.innerText = "تحديث الرمز 🔄";
+            btn.disabled = false;
+            showToast("تم توليد رمز الربط بنجاح! أدخله في هاتفك الآن 📲", "success");
         } else {
-            showToast(data.error || "فشل توليد الرمز، تأكد من الرقم وحاول مجدداً", "error");
-            btn.innerText = "طلب رمز الربط 📲";
+            showToast(data.error || "انتظر ثواني حتى يجهز المحرك ثم حاول مجدداً", "error");
+            btn.innerText = "توليد الكود 📲";
             btn.disabled = false;
         }
     } catch (e) {
-        showToast("حدث خطأ في الاتصال بسيرفر الواتساب!", "error");
-        btn.innerText = "طلب رمز الربط 📲";
+        showToast("تأكد من تشغيل السيرفر المحلي أولاً!", "error");
+        btn.innerText = "توليد الكود 📲";
         btn.disabled = false;
     }
+};
+
+window.copyPairingOtpCode = function() {
+    if (!window.lastGeneratedPairingCode) return;
+    navigator.clipboard.writeText(window.lastGeneratedPairingCode);
+    showToast("تم نسخ رمز الربط! 📋", "success");
 };
 
 
@@ -3968,58 +4045,7 @@ window.getSafeUid = function() {
 
 window.latestGeneratedCodes = []; // مصفوفة مؤقتة عشان نحفظ فيها الأكواد الجديدة بس للنافذة
 
-window.generateChargeCodes = async function() {
-    let uid = getSafeUid();
-    let amount = parseInt(document.getElementById("codeAmount").value);
-    let count = parseInt(document.getElementById("codeCount").value);
-    let linkedCourseId = document.getElementById("codeLinkedCourse").value; // 🔴 سحب الكورس المربوط
-    
-    if(!amount || !count || count <= 0) {
-        if(typeof showToast === 'function') showToast("يرجى إدخال القيمة والعدد بشكل صحيح!", "error");
-        else alert("يرجى إدخال القيمة والعدد بشكل صحيح!");
-        return;
-    }
 
-    let newCodes = {};
-    window.latestGeneratedCodes = []; 
-    
-    let btn = document.querySelector('#platform-codes .save-btn');
-    let originalText = btn.innerText;
-    btn.innerText = "جاري التوليد... ⏳";
-    btn.disabled = true;
-
-    for(let i=0; i<count; i++) {
-        let codeStr = "EDU-" + Math.random().toString(36).substr(2, 7).toUpperCase();
-        let codeObj = { amount: amount, status: "unused", createdAt: new Date().toISOString().split('T')[0] };
-        
-        // 🔴 حفظ الكورس المربوط لو المدرس اختار واحد
-        if (linkedCourseId) codeObj.linkedCourseId = linkedCourseId; 
-        
-        newCodes[codeStr] = codeObj;
-        window.latestGeneratedCodes.push({ code: codeStr, amount: amount });
-    }
-
-    try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/chargeCodes.json`, {
-            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newCodes)
-        });
-        
-        document.getElementById("codeAmount").value = "";
-        document.getElementById("codeCount").value = "";
-        renderChargeCodes(); 
-        
-        document.getElementById("newCodesCountDisplay").innerText = count;
-        document.getElementById("newCodesAmountDisplay").innerText = amount;
-        document.getElementById("newCodesListDisplay").innerHTML = window.latestGeneratedCodes.map(c => `<div>${c.code}</div>`).join('');
-        openModal('newCodesModal');
-
-    } catch(e) { 
-        alert("حدث خطأ أثناء توليد الأكواد!"); 
-    }
-    
-    btn.innerText = originalText;
-    btn.disabled = false;
-};
 
 // 📋 نسخ الأكواد الجديدة للذاكرة
 window.copyNewCodes = function() {
@@ -4069,19 +4095,96 @@ window.exportAllCodesToExcel = async function() {
     } catch(e) { showToast("خطأ في الاتصال أثناء التحميل!", "error"); }
 };
 
-// 📋 عرض الأكواد في الجدول بتصميم فخم
+// =========================================================
+// 💳 توليد أكواد شحن رقمية من 16 رقماً (بنك هيستوريا VIP)
+// =========================================================
+
+// دالة مساعدة لتوليد 16 رقماً عشوائياً فريداً (لا يبدأ بصفر)
+window.generate16DigitCardNumber = function() {
+    let num = String(Math.floor(1 + Math.random() * 9)); // أول رقم من 1 إلى 9
+    for (let i = 0; i < 15; i++) {
+        num += String(Math.floor(Math.random() * 10));
+    }
+    return num;
+};
+
+// دالة لتنسيق الـ 16 رقماً للعرض البصري (XXXX XXXX XXXX XXXX)
+window.format16DigitDisplay = function(codeStr) {
+    return String(codeStr).replace(/(\d{4})(?=\d)/g, '$1 ');
+};
+
+window.generateChargeCodes = async function() {
+    let uid = getSafeUid();
+    let amount = parseInt(document.getElementById("codeAmount").value);
+    let count = parseInt(document.getElementById("codeCount").value);
+    let linkedCourseId = document.getElementById("codeLinkedCourse").value;
+    
+    if (!amount || !count || count <= 0) {
+        if (typeof showToast === 'function') showToast("يرجى إدخال القيمة والعدد بشكل صحيح!", "error");
+        else alert("يرجى إدخال القيمة والعدد بشكل صحيح!");
+        return;
+    }
+
+    let newCodes = {};
+    window.latestGeneratedCodes = []; 
+    
+    let btn = document.querySelector('#platform-codes .save-btn');
+    let originalText = btn ? btn.innerText : "توليد الأكواد 🚀";
+    if (btn) { btn.innerText = "جاري التوليد... ⏳"; btn.disabled = true; }
+
+    for (let i = 0; i < count; i++) {
+        // توليد كود من 16 رقماً صافياً
+        let codeStr = window.generate16DigitCardNumber();
+        let codeObj = { 
+            amount: amount, 
+            status: "unused", 
+            createdAt: new Date().toISOString().split('T')[0] 
+        };
+        
+        if (linkedCourseId) codeObj.linkedCourseId = linkedCourseId; 
+        
+        newCodes[codeStr] = codeObj;
+        window.latestGeneratedCodes.push({ code: codeStr, amount: amount });
+    }
+
+    try {
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/chargeCodes.json`, {
+            method: 'PATCH', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify(newCodes)
+        });
+        
+        document.getElementById("codeAmount").value = "";
+        document.getElementById("codeCount").value = "";
+        renderChargeCodes(); 
+        
+        document.getElementById("newCodesCountDisplay").innerText = count;
+        document.getElementById("newCodesAmountDisplay").innerText = amount;
+        document.getElementById("newCodesListDisplay").innerHTML = window.latestGeneratedCodes
+            .map(c => `<div style="padding: 6px 0; border-bottom: 1px dashed var(--border-color);">${window.format16DigitDisplay(c.code)}</div>`)
+            .join('');
+        openModal('newCodesModal');
+
+    } catch(e) { 
+        alert("حدث خطأ أثناء توليد الأكواد!"); 
+    }
+    
+    if (btn) { btn.innerText = originalText; btn.disabled = false; }
+};
+
+// عرض الأكواد في جدول المدرس بتنسيق البطاقات البنكية (4 × 4)
 window.renderChargeCodes = async function() {
     let table = document.getElementById("codes-table");
-    if(!table) return;
+    if (!table) return;
     
     table.innerHTML = `
         <thead>
             <tr>
-                <th style="width:25%;">الكود</th>
+                <th style="width:30%;">رقم كارت الشحن (16 رقماً)</th>
                 <th style="width:15%;">القيمة</th>
                 <th style="width:25%;">الحالة / المستخدم</th>
                 <th style="width:15%;">تاريخ الإنشاء</th>
-                <th style="width:20%;">إجراء</th>
+                <th style="width:15%;">إجراء</th>
             </tr>
         </thead>
         <tbody id="codes-tbody">
@@ -4095,8 +4198,8 @@ window.renderChargeCodes = async function() {
         tbody.innerHTML = "";
         let keys = Object.keys(codes).reverse();
         
-        if(keys.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: var(--text-muted); font-weight: bold; padding: 30px;">لم تقم بإنشاء أي أكواد شحن حتى الآن. 💳</td></tr>`;
+        if (keys.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: var(--text-muted); font-weight: bold; padding: 30px;">لم تقم بإنشاء أي كروت شحن حتى الآن. 💳</td></tr>`;
             return;
         }
 
@@ -4110,15 +4213,17 @@ window.renderChargeCodes = async function() {
                 : `<span class="status-badge" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 5px 12px;">مستخدم ❌</span>${usedByInfo}`;
             
             let reactivateBtn = isUsed 
-                ? `<button class="icon-btn" style="background:#f59e0b; color:white; border:none; padding:5px 10px; font-size:12px;" onclick="reactivateChargeCode('${codeStr}')" title="إعادة تفعيل الكود">🔄 تفعيل</button>` 
+                ? `<button class="icon-btn" style="background:#f59e0b; color:white; border:none; padding:5px 10px; font-size:12px;" onclick="reactivateChargeCode('${codeStr}')">🔄 تفعيل</button>` 
                 : '';
+
+            let formattedCardNum = window.format16DigitDisplay(codeStr);
 
             tbody.innerHTML += `
             <tr style="${isUsed ? 'background: rgba(239,68,68,0.02);' : ''}">
                 <td style="direction: ltr; text-align: right;">
                     <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
-                        <span style="color: var(--primary-color); font-family: monospace; font-size: 16px; font-weight: 900; letter-spacing: 2px;">${codeStr}</span>
-                        <button onclick="navigator.clipboard.writeText('${codeStr}'); showToast('تم نسخ الكود! 📋');" style="background:var(--hover-bg); border:1px solid var(--border-color); border-radius:6px; cursor:pointer; font-size:14px; padding:4px 8px;">📋</button>
+                        <span style="color: var(--primary-color); font-family: monospace; font-size: 16px; font-weight: 900; letter-spacing: 2px;">${formattedCardNum}</span>
+                        <button onclick="navigator.clipboard.writeText('${codeStr}'); showToast('تم نسخ رقم الكارت (16 رقماً)! 📋');" style="background:var(--hover-bg); border:1px solid var(--border-color); border-radius:6px; cursor:pointer; font-size:14px; padding:4px 8px;" title="نسخ الرقم">📋</button>
                     </div>
                 </td>
                 <td><strong style="color: #f59e0b; font-size: 17px;">${data.amount} ج.م</strong></td>
@@ -4133,8 +4238,8 @@ window.renderChargeCodes = async function() {
             </tr>`;
         });
     } catch(e) { 
-    let tbody = document.getElementById("codes-tbody");
-    if(tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: red; font-weight: bold;">حدث خطأ في تحميل الأكواد!</td></tr>`;
+        let tbody = document.getElementById("codes-tbody");
+        if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: red; font-weight: bold;">حدث خطأ في تحميل الأكواد!</td></tr>`;
     }
 };
 
@@ -4379,19 +4484,30 @@ window.openEditCourseModal = function(id) {
 
 
 
-// 🔄 3. تحديث دالة فتح المنصة عشان ترسم أول فيديو أوتوماتيك
 window.switchPlatformTab = function(tabName) {
     document.querySelectorAll('.platform-section').forEach(sec => sec.style.display = 'none');
-    document.querySelectorAll('[id^="tab-btn-"]').forEach(btn => btn.style.background = 'var(--secondary-color)');
+    
+    // إزالة اللون النشط من كل الأزرار
+    document.querySelectorAll('[id^="tab-btn-"]').forEach(btn => {
+        btn.style.background = '#ffffff';
+        btn.style.color = '#0f172a';
+        btn.style.borderColor = '#cbd5e1';
+    });
     
     let targetSec = document.getElementById(`platform-${tabName}`);
     let targetBtn = document.getElementById(`tab-btn-${tabName}`);
+    
     if(targetSec) targetSec.style.display = 'block';
-    if(targetBtn) targetBtn.style.background = 'var(--primary-color)';
+    
+    // تمييز الزر النشط بالأحمر الملكي الخاص بهوية هيستوريا
+    if(targetBtn) {
+        targetBtn.style.background = 'linear-gradient(135deg, #b91c1c, #980000)';
+        targetBtn.style.color = '#ffffff';
+        targetBtn.style.borderColor = 'transparent';
+    }
 
     if(tabName === 'codes') {
         renderChargeCodes();
-        // 🔴 جلب الكورسات لوضعها في قائمة الربط
         fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/lectures.json`)
         .then(res => res.json())
         .then(data => {
@@ -5122,8 +5238,11 @@ window.renderQuestionBlocks = function() {
             </div>
             <div style="display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;">
                 <div style="flex: 1; min-width: 200px;">
-                    <label style="font-size: 12px; font-weight: bold; color: #3b82f6;">🗺️ رابط صورة / خريطة للسؤال (اختياري):</label>
-                    <input type="url" class="custom-input" placeholder="https://..." value="${q.imageUrl || ''}" oninput="updateQuestion(${index}, 'imageUrl', this.value)" style="direction: ltr;">
+                    <label style="color: var(--text-main); font-weight: bold; display: block; margin-bottom: 5px;">🖼️ صورة / خريطة للسؤال (اختياري):</label>
+                    <label style="display: flex; justify-content: center; align-items: center; background: #ffffff; border: 2px dashed var(--primary-color); color: var(--primary-color); padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s;">
+                        <span>${q.imageUrl ? '✅ تم الرفع مسبقاً (اضغط لتغييرها)' : '+ رفع صورة'}</span>
+                        <input type="file" accept="image/*" onchange="encodeExamImage(this, ${index})" style="display: none;">
+                    </label>
                 </div>
                 <div style="flex: 1; min-width: 200px;">
                     <label style="font-size: 12px; font-weight: bold; color: #10b981;">💡 تفسير الإجابة / ناتج التعلم (يظهر بعد الحل):</label>
@@ -5138,7 +5257,21 @@ window.renderQuestionBlocks = function() {
 
 window.generateOptionsHtml = function(q, index) {
     if(q.type === 'mcq') {
-        return `<label style="font-weight:bold; font-size:14px; margin-bottom:5px; display:block;">الاختيارات (حدد الإجابة الصحيحة بالدائرة):</label><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">${q.options.map((opt, i) => `<div style="display:flex; gap:10px; align-items:center;"><input type="radio" name="correct_${index}" ${q.correctAnswerIndex === i ? 'checked' : ''} onchange="updateQuestion(${index}, 'correctAnswerIndex', ${i})" style="width:18px; height:18px; cursor:pointer;"><input type="text" class="custom-input" value="${opt}" placeholder="الاختيار ${i+1}" oninput="updateOption(${index}, ${i}, this.value)"></div>`).join('')}</div>`;
+        let optionsHtml = q.options.map((opt, i) => {
+            let optText = typeof opt === 'object' ? opt.text : opt;
+            let btnText = (typeof opt === 'object' && opt.image) ? '✅ تم' : '🖼️ صورة';
+            let btnStyle = (typeof opt === 'object' && opt.image) ? 'background: #d1fae5; border-color: #10b981; color: #047857;' : 'background: var(--hover-bg); border-color: var(--border-color); color: var(--text-muted);';
+            
+            return `<div style="display:flex; gap:10px; align-items:center; background: var(--bg-color); padding: 10px; border-radius: 12px; border: 1px solid var(--border-color);">
+                <input type="radio" name="correct_${index}" ${q.correctAnswerIndex === i ? 'checked' : ''} onchange="updateQuestion(${index}, 'correctAnswerIndex', ${i})" style="width:18px; height:18px; cursor:pointer; accent-color: var(--primary-color);">
+                <input type="text" class="custom-input" value="${optText}" placeholder="الاختيار ${i+1}" oninput="updateOption(${index}, ${i}, this.value)" style="flex: 1; margin: 0;">
+                <label style="${btnStyle} border: 1px solid; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.3s; white-space: nowrap;">
+                    ${btnText}
+                    <input type="file" accept="image/*" onchange="encodeExamImage(this, ${index}, ${i})" style="display: none;">
+                </label>
+            </div>`;
+        }).join('');
+        return `<label style="font-weight:bold; font-size:14px; margin-bottom:5px; display:block;">الاختيارات (حدد الإجابة الصحيحة بالدائرة):</label><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">${optionsHtml}</div>`;
     } else if(q.type === 'tf') {
         return `<div style="display: flex; gap: 20px;"><label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; color:var(--success-color);"><input type="radio" name="ans_${index}" ${q.correctAnswerTF === 'true' ? 'checked' : ''} onchange="updateQuestion(${index}, 'correctAnswerTF', 'true')" style="width:18px; height:18px;"> صح ✔️</label><label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; color:var(--danger-color);"><input type="radio" name="ans_${index}" ${q.correctAnswerTF === 'false' ? 'checked' : ''} onchange="updateQuestion(${index}, 'correctAnswerTF', 'false')" style="width:18px; height:18px;"> خطأ ❌</label></div>`;
     } else if(q.type === 'blank') {
@@ -5149,7 +5282,7 @@ window.generateOptionsHtml = function(q, index) {
 };
 
 window.updateQuestion = function(index, field, value) { currentQuestions[index][field] = value; };
-window.updateOption = function(qIndex, optIndex, value) { currentQuestions[qIndex].options[optIndex] = value; };
+
 window.removeQuestion = function(index) { currentQuestions.splice(index, 1); renderQuestionBlocks(); };
 
 
@@ -8741,56 +8874,16 @@ window.openQuickAddFromSession = function() {
 };
 
 
-window.closeShefoChat = function() {
-    document.getElementById("shefo-chat-overlay").style.display = "none";
-};
 
 window.sendAiCommand = function(text) {
     document.getElementById("shefo-text-input").value = text;
     sendShefoMessage();
 };
 
-window.handleAiKeyPress = function(e) {
-    if(e.key === 'Enter') sendShefoMessage();
-};
 
 
 
-window.sendShefoMessage = function() {
-    let input = document.getElementById("shefo-text-input");
-    let text = input.value.trim();
-    if (!text) return;
-    
-    let messagesContainer = document.getElementById("shefo-chat-messages");
-    document.getElementById("ai-suggestions-container").style.display = "none";
-    
-    let userMsgDiv = document.createElement("div");
-    userMsgDiv.className = "user-message";
-    userMsgDiv.innerText = text;
-    messagesContainer.appendChild(userMsgDiv);
-    input.value = "";
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-    let typingDiv = document.createElement("div");
-    typingDiv.className = "ai-message";
-    typingDiv.innerHTML = `<div class="ai-typing"><span></span><span></span><span></span></div>`;
-    messagesContainer.appendChild(typingDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-    setTimeout(() => {
-        typingDiv.remove();
-        let aiResult = processAiLogic(text); 
-        
-        let aiMsgDiv = document.createElement("div");
-        aiMsgDiv.className = "ai-message";
-        aiMsgDiv.innerHTML = aiResult.response;
-        messagesContainer.appendChild(aiMsgDiv);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        
-        renderAiSuggestions(aiResult.suggestions);
-
-    }, 600); // استجابة أسرع
-};
 
 // ==========================================
 // 🤖 عقل المساعد الذكي المُطور (القائمة الشاملة والألوان)
@@ -8813,31 +8906,6 @@ window.aiMasterMenu = [
     { text: "📊 إحصائيات السنتر", cmd: "احصائيات", color: "#64748b" }
 ];
 
-window.openShefoChat = function() {
-    let chatOverlay = document.getElementById("shefo-chat-overlay");
-    if (chatOverlay.style.display === "none" || chatOverlay.style.display === "") {
-        chatOverlay.style.display = "flex";
-        // عرض القائمة الشاملة عند فتح الشات
-        renderAiSuggestions(window.aiMasterMenu);
-        document.getElementById("shefo-text-input").focus();
-    } else {
-        chatOverlay.style.display = "none";
-    }
-};
-
-window.closeShefoChat = function() {
-    document.getElementById("shefo-chat-overlay").style.display = "none";
-};
-
-// فتح وقفل القائمة المنسدلة للأوامر
-window.toggleAiMenu = function() {
-    let popup = document.getElementById("ai-dropdown-popup");
-    if (popup.style.display === "none" || popup.style.display === "") {
-        popup.style.display = "flex";
-    } else {
-        popup.style.display = "none";
-    }
-};
 
 // إغلاق القائمة عند النقر في أي مكان خارجها
 document.addEventListener('click', function(e) {
@@ -10113,4 +10181,1106 @@ window.exportSessionAnalyticsExcel = function(category) {
     let safeGroupName = session.group.replace(/[\\/?*[\]]/g, '');
     XLSX.writeFile(wb, `${titleAr}_${safeGroupName}_${session.date}.xlsx`);
     showToast(`تم تحميل شيت (${titleAr.replace(/_/g, ' ')}) بنجاح! 📥`, "success");
+};
+
+// داخل script.js المرفوع على GitHub
+window.launchLocalTerminalServer = async function() {
+    window.switchWaServerMode('local');
+    try {
+        // محاولة الاتصال بالسيرفر المحلي أولاً
+        let res = await fetch("http://localhost:3000/status?clientId=Historia_System_Master");
+        if (res.ok) {
+            showToast("السيرفر المحلي يعمل بالفعل ومتصل! ✅", "success");
+            checkWaServerStatusNow();
+            return;
+        }
+    } catch (e) {
+        // إذا كان متوقفاً، يرسل إشارة التشغيل عبر البروتوكول المسجل
+        let launcherLink = document.createElement('a');
+        launcherLink.href = "historia-wa://start";
+        document.body.appendChild(launcherLink);
+        launcherLink.click();
+        document.body.removeChild(launcherLink);
+        
+        showToast("تم إرسال أمر التشغيل لمحرك الواتساب المحلي ⚡", "info");
+        setTimeout(checkWaServerStatusNow, 3500);
+    }
+};
+
+// دالة حفظ ونشر الكورس الجديد
+window.saveLecture = async function() {
+    let title = document.getElementById("lecTitle").value.trim();
+    let level = document.getElementById("lecLevel").value;
+    let track = document.getElementById("lecTrack").value;
+    let visibility = document.getElementById("lecVisibility").value;
+    let maxViews = parseInt(document.getElementById("lecMaxViews").value) || 0;
+    let desc = document.getElementById("lecDesc").value.trim();
+    
+    // التأكد من إدخال العنوان
+    if (!title) {
+        if(typeof showToast === 'function') showToast("يرجى كتابة عنوان الكورس!", "error");
+        else alert("يرجى كتابة عنوان الكورس!");
+        return;
+    }
+
+    let videos = [];
+    // ابحث عن صفوف الفيديوهات حسب النافذة (جديد أو تعديل)
+    let videoRows = document.querySelectorAll(document.getElementById("courseVideosContainer") ? "#courseVideosContainer .video-row" : "#editCourseVideosContainer .video-row-edit");
+    
+    videoRows.forEach(row => {
+        let vTitle = row.querySelector(".vid-title").value.trim();
+        let vUrl = row.querySelector(".vid-url").value.trim();
+        let vPdf = row.querySelector(".vid-pdf") ? row.querySelector(".vid-pdf").value.trim() : ""; // 👈 هذا السطر هو الحل الجذري
+        let vType = row.querySelector(".vid-type").value;
+        let vPrice = parseFloat(row.querySelector(".vid-price").value) || 0;
+        let vExam = row.querySelector(".vid-exam").value;
+        
+        let linkedSessions = [];
+        row.querySelectorAll(".vid-session-cb:checked").forEach(cb => linkedSessions.push(cb.value));
+
+        if (vTitle && vUrl) {
+            videos.push({
+                title: vTitle,
+                url: vUrl,
+                pdfUrl: vPdf, // 👈 يتم الآن إرسال رابط الملزمة لقاعدة البيانات بنجاح
+                type: vType,
+                price: vPrice,
+                requiredExam: vExam,
+                linkedSessions: linkedSessions
+            });
+        }
+    });
+
+    if (videos.length === 0) {
+        if(typeof showToast === 'function') showToast("يرجى إضافة فيديو واحد على الأقل!", "error");
+        else alert("يرجى إضافة فيديو واحد على الأقل!");
+        return;
+    }
+
+    let btn = document.querySelector('button[onclick="saveLecture()"]');
+    let origText = btn.innerText;
+    btn.innerText = "جاري النشر... ⏳";
+    btn.disabled = true;
+
+    try {
+        let imageBase64 = "";
+        let fileInput = document.getElementById("lecImageFile");
+        if (fileInput && fileInput.files && fileInput.files.length > 0) {
+            imageBase64 = await window.readFileAsBase64("lecImageFile");
+        }
+
+        let newLecture = {
+            id: "lec_" + Date.now(),
+            title: title,
+            level: level,
+            track: track,
+            isHidden: visibility === "hidden",
+            maxViews: maxViews,
+            desc: desc,
+            image: imageBase64 || "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=600&auto=format&fit=crop",
+            videos: videos,
+            date: new Date().toISOString()
+        };
+
+        // رفع الكورس لقاعدة البيانات
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/lectures/${newLecture.id}.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newLecture)
+        });
+
+        if(typeof showToast === 'function') showToast("تم نشر الكورس بنجاح! 🚀", "success");
+        else alert("تم نشر الكورس بنجاح!");
+        
+        // تفريغ الخانات بعد النشر
+        document.getElementById("lecTitle").value = "";
+        document.getElementById("lecDesc").value = "";
+        document.getElementById("lecMaxViews").value = "";
+        if(fileInput) fileInput.value = "";
+        document.getElementById("courseVideosContainer").innerHTML = "";
+        window.addCourseVideoRow(); // إضافة صف فارغ جديد
+
+        // تحديث قائمة الكورسات المعروضة
+        if (typeof window.renderLectures === 'function') window.renderLectures();
+    } catch(e) {
+        console.error(e);
+        alert("حدث خطأ أثناء الاتصال بالإنترنت!");
+    } finally {
+        btn.innerText = origText;
+        btn.disabled = false;
+    }
+};
+
+
+// دالة حفظ التعديلات على كورس موجود
+window.saveEditedCourse = async function() {
+    let id = document.getElementById("editLecId").value;
+    if (!id) return alert("خطأ: لم يتم العثور على الكورس!");
+
+    let title = document.getElementById("editLecTitle").value.trim();
+    let level = document.getElementById("editLecLevel").value;
+    let track = document.getElementById("editLecTrack").value;
+    let visibility = document.getElementById("editLecVisibility").value;
+    let maxViews = parseInt(document.getElementById("editLecMaxViews").value) || 0;
+    let desc = document.getElementById("editLecDesc").value.trim();
+
+    if (!title) {
+        if(typeof showToast === 'function') showToast("يرجى كتابة عنوان الكورس!", "error");
+        return;
+    }
+
+    let videos = [];
+    let videoRows = document.querySelectorAll("#editCourseVideosContainer .video-row-edit");
+    videoRows.forEach(row => {
+        let vTitle = row.querySelector(".vid-title").value.trim();
+        let vUrl = row.querySelector(".vid-url").value.trim();
+        let vPdf = row.querySelector(".vid-pdf").value.trim();
+        let vType = row.querySelector(".vid-type").value;
+        let vPrice = parseFloat(row.querySelector(".vid-price").value) || 0;
+        let vExam = row.querySelector(".vid-exam").value;
+        
+        let linkedSessions = [];
+        row.querySelectorAll(".vid-session-cb:checked").forEach(cb => linkedSessions.push(cb.value));
+
+        if (vTitle && vUrl) {
+            videos.push({
+                title: vTitle,
+                url: vUrl,
+                pdfUrl: vPdf,
+                type: vType,
+                price: vPrice,
+                requiredExam: vExam,
+                linkedSessions: linkedSessions
+            });
+        }
+    });
+
+    let btn = document.querySelector('button[onclick="saveEditedCourse()"]');
+    let origText = btn.innerText;
+    btn.innerText = "جاري الحفظ... ⏳";
+    btn.disabled = true;
+
+    try {
+        let imageBase64 = document.getElementById("editLecImageBase64").value;
+        let fileInput = document.getElementById("editLecImageFile");
+        if (fileInput && fileInput.files && fileInput.files.length > 0) {
+            imageBase64 = await window.readFileAsBase64("editLecImageFile");
+        }
+
+        let updatedLecture = {
+            id: id,
+            title: title,
+            level: level,
+            track: track,
+            isHidden: visibility === "hidden",
+            maxViews: maxViews,
+            desc: desc,
+            image: imageBase64 || "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=600&auto=format&fit=crop",
+            videos: videos
+        };
+
+        // تحديث الكورس في قاعدة البيانات
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/lectures/${id}.json`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedLecture)
+        });
+
+        if(typeof showToast === 'function') showToast("تم حفظ التعديلات بنجاح! 💾", "success");
+        closeModal('editCourseModal');
+        
+        if (typeof window.renderLectures === 'function') window.renderLectures();
+    } catch(e) {
+        console.error(e);
+        alert("حدث خطأ أثناء حفظ التعديلات!");
+    } finally {
+        btn.innerText = origText;
+        btn.disabled = false;
+    }
+};
+
+// دالة تشفير ورفع الصور للامتحانات بذكاء
+window.encodeExamImage = function(input, qIndex, optIndex = null) {
+    if (input.files && input.files[0]) {
+        let reader = new FileReader();
+        reader.onload = function(e) {
+            let base64 = e.target.result;
+            if (optIndex === null) {
+                // حفظ صورة السؤال الرئيسي
+                currentQuestions[qIndex].imageUrl = base64;
+            } else {
+                // حفظ صورة الاختيار
+                let currentOpt = currentQuestions[qIndex].options[optIndex];
+                let optText = typeof currentOpt === 'object' ? currentOpt.text : currentOpt;
+                currentQuestions[qIndex].options[optIndex] = { text: optText, image: base64 };
+            }
+            // تغيير شكل الزر ليدل على النجاح
+            let label = input.parentElement;
+            label.style.background = '#d1fae5';
+            label.style.borderColor = '#10b981';
+            label.style.color = '#047857';
+            label.innerHTML = '✅ تم الرفع';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+};
+
+// تحديث نص الاختيار دون مسح الصورة (إن وجدت)
+window.updateOption = function(qIndex, optIndex, value) { 
+    let currentOpt = currentQuestions[qIndex].options[optIndex];
+    if (typeof currentOpt === 'object') {
+        currentQuestions[qIndex].options[optIndex].text = value;
+    } else {
+        currentQuestions[qIndex].options[optIndex] = value;
+    }
+};
+
+
+// =========================================================
+// 🏆 1. محرك المستويات والمهمات لكارت الطلاب (Student Quest Engine V2)
+// =========================================================
+const STUDENT_QUEST_MILESTONES = [
+    { target: 100,  level: 1, title: "🌱 البداية القوية (كتيبة المئة)", color: "linear-gradient(135deg, #10b981, #047857)" },
+    { target: 200,  level: 2, title: "⚡ التمدد السريع (200 بطل)", color: "linear-gradient(135deg, #3b82f6, #1d4ed8)" },
+    { target: 500,  level: 3, title: "🔥 جيش النصف ألف", color: "linear-gradient(135deg, #f59e0b, #b45309)" },
+    { target: 1000, level: 4, title: "👑 إمبراطورية الألف طالب", color: "linear-gradient(135deg, #8b5cf6, #5b21b6)" },
+    { target: 2000, level: 5, title: "💎 أسطورة الـ 2000 (هيستوريا VIP)", color: "linear-gradient(135deg, #ec4899, #be185d)" },
+    { target: 5000, level: 6, title: "🌍 القمة التاريخية الكبرى", color: "linear-gradient(135deg, #ef4444, #b91c1c)" }
+];
+
+window.updateStudentQuestCard = function() {
+    const count = Array.isArray(students) ? students.length : 0;
+    const totalEl = document.getElementById("total-students");
+    if (totalEl) totalEl.innerText = count;
+
+    // تحديد المستوى الحالي
+    let currentQuest = STUDENT_QUEST_MILESTONES.find(m => count < m.target);
+    let isMaxed = false;
+
+    if (!currentQuest) {
+        currentQuest = { target: 10000, level: "MAX", title: "🚀 الأسطورة الحية", color: "linear-gradient(135deg, #0f172a, #000000)" };
+        isMaxed = true;
+    }
+
+    let prevIndex = STUDENT_QUEST_MILESTONES.indexOf(currentQuest) - 1;
+    let prevTarget = prevIndex >= 0 ? STUDENT_QUEST_MILESTONES[prevIndex].target : 0;
+    
+    // حساب النسبة (من بداية المستوى الحالي لحد الهدف القادم) عشان الشريط يفضل يتحرك صح
+    let range = currentQuest.target - prevTarget;
+    let progress = count - prevTarget;
+    let pct = isMaxed ? 100 : Math.min(100, Math.round((progress / range) * 100));
+    let remaining = Math.max(0, currentQuest.target - count);
+
+    // تطبيق الألوان والنصوص
+    let card = document.getElementById("quest-hero-card");
+    if (card) card.style.background = currentQuest.color;
+
+    if (document.getElementById("quest-level-badge")) document.getElementById("quest-level-badge").innerText = `⭐ المستوى ${currentQuest.level}`;
+    if (document.getElementById("quest-rank-title")) document.getElementById("quest-rank-title").innerText = currentQuest.title;
+    if (document.getElementById("quest-next-target")) document.getElementById("quest-next-target").innerText = isMaxed ? "∞" : currentQuest.target;
+    if (document.getElementById("quest-percentage-badge")) document.getElementById("quest-percentage-badge").innerText = `${pct}%`;
+    if (document.getElementById("quest-progress-bar")) document.getElementById("quest-progress-bar").style.width = `${pct}%`;
+    
+    if (document.getElementById("quest-remaining-text")) {
+        document.getElementById("quest-remaining-text").innerHTML = isMaxed
+            ? `🎉 لقد حطمت جميع الأرقام القياسية! أنت الآن أسطورة.`
+            : `🔥 متبقي <strong>${remaining}</strong> طالب لفتح المستوى القادم!`;
+    }
+
+    // رسم كبسولات المحطات
+    const pillsBox = document.getElementById("quest-milestones-pills");
+    if (pillsBox) {
+        pillsBox.innerHTML = [100, 200, 500, 1000, 2000].map(m => {
+            let achieved = count >= m;
+            let isCurrent = currentQuest.target === m;
+            let bg = achieved ? "rgba(255,255,255,0.9)" : (isCurrent ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.2)");
+            let border = isCurrent ? "1px solid #fff" : "1px solid transparent";
+            let color = achieved ? "#000" : "#fff";
+            return `<span style="background:${bg}; color:${color}; border:${border}; padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:900;">${achieved ? '✓ ' : ''}${m}</span>`;
+        }).join('');
+    }
+};
+
+// ربط تحديث كارت المهمة مع رسم الداشبورد والجدول
+const origRenderChartsForQuest = window.renderDashboardCharts;
+window.renderDashboardCharts = function() {
+    if (origRenderChartsForQuest) origRenderChartsForQuest();
+    window.updateStudentQuestCard();
+};
+
+const origRenderTableForQuest = window.renderTable;
+window.renderTable = function() {
+    if (origRenderTableForQuest) origRenderTableForQuest();
+    window.updateStudentQuestCard();
+};
+
+
+// =========================================================
+// 📈 2. محرك صفحة الإحصائيات الشاملة (يدعم فلتر الوقت والتاريخ)
+// =========================================================
+window.anGroupsChartInst = null;
+window.anLevelsChartInst = null;
+
+// دالة مساعدة لمعرفة هل التاريخ يقع ضمن الفترة المطلوبة
+window.isDateInRange = function(dateStr, timeFilter) {
+    if (!dateStr || timeFilter === "all") return true;
+    
+    let targetDate = new Date(dateStr);
+    if (isNaN(targetDate.getTime())) return true; // لو التاريخ مش مظبوط كمل عادي
+
+    let now = new Date();
+    now.setHours(23, 59, 59, 999); // تصفير الساعات لنهاية اليوم للمقارنة
+    
+    let diffDays = (now - targetDate) / (1000 * 60 * 60 * 24);
+
+    if (timeFilter === "today") return diffDays <= 1;
+    if (timeFilter === "week") return diffDays <= 7;
+    if (timeFilter === "month") return targetDate.getMonth() === now.getMonth() && targetDate.getFullYear() === now.getFullYear();
+    if (timeFilter === "3months") return diffDays <= 90;
+    
+    return true;
+};
+
+window.renderMasterAnalytics = function() {
+    const levelFilter = document.getElementById("masterAnalyticsLevelFilter")?.value || "all";
+    const timeFilter = document.getElementById("masterAnalyticsTimeFilter")?.value || "all";
+
+    // ضمان أن كل المصفوفات موجودة قبل الفلترة
+    let allSt = Array.isArray(students) ? students : [];
+    let allGrps = Array.isArray(groups) ? groups : [];
+    let allSess = Array.isArray(classSessions) ? classSessions : [];
+    let allExs = Array.isArray(exams) ? exams : [];
+    let allHws = Array.isArray(homeworks) ? homeworks : [];
+    let allBks = Array.isArray(books) ? books : [];
+    let allFin = financeRecords || {};
+
+    // 1. فلترة البيانات
+    const filteredStudents = allSt.filter(s => {
+        let matchLevel = levelFilter === "all" || (s.level && s.level.includes(levelFilter));
+        let matchTime = isDateInRange(s.timestamp || s.date, timeFilter); // لو متسجلوش بتاريخ نعتبرهم متاحين
+        return matchLevel && matchTime;
+    });
+
+    const filteredGroups = allGrps.filter(g => levelFilter === "all" || (g.level && g.level.includes(levelFilter)));
+    const filteredGroupNames = new Set(filteredGroups.map(g => g.name));
+    
+    const filteredSessions = allSess.filter(s => {
+        let matchGroup = levelFilter === "all" || filteredGroupNames.has(s.group);
+        let matchTime = isDateInRange(s.date, timeFilter);
+        return matchGroup && matchTime;
+    });
+
+    const filteredExams = allExs.filter(e => {
+        let matchGroup = levelFilter === "all" || filteredGroupNames.has(e.group);
+        let matchTime = isDateInRange(e.date, timeFilter);
+        return matchGroup && matchTime;
+    });
+
+    const filteredHws = allHws.filter(h => {
+        let matchGroup = levelFilter === "all" || filteredGroupNames.has(h.group);
+        let matchTime = isDateInRange(h.date, timeFilter);
+        return matchGroup && matchTime;
+    });
+
+    // 2. إحصائيات الطلاب
+    let onlineCount = 0, centerCount = 0, males = 0, females = 0, specialCases = 0, suspendedCount = 0;
+
+    filteredStudents.forEach(s => {
+        if (String(s.code).startsWith("O-") || String(s.code).startsWith("GUEST-") || (s.group && s.group.includes("أونلاين"))) onlineCount++;
+        else centerCount++;
+
+        if (s.gender === "أنثى") females++; else males++;
+        if (s.isSpecialCase) specialCases++;
+        if (s.isSuspended) suspendedCount++;
+    });
+
+    let timeText = timeFilter === 'today' ? 'اليوم' : timeFilter === 'week' ? 'آخر أسبوع' : timeFilter === 'month' ? 'هذا الشهر' : timeFilter === '3months' ? 'آخر 3 شهور' : 'الإجمالي';
+
+    if(document.getElementById("an-total-students")) document.getElementById("an-total-students").innerText = filteredStudents.length;
+    if(document.getElementById("an-new-students-month")) document.getElementById("an-new-students-month").innerText = `(${timeText})`;
+    if(document.getElementById("an-center-vs-online")) document.getElementById("an-center-vs-online").innerText = `${centerCount} سنتر / ${onlineCount} أونلاين`;
+    if(document.getElementById("an-gender-breakdown")) document.getElementById("an-gender-breakdown").innerText = `ذكور: ${males} | إناث: ${females} | إعفاء: ${specialCases}`;
+    if(document.getElementById("an-suspended-count")) document.getElementById("an-suspended-count").innerText = `${suspendedCount} موقوف`;
+
+    // 3. الحضور والغياب (بناءً على الحصص المفلترة)
+    let totalPresent = 0, totalAbsent = 0, totalLate = 0, totalMakeup = 0;
+    let studentAbsentMap = {};
+    let studentLateMap = {};
+
+    filteredSessions.forEach(sess => {
+        const att = sess.attendance || {};
+        Object.keys(att).forEach(key => {
+            const val = att[key];
+            if (val === 'present') {
+                totalPresent++;
+            } else if (val === 'late') {
+                totalLate++;
+                studentLateMap[key] = (studentLateMap[key] || 0) + 1;
+            } else if (val === 'absent') {
+                totalAbsent++;
+                studentAbsentMap[key] = (studentAbsentMap[key] || 0) + 1;
+            } else if (typeof val === 'object' && val !== null && val.status === 'makeup') {
+                totalMakeup++;
+                if (val.isLate) {
+                    totalLate++;
+                    studentLateMap[key] = (studentLateMap[key] || 0) + 1;
+                } else {
+                    totalPresent++;
+                }
+            }
+        });
+    });
+
+    const totalAttRecords = totalPresent + totalLate + totalAbsent;
+    const attRate = totalAttRecords > 0 ? Math.round(((totalPresent + totalLate) / totalAttRecords) * 100) : 0;
+    const absRate = totalAttRecords > 0 ? Math.round((totalAbsent / totalAttRecords) * 100) : 0;
+
+    if(document.getElementById("an-attendance-rate")) document.getElementById("an-attendance-rate").innerText = `${attRate}%`;
+    if(document.getElementById("an-sessions-count")) document.getElementById("an-sessions-count").innerText = `في ${filteredSessions.length} حصة (${totalPresent + totalLate} حضور)`;
+    if(document.getElementById("an-absence-count")) document.getElementById("an-absence-count").innerText = totalAbsent;
+    if(document.getElementById("an-absent-rate")) document.getElementById("an-absent-rate").innerText = `${absRate}% نسبة الغياب`;
+    if(document.getElementById("an-late-count")) document.getElementById("an-late-count").innerText = totalLate;
+    if(document.getElementById("an-makeup-count")) document.getElementById("an-makeup-count").innerText = `حالات تأخير | ${totalMakeup} تعويض 🔄`;
+
+    // 4. الماليات والكتب (مربوطة بفترة الفلتر)
+    let totalIncome = 0, totalExtraExp = 0;
+    let sessionIncomeMap = {};
+
+    filteredSessions.forEach(sess => {
+        const recKey = `fin_session_${sess.id}`;
+        const rec = allFin[recKey] || {};
+        const grpObj = allGrps.find(g => g.name === sess.group) || {};
+        const defaultPrice = parseFloat(grpObj.price) || 0;
+        let sessInc = 0;
+
+        Object.keys(rec).forEach(stCode => {
+            const payment = rec[stCode];
+            if (payment && payment.status === 'paid') sessInc += parseFloat(payment.amount) || 0;
+            else if (payment === 'paid') sessInc += defaultPrice; 
+        });
+        sessionIncomeMap[sess.group] = (sessionIncomeMap[sess.group] || 0) + sessInc;
+        totalIncome += sessInc;
+    });
+
+    const validSessionIds = new Set(filteredSessions.map(s => s.id));
+    if(Array.isArray(expenses)) {
+        expenses.forEach(ex => {
+            if (validSessionIds.has(ex.sessionId)) {
+                totalExtraExp += parseFloat(ex.amount) || 0;
+            }
+        });
+    }
+
+    const netProfit = totalIncome - totalExtraExp;
+    if (document.getElementById("an-net-profit")) {
+        document.getElementById("an-net-profit").innerText = `${netProfit.toLocaleString()} ج`;
+        document.getElementById("an-income-vs-exp").innerText = `إيراد: ${totalIncome.toLocaleString()} | مصاريف: ${totalExtraExp.toLocaleString()}`;
+    }
+
+    let booksReceived = 0, booksRemaining = 0;
+    allBks.filter(b => isDateInRange(b.date || b.id, timeFilter)).forEach(b => {
+        let comm = b.commissionType === 'percentage' ? (b.price * b.commissionValue / 100) : b.commissionValue;
+        let expected = (b.price - comm) * b.quantity;
+        let rec = parseFloat(b.receivedAmount) || 0;
+        booksReceived += rec;
+        booksRemaining += (expected - rec);
+    });
+    if (document.getElementById("an-books-received")) {
+        document.getElementById("an-books-received").innerText = `${booksReceived.toLocaleString()} ج`;
+        document.getElementById("an-books-remaining").innerText = `متبقي: ${booksRemaining.toLocaleString()} ج`;
+    }
+
+    // 5. الامتحانات والواجبات المفلترة
+    let sumExamPct = 0, examEntries = 0;
+    filteredExams.forEach(ex => {
+        const max = parseFloat(ex.maxScore) || 100;
+        Object.values(ex.grades || {}).forEach(g => {
+            if (!isNaN(parseFloat(g)) && max > 0) {
+                sumExamPct += (parseFloat(g) / max) * 100;
+                examEntries++;
+            }
+        });
+    });
+    const overallExamAvg = examEntries > 0 ? Math.round(sumExamPct / examEntries) : 0;
+    const allOnlineExamsList = window.fetchedOnlineExams || JSON.parse(localStorage.getItem("onlineExams")) || [];
+    const filteredOnlineExams = allOnlineExamsList.filter(e => isDateInRange(e.date, timeFilter));
+    
+    if(document.getElementById("an-exams-avg")) document.getElementById("an-exams-avg").innerText = `${overallExamAvg}%`;
+    if(document.getElementById("an-exams-hw-count")) document.getElementById("an-exams-hw-count").innerText = `${filteredExams.length + filteredOnlineExams.length} امتحان | ${filteredHws.length} واجب`;
+
+    // 6. قوائم الـ Top 8
+    const resolveStudent = (key) => allSt.find(s => String(s.code) === String(key) || (s.phone !== "0" && String(s.phone) === String(key)));
+
+    const topAbsentArr = Object.entries(studentAbsentMap).map(([k, count]) => ({ st: resolveStudent(k), count })).filter(item => item.st).sort((a, b) => b.count - a.count).slice(0, 8);
+    let absTbody = document.getElementById("an-top-absent-list");
+    if(absTbody) {
+        absTbody.innerHTML = topAbsentArr.length === 0
+            ? `<div style="text-align:center; padding:30px; color:var(--text-muted); font-weight:bold;">🎉 لا توجد حالات غياب!</div>`
+            : topAbsentArr.map(item => `<div class="mini-rank-item" onclick="openStudentProfile('${item.st.code}')" style="cursor:pointer;"><div><strong style="color:var(--primary-color);">${item.st.code}</strong> - ${item.st.name}<div style="font-size:11px; color:var(--text-muted);">${item.st.group}</div></div><span class="stat-pill" style="background:#fee2e2; color:#b91c1c;">غاب ${item.count} ❌</span></div>`).join('');
+    }
+
+    const topLateArr = Object.entries(studentLateMap).map(([k, count]) => ({ st: resolveStudent(k), count })).filter(item => item.st).sort((a, b) => b.count - a.count).slice(0, 8);
+    let lateTbody = document.getElementById("an-top-late-list");
+    if(lateTbody) {
+        lateTbody.innerHTML = topLateArr.length === 0
+            ? `<div style="text-align:center; padding:30px; color:var(--text-muted); font-weight:bold;">✨ الجميع ملتزمون!</div>`
+            : topLateArr.map(item => `<div class="mini-rank-item" onclick="openStudentProfile('${item.st.code}')" style="cursor:pointer;"><div><strong style="color:var(--primary-color);">${item.st.code}</strong> - ${item.st.name}<div style="font-size:11px; color:var(--text-muted);">${item.st.group}</div></div><span class="stat-pill" style="background:#fef3c7; color:#b45309;">تأخر ${item.count} ⏳</span></div>`).join('');
+    }
+
+    const newestArr = [...filteredStudents].slice(-8).reverse();
+    let newTbody = document.getElementById("an-newest-students-list");
+    if(newTbody) {
+        newTbody.innerHTML = newestArr.length === 0
+            ? `<div style="text-align:center; padding:30px; color:var(--text-muted); font-weight:bold;">لا يوجد طلاب.</div>`
+            : newestArr.map(st => `<div class="mini-rank-item" onclick="openStudentProfile('${st.code}')" style="cursor:pointer;"><div><strong style="color:#10b981;">${st.code}</strong> - ${st.name}<div style="font-size:11px; color:var(--text-muted);">${st.group}</div></div><span class="stat-pill" style="background:#d1fae5; color:#047857;">جديد ✨</span></div>`).join('');
+    }
+
+    // 7. جدول ورسوم المجموعات (Charts)
+    const tbody = document.getElementById("an-groups-Comparison-tbody");
+    if(tbody) {
+        tbody.innerHTML = "";
+        let chartLabels = [], chartPresent = [], chartAbsent = [], chartLate = [];
+
+        filteredGroups.forEach(grp => {
+            const gStudentsCount = filteredStudents.filter(s => s.group === grp.name).length;
+            const gSessions = filteredSessions.filter(s => s.group === grp.name);
+            const gExams = filteredExams.filter(e => e.group === grp.name);
+
+            let gPres = 0, gAbs = 0, gLate = 0;
+            gSessions.forEach(sess => {
+                Object.values(sess.attendance || {}).forEach(v => {
+                    if (v === 'present' || (typeof v === 'object' && v?.status === 'makeup' && !v?.isLate)) gPres++;
+                    else if (v === 'late' || (typeof v === 'object' && v?.isLate)) gLate++;
+                    else if (v === 'absent') gAbs++;
+                });
+            });
+
+            let gTotalAtt = gPres + gLate + gAbs;
+            let gRate = gTotalAtt > 0 ? Math.round(((gPres + gLate) / gTotalAtt) * 100) : 0;
+
+            let gExSum = 0, gExCnt = 0;
+            gExams.forEach(ex => {
+                let max = parseFloat(ex.maxScore) || 100;
+                Object.values(ex.grades || {}).forEach(val => {
+                    if (!isNaN(parseFloat(val)) && max > 0) {
+                        gExSum += (parseFloat(val) / max) * 100;
+                        gExCnt++;
+                    }
+                });
+            });
+            let gExAvg = gExCnt > 0 ? Math.round(gExSum / gExCnt) : 0;
+            let gIncome = sessionIncomeMap[grp.name] || 0;
+
+            chartLabels.push(grp.name);
+            chartPresent.push(gPres);
+            chartAbsent.push(gAbs);
+            chartLate.push(gLate);
+
+            let rateColor = gRate >= 75 ? '#10b981' : (gRate >= 50 ? '#f59e0b' : '#ef4444');
+
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong style="color:var(--primary-color); cursor:pointer;" onclick="switchPage('groups'); openGroupDetails('${grp.name}')">📁 ${grp.name}</strong></td>
+                    <td>${grp.level}</td>
+                    <td><strong>${gStudentsCount}</strong></td>
+                    <td>${gSessions.length}</td>
+                    <td><span class="stat-pill" style="background:${rateColor}20; color:${rateColor};">${gRate}% (${gPres})</span></td>
+                    <td style="color:#ef4444; font-weight:bold;">${gAbs}</td>
+                    <td style="color:#f59e0b; font-weight:bold;">${gLate}</td>
+                    <td><strong>${gExAvg}%</strong></td>
+                    <td class="admin-only" style="color:#10b981; font-weight:900;">${gIncome.toLocaleString()} ج.م</td>
+                </tr>`;
+        });
+
+        if (filteredGroups.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:25px; color:var(--text-muted);">لا توجد مجموعات مسجلة لهذه الفلاتر.</td></tr>`;
+        }
+
+        const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#334155';
+        
+        // شارت الحضور
+        const ctxGrp = document.getElementById("anGroupsBreakdownChart")?.getContext("2d");
+        if (ctxGrp && typeof Chart !== "undefined") {
+            if (window.anGroupsChartInst) window.anGroupsChartInst.destroy();
+            window.anGroupsChartInst = new Chart(ctxGrp, {
+                type: 'bar',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        { label: 'حاضر ✅', data: chartPresent, backgroundColor: '#10b981', borderRadius: 6 },
+                        { label: 'متأخر ⏳', data: chartLate, backgroundColor: '#f59e0b', borderRadius: 6 },
+                        { label: 'غائب ❌', data: chartAbsent, backgroundColor: '#ef4444', borderRadius: 6 }
+                    ]
+                },
+                options: { responsive: true, plugins: { legend: { labels: { color: textColor, font: { family: 'Cairo' } } } }, scales: { x: { ticks: { color: textColor } }, y: { ticks: { color: textColor } } } }
+            });
+        }
+
+        // شارت الصفوف
+        const ctxLvl = document.getElementById("anLevelsDoughnutChart")?.getContext("2d");
+        if (ctxLvl && typeof Chart !== "undefined") {
+            if (window.anLevelsChartInst) window.anLevelsChartInst.destroy();
+            let lvlCounts = { "الأول": 0, "الثاني": 0, "الثالث": 0, "أخرى": 0 };
+            filteredStudents.forEach(s => {
+                if (s.level?.includes("الأول")) lvlCounts["الأول"]++;
+                else if (s.level?.includes("الثاني")) lvlCounts["الثاني"]++;
+                else if (s.level?.includes("الثالث")) lvlCounts["الثالث"]++;
+                else lvlCounts["أخرى"]++;
+            });
+            window.anLevelsChartInst = new Chart(ctxLvl, {
+                type: 'doughnut',
+                data: {
+                    labels: ["الأول", "الثاني", "الثالث"],
+                    datasets: [{ data: [lvlCounts["الأول"], lvlCounts["الثاني"], lvlCounts["الثالث"]], backgroundColor: ['#f59e0b', '#10b981', '#980000'], borderWidth: 0 }]
+                },
+                options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: textColor, font: { family: 'Cairo' } } } } }
+            });
+        }
+    }
+};
+
+// تصدير جدول الإحصائيات الشامل إلى شيت Excel
+window.exportMasterAnalyticsTable = function() {
+    const table = document.getElementById("master-groups-analytics-table");
+    if (!table || typeof XLSX === "undefined") return;
+    const wb = XLSX.utils.table_to_book(table, { sheet: "إحصائيات_المجموعات" });
+    XLSX.writeFile(wb, `إحصائيات_هيستوريا_الشاملة_${new Date().toISOString().split('T')[0]}.xlsx`);
+    if (typeof showToast === "function") showToast("تم تحميل شيت الإحصائيات الشاملة بنجاح! 📥");
+};
+
+// ربط صفحة الإحصائيات بنظام التنقل switchPage
+const prevSwitchPageForMasterAnalytics = window.switchPage;
+window.switchPage = function(pageId) {
+    if (prevSwitchPageForMasterAnalytics) prevSwitchPageForMasterAnalytics(pageId);
+    if (pageId === "analytics") {
+        document.getElementById("page-title").innerText = "الإحصائيات الشاملة والرادار 📈";
+        document.getElementById("page-desc").innerText = "تحليل متكامل للطلاب، الحضور، الغياب، التأخير، والماليات";
+        
+        // استدعاء دالة الرسم بعد ثانية صغيرة للتأكد من إن الشاشة ظهرت وكل الـ DOM اتعمله Render
+        setTimeout(() => {
+            if (typeof renderMasterAnalytics === "function") renderMasterAnalytics();
+        }, 100);
+    }
+    if (pageId === "dashboard") {
+        if(typeof window.updateStudentQuestCard === "function") window.updateStudentQuestCard();
+    }
+};
+
+// =========================================================
+// 🤖 محرك "أوكتو AI" التنفيذي الشامل (Full-System Action Agent V3)
+// =========================================================
+
+// 1. فتح وإغلاق الشات وتجهيز الواجهة
+window.openShefoChat = function() {
+    const overlay = document.getElementById("shefo-chat-overlay");
+    if (!overlay) return;
+    overlay.style.display = "flex";
+    renderAiQuickSuggestions();
+    renderAiDropdownCommands();
+    setTimeout(() => document.getElementById("shefo-text-input")?.focus(), 150);
+};
+
+window.closeShefoChat = function() {
+    const overlay = document.getElementById("shefo-chat-overlay");
+    if (overlay) overlay.style.display = "none";
+};
+
+window.toggleAiMenu = function() {
+    const popup = document.getElementById("ai-dropdown-popup");
+    if (!popup) return;
+    popup.style.display = popup.style.display === "flex" ? "none" : "flex";
+};
+
+window.handleAiKeyPress = function(e) {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        sendShefoMessage();
+    }
+};
+
+// 2. كبسولات الأوامر السريعة التفاعلية
+window.renderAiQuickSuggestions = function() {
+    const box = document.getElementById("ai-suggestions-container");
+    if (!box) return;
+    const suggestions = [
+        { label: "📊 رادار السيستم اليوم", cmd: "ملخص السيستم" },
+        { label: "📖 كتالوج أوامر التنفيذ", cmd: "كل الاوامر" },
+        { label: "🎯 فتح حصة جديدة", cmd: "عايز افتح حصة" },
+        { label: "💳 توليد 10 كروت بـ 50", cmd: "توليد 10 كارت شحن بـ 50" },
+        { label: "💰 جرد الخزنة والكتب", cmd: "تقرير الخزنة والماليات" },
+        { label: "🚨 الطلاب في خطر", cmd: "اعرض الطلاب تحت الملاحظة" }
+    ];
+    box.innerHTML = suggestions.map(s => `
+        <button class="ai-quick-btn" onclick="executeQuickAiCommand('${s.cmd}')">${s.label}</button>
+    `).join('');
+};
+
+// 3. قائمة الصاعقة (⚡) للمهام الفورية
+window.renderAiDropdownCommands = function() {
+    const popup = document.getElementById("ai-dropdown-popup");
+    if (!popup) return;
+    const actions = [
+        { title: "📖 عرض كتالوج الأوامر الصوتية/الكتابية", action: "executeQuickAiCommand('كل الاوامر');" },
+        { title: "➕ تسجيل طالب جديد فوراً", action: "openModal('addStudentModal'); closeShefoChat();" },
+        { title: "🎯 فتح حصة ورصد الباركود", action: "switchPage('attendance'); openModal('addSessionModal'); closeShefoChat();" },
+        { title: "📝 إنشاء امتحان ورقي لمجموعة", action: "switchPage('exams'); openModal('addExamModal'); closeShefoChat();" },
+        { title: "💻 صانع الامتحانات الإلكترونية", action: "switchPage('platform'); switchPlatformTab('exams'); openOnlineExamBuilder(); closeShefoChat();" },
+        { title: "🎬 رفع كورس أو ملزمة PDF", action: "switchPage('platform'); switchPlatformTab('lectures'); closeShefoChat();" },
+        { title: "📘 تسليم عهدة كتب لسنتر", action: "switchPage('books'); openModal('addBookModal'); closeShefoChat();" },
+        { title: "📈 فتح الرادار والإحصائيات الشاملة", action: "switchPage('analytics'); closeShefoChat();" },
+        { title: "📥 تحميل نسخة احتياطية كاملة (Backup)", action: "exportData(); closeShefoChat();" }
+    ];
+    popup.innerHTML = actions.map(a => `
+        <button class="ai-dropdown-item" onclick="${a.action}; document.getElementById('ai-dropdown-popup').style.display='none';">
+            <span>${a.title}</span>
+            <span style="color:#3b82f6;">⬅</span>
+        </button>
+    `).join('');
+};
+
+window.executeQuickAiCommand = function(cmdText) {
+    const input = document.getElementById("shefo-text-input");
+    if (input) {
+        input.value = cmdText;
+        sendShefoMessage();
+    }
+};
+
+// 4. إرسال الرسالة وتشغيل العقل التنفيذي
+window.sendShefoMessage = function() {
+    const input = document.getElementById("shefo-text-input");
+    const msgContainer = document.getElementById("shefo-chat-messages");
+    if (!input || !msgContainer) return;
+
+    const text = input.value.trim();
+    if (!text) return;
+
+    const popup = document.getElementById("ai-dropdown-popup");
+    if (popup) popup.style.display = "none";
+
+    msgContainer.innerHTML += `<div class="user-message">${text}</div>`;
+    input.value = "";
+    msgContainer.scrollTop = msgContainer.scrollHeight;
+
+    const typingId = "typing_" + Date.now();
+    msgContainer.innerHTML += `
+        <div class="ai-message" id="${typingId}">
+            <div class="ai-typing"><span></span><span></span><span></span></div>
+        </div>`;
+    msgContainer.scrollTop = msgContainer.scrollHeight;
+
+    setTimeout(async () => {
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+        const replyHtml = await processOctoAiBrain(text);
+        msgContainer.innerHTML += `<div class="ai-message">${replyHtml}</div>`;
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+    }, 300);
+};
+
+// دالة مساعدة لاستخراج الطالب من داخل الجملة النصية بذكاء
+window.extractStudentFromSentence = function(sentence) {
+    if (!Array.isArray(students) || students.length === 0) return null;
+    // 1. محاولة البحث بالكود المكتوب في الجملة (سواء رقم أو O-1001)
+    let tokens = sentence.split(/\s+/);
+    for (let t of tokens) {
+        let cleanToken = t.replace(/[^\w\d-]/g, '');
+        if (!cleanToken) continue;
+        let byCode = students.find(s => String(s.code).toLowerCase() === cleanToken.toLowerCase());
+        if (byCode) return byCode;
+    }
+    // 2. البحث بتطابق الاسم داخل الجملة
+    let normSentence = window.smartArabicNormalize ? window.smartArabicNormalize(sentence) : sentence;
+    let sortedByLength = [...students].sort((a, b) => (b.name?.length || 0) - (a.name?.length || 0));
+    for (let st of sortedByLength) {
+        let normName = window.smartArabicNormalize ? window.smartArabicNormalize(st.name) : st.name;
+        if (normName && normName.length >= 5 && normSentence.includes(normName)) {
+            return st;
+        }
+    }
+    return null;
+};
+
+// =========================================================
+// 🧠 5. العقل التنفيذي الشامل (ينفذ كل مهام السيستم أوتوماتيك)
+// =========================================================
+window.processOctoAiBrain = async function(rawInput) {
+    const text = window.smartArabicNormalize ? window.smartArabicNormalize(rawInput) : rawInput.trim().toLowerCase();
+    const allSt = Array.isArray(students) ? students : [];
+    const allGrps = Array.isArray(groups) ? groups : [];
+    const allSess = Array.isArray(classSessions) ? classSessions : [];
+    const allEx = Array.isArray(exams) ? exams : [];
+    const allHw = Array.isArray(homeworks) ? Array.from(homeworks) : [];
+    const allBks = Array.isArray(books) ? books : [];
+
+    // ---------------------------------------------------------
+    // 1️⃣ كتالوج الأوامر الشامل (تعليم أي مستخدم أو مساعد جديد)
+    // ---------------------------------------------------------
+    if (text.includes("كل الاوامر") || text.includes("كتالوج") || text.includes("بتعمل ايه") || text.includes("ازاي") || text.includes("شرح")) {
+        return `
+            👑 <strong>كتالوج الأوامر التنفيذية لـ "أوكتو AI":</strong><br>
+            اكتب لي أي أمر من دول وهنفذه فوراً مكانك:<br><br>
+            📋 <strong>الحضور والحصص:</strong><br>
+            • <code>افتح حصة لمجموعة [اسمها] بعنوان [الموضوع]</code><br>
+            • <code>حضر الطالب [الكود/الاسم]</code> أو <code>سجل متأخر للطالب [الكود]</code><br><br>
+            📝 <strong>الامتحانات والواجبات والنقاط:</strong><br>
+            • <code>رصد امتحان للطالب [الكود] درجة [45]</code><br>
+            • <code>رصد واجب للطالب [الكود] درجة [20]</code><br>
+            • <code>كافئ الطالب [الكود] بـ 10 نقاط</code> أو <code>اخصم 5 نقاط من [الكود]</code><br><br>
+            💰 <strong>الماليات والكتب وكروت الشحن:</strong><br>
+            • <code>تحصيل من الطالب [الكود]</code> (يسجل دفع الحصة/الشهر)<br>
+            • <code>سجل مصروف 150 تصوير ملازم</code><br>
+            • <code>استلام 500 من سنتر [اسم السنتر]</code> (حسابات الكتب)<br>
+            • <code>توليد 20 كارت شحن بـ 100</code><br><br>
+            🔄 <strong>إدارة الطلاب والمنصة:</strong><br>
+            • <code>انقل الطالب [الكود] لمجموعة [اسم المجموعة]</code><br>
+            • <code>اوقف الطالب [الكود]</code> أو <code>فعل الطالب [الكود]</code><br>
+            • <code>ابعت اشعار للكل: [نص الإشعار]</code>`;
+    }
+
+    // ---------------------------------------------------------
+    // 2️⃣ تنفيذ فوري: تحضير أو تأخير أو تغييب طالب من الشات
+    // ---------------------------------------------------------
+    if (text.includes("حضر") || text.includes("تسجيل حضور") || text.includes("سجل متاخر") || text.includes("غيب")) {
+        let targetSt = window.extractStudentFromSentence(rawInput);
+        if (!targetSt) return `⚠️ لم أتعرف على كود أو اسم الطالب! اكتب مثلاً: <code>حضر الطالب 105</code>`;
+
+        // تحديد الحصة المستهدفة (المفتوحة حالياً أو آخر حصة لمجموعة الطالب)
+        let targetSess = currentActiveSessionId
+            ? allSess.find(s => s.id === currentActiveSessionId)
+            : [...allSess].reverse().find(s => s.group === targetSt.group && s.status !== 'closed');
+
+        if (!targetSess) return `⚠️ لا توجد حصة مفتوحة حالياً لمجموعة (${targetSt.group})! اكتب أولاً: <code>افتح حصة لمجموعة ${targetSt.group}</code>`;
+
+        let status = text.includes("متاخر") ? "late" : (text.includes("غيب") ? "absent" : "present");
+        let statusAr = status === "present" ? "حاضر ✅" : (status === "late" ? "متأخر ⏳" : "غائب ❌");
+
+        if (!targetSess.attendance) targetSess.attendance = {};
+        targetSess.attendance[targetSt.code] = status;
+        localStorage.setItem("classSessions", JSON.stringify(classSessions));
+        if (currentActiveSessionId === targetSess.id && typeof renderAttendanceTable === "function") {
+            renderAttendanceTable(targetSess);
+        }
+
+        return `✅ <strong>تم التنفيذ فوراً!</strong><br>سجلت الطالب <strong>${targetSt.name} (${targetSt.code})</strong> كـ <strong>${statusAr}</strong> في حصة (${targetSess.group} - ${targetSess.date}).`;
+    }
+
+    // ---------------------------------------------------------
+    // 3️⃣ تنفيذ فوري: رصد درجة امتحان أو واجب لطالب
+    // ---------------------------------------------------------
+    if (text.includes("رصد") || text.includes("درجه")) {
+        let targetSt = window.extractStudentFromSentence(rawInput);
+        // استخراج الأرقام واستبعاد كود الطالب منها للحصول على الدرجة
+        let allNums = rawInput.match(/\d+(\.\d+)?/g) || [];
+        let gradeVal = allNums.find(n => String(n) !== String(targetSt?.code));
+
+        if (targetSt && gradeVal !== undefined) {
+            let isHw = text.includes("واجب");
+            if (isHw) {
+                let targetHw = currentActiveHwId
+                    ? allHw.find(h => h.id === currentActiveHwId)
+                    : [...allHw].reverse().find(h => h.group === targetSt.group);
+                if (!targetHw) return `⚠️ لا يوجد واجب مسجل لمجموعة (${targetSt.group})!`;
+
+                if (!targetHw.grades) targetHw.grades = {};
+                targetHw.grades[targetSt.code] = parseFloat(gradeVal);
+                localStorage.setItem("homeworks", JSON.stringify(homeworks));
+                if (currentActiveHwId === targetHw.id && typeof openHwDetails === "function") openHwDetails(targetHw.id);
+
+                return `📚 <strong>تم رصد درجة الواجب بنجاح!</strong><br>الطالب: <strong>${targetSt.name}</strong><br>الواجب: ${targetHw.name}<br>الدرجة: <strong>${gradeVal} / ${targetHw.maxScore}</strong>`;
+            } else {
+                let targetEx = currentActiveExamId
+                    ? allEx.find(e => e.id === currentActiveExamId)
+                    : [...allEx].reverse().find(e => e.group === targetSt.group);
+                if (!targetEx) return `⚠️ لا يوجد امتحان مسجل لمجموعة (${targetSt.group})!`;
+
+                if (!targetEx.grades) targetEx.grades = {};
+                targetEx.grades[targetSt.code] = parseFloat(gradeVal);
+                localStorage.setItem("exams", JSON.stringify(exams));
+                if (currentActiveExamId === targetEx.id && typeof openExamDetails === "function") openExamDetails(targetEx.id);
+
+                return `📝 <strong>تم رصد درجة الامتحان بنجاح!</strong><br>الطالب: <strong>${targetSt.name}</strong><br>الامتحان: ${targetEx.name}<br>الدرجة: <strong style="color:#10b981;">${gradeVal} / ${targetEx.maxScore}</strong>`;
+            }
+        }
+    }
+
+    // ---------------------------------------------------------
+    // 4️⃣ تنفيذ فوري: تحصيل مالي من طالب أو تسجيل مصروف بالخزنة
+    // ---------------------------------------------------------
+    if (text.includes("تحصيل") || text.includes("دفع")) {
+        let targetSt = window.extractStudentFromSentence(rawInput);
+        if (!targetSt) return `⚠️ اذكر كود أو اسم الطالب! مثال: <code>تحصيل من الطالب 105</code>`;
+
+        let targetSess = currentActiveSessionId
+            ? allSess.find(s => s.id === currentActiveSessionId)
+            : [...allSess].reverse().find(s => s.group === targetSt.group);
+        if (!targetSess) return `⚠️ لا توجد حصة مسجلة لمجموعة (${targetSt.group}) لتحصيل المبلغ فيها!`;
+
+        let grpObj = allGrps.find(g => g.name === targetSess.group) || {};
+        let payType = grpObj.payType || 'session';
+        let amount = targetSt.isSpecialCase ? (parseFloat(targetSt.specialAmount) || 0) : (parseFloat(grpObj.price) || 50);
+
+        let recKey = `fin_session_${targetSess.id}`;
+        if (!financeRecords[recKey]) financeRecords[recKey] = {};
+        financeRecords[recKey][targetSt.code] = { status: 'paid', type: payType, amount: amount, date: new Date().toISOString() };
+        localStorage.setItem("financeRecords", JSON.stringify(financeRecords));
+
+        if (payType === 'month') {
+            let mKey = targetSess.date.substring(0, 7);
+            if (!window.monthlyPayments[targetSt.code]) window.monthlyPayments[targetSt.code] = {};
+            window.monthlyPayments[targetSt.code][mKey] = true;
+            localStorage.setItem("monthlyPayments", JSON.stringify(window.monthlyPayments));
+        }
+        if (typeof renderFinanceTable === "function") renderFinanceTable();
+
+        return `💰 <strong>تم تحصيل النقدية وإضافتها للخزنة!</strong><br>الطالب: <strong>${targetSt.name}</strong><br>المبلغ المحصل: <strong style="color:#10b981;">${amount} ج.م</strong> (${payType === 'month' ? 'اشتراك شهر' : 'حصة'}).`;
+    }
+
+    if (text.includes("مصروف") || text.includes("مصاريف")) {
+        let nums = rawInput.match(/\d+/g);
+        if (nums && nums.length > 0) {
+            let expVal = parseFloat(nums[0]);
+            let targetSess = currentActiveSessionId ? allSess.find(s => s.id === currentActiveSessionId) : allSess[allSess.length - 1];
+            if (!targetSess) return `⚠️ افتح حصة أولاً لتسجيل المصروف عليها!`;
+
+            let desc = rawInput.replace(/سجل|مصروف|مصاريف|\d+|جنيه|ج/g, '').trim() || "مصروف إضافي";
+            expenses.push({ id: "exp_" + Date.now(), sessionId: targetSess.id, desc: desc, amount: expVal });
+            localStorage.setItem("expenses", JSON.stringify(expenses));
+            if (typeof renderFinanceTable === "function") renderFinanceTable();
+
+            return `📤 <strong>تم تسجيل المصروف بنجاح!</strong><br>البند: <strong>${desc}</strong><br>المبلغ: <strong style="color:#ef4444;">${expVal} ج.م</strong> (حصة ${targetSess.group}).`;
+        }
+    }
+
+    // ---------------------------------------------------------
+    // 5️⃣ تنفيذ فوري: مكافأة/خصم نقاط سلوك، أو نقل مجموعة، أو إيقاف/تفعيل طالب
+    // ---------------------------------------------------------
+    if (text.includes("نقاط") || text.includes("نقطه") || text.includes("كافئ") || text.includes("اخصم")) {
+        let targetSt = window.extractStudentFromSentence(rawInput);
+        let nums = rawInput.match(/\d+/g) || [];
+        let ptsVal = nums.find(n => String(n) !== String(targetSt?.code));
+        if (targetSt && ptsVal) {
+            let delta = (text.includes("اخصم") || text.includes("خصم")) ? -parseInt(ptsVal) : parseInt(ptsVal);
+            targetSt.behaviorPoints = (targetSt.behaviorPoints || 0) + delta;
+            localStorage.setItem("students", JSON.stringify(students));
+            return `🏆 <strong>تم تحديث نقاط الطالب (${targetSt.name})!</strong><br>${delta > 0 ? `تمت إضافة +${delta} نقطة 🌟` : `تم خصم ${delta} نقطة 🤫`}.`;
+        }
+    }
+
+    if (text.includes("انقل") || text.includes("نقل")) {
+        let targetSt = window.extractStudentFromSentence(rawInput);
+        let targetGrp = allGrps.find(g => text.includes(window.smartArabicNormalize(g.name)));
+        if (targetSt && targetGrp) {
+            let oldGrp = targetSt.group;
+            targetSt.group = targetGrp.name;
+            localStorage.setItem("students", JSON.stringify(students));
+            if (typeof renderTable === "function") renderTable();
+            return `🔄 <strong>تم نقل الطالب بنجاح!</strong><br>الطالب: <strong>${targetSt.name}</strong><br>من: (${oldGrp}) ⬅️ إلى: <strong style="color:#3b82f6;">(${targetGrp.name})</strong> مع الاحتفاظ بكامل سجله القديم.`;
+        }
+    }
+
+    if (text.includes("اوقف") || text.includes("ايقاف") || text.includes("فعل") || text.includes("تفعيل")) {
+        let targetSt = window.extractStudentFromSentence(rawInput);
+        if (targetSt) {
+            let suspend = text.includes("اوقف") || text.includes("ايقاف");
+            targetSt.isSuspended = suspend;
+            localStorage.setItem("students", JSON.stringify(students));
+            return suspend
+                ? `⛔ <strong>تم إيقاف حساب الطالب (${targetSt.name})!</strong> لن يتمكن من الدخول للمنصة أو التحضير بالباركود حتى تعيد تفعيله.`
+                : `✅ <strong>تم إعادة تفعيل حساب الطالب (${targetSt.name}) بنجاح!</strong>`;
+        }
+    }
+
+    // ---------------------------------------------------------
+    // 6️⃣ تنفيذ فوري: استلام نقدية كتب من سنتر
+    // ---------------------------------------------------------
+    if (text.includes("استلام") && (text.includes("سنتر") || text.includes("كتاب"))) {
+        let nums = rawInput.match(/\d+/g);
+        let matchedBook = allBks.find(b => text.includes(window.smartArabicNormalize(b.centerName)) || text.includes(window.smartArabicNormalize(b.bookName)));
+        if (nums && matchedBook) {
+            let amount = parseFloat(nums[0]);
+            matchedBook.receivedAmount = (parseFloat(matchedBook.receivedAmount) || 0) + amount;
+            localStorage.setItem("books", JSON.stringify(books));
+            if (typeof renderBooksTable === "function") renderBooksTable();
+            return `📘 <strong>تم تسجيل استلام نقدية الكتب!</strong><br>السنتر: <strong>${matchedBook.centerName}</strong> (${matchedBook.bookName})<br>المبلغ المستلم: <strong style="color:#10b981;">${amount} ج.م</strong>.`;
+        }
+    }
+
+    // ---------------------------------------------------------
+    // 7️⃣ تنفيذ فوري: إرسال إشعار مباشر لطلاب المنصة
+    // ---------------------------------------------------------
+    if (text.includes("اشعار") && (text.includes("ابعت") || text.includes("ارسل"))) {
+        let content = rawInput.split(/بعنوان|للطلاب|للكل|:/)[1] || rawInput.replace(/ابعت|ارسل|اشعار|للكل/g, '');
+        if (content && content.trim().length > 3 && typeof sendPlatformNotification === "function") {
+            await sendPlatformNotification("all", "📢 تنبيه هام من مستر أسامة رفعت", content.trim());
+            return `📢 <strong>تم بث الإشعار لجميع طلاب المنصة فوراً!</strong><br>النص: <em>"${content.trim()}"</em>`;
+        }
+    }
+
+    // ---------------------------------------------------------
+    // 8️⃣ توليد كروت شحن / فتح حصة / ملخص السيستم / بحث عن طالب
+    // ---------------------------------------------------------
+    if ((text.includes("توليد") || text.includes("اعمل") || text.includes("طلع")) && (text.includes("كارت") || text.includes("كروت") || text.includes("شحن"))) {
+        let nums = rawInput.match(/\d+/g);
+        if (nums && nums.length >= 2) {
+            let count = parseInt(nums[0]), amount = parseInt(nums[1]);
+            if (count > 50 && amount <= 50) { let t = count; count = amount; amount = t; }
+            switchPage('platform'); switchPlatformTab('codes');
+            document.getElementById("codeCount").value = count;
+            document.getElementById("codeAmount").value = amount;
+            generateChargeCodes();
+            return `✅ <strong>تم توليد ${count} كارت شحن فئة ${amount} ج.م فوراً!</strong>`;
+        }
+    }
+
+    if ((text.includes("افتح") || text.includes("انشئ")) && text.includes("حصه")) {
+        let matchedGrp = allGrps.find(g => text.includes(window.smartArabicNormalize(g.name)));
+        if (matchedGrp) {
+            let todayStr = new Date().toISOString().split('T')[0];
+            let topic = (rawInput.split(/بعنوان|موضوع/i)[1] || "حصة جديدة").trim();
+            let newId = Date.now().toString();
+            classSessions.push({ id: newId, group: matchedGrp.name, date: todayStr, topic: topic, status: "open", attendance: {} });
+            localStorage.setItem("classSessions", JSON.stringify(classSessions));
+            switchPage('attendance'); openSessionDetails(newId);
+            return `🚀 <strong>تم فتح حصة (${matchedGrp.name}) وتجهيز شاشة الباركود للرصد!</strong>`;
+        }
+        switchPage('attendance'); openModal('addSessionModal');
+        return `📋 فتحت لك نافذة إنشاء الحصة الآن!`;
+    }
+
+    if (text.includes("ملخص") || text.includes("تقرير") || text.includes("احصائيات") || text.includes("خزنه")) {
+        let totalInc = 0;
+        Object.keys(financeRecords || {}).forEach(k => {
+            Object.values(financeRecords[k] || {}).forEach(p => { if (p && p.status === 'paid') totalInc += (parseFloat(p.amount) || 0); });
+        });
+        return `
+            📊 <strong>تقرير هيستوريا الشامل:</strong><br>
+            • الطلاب: <strong>${allSt.length}</strong> | المجموعات: <strong>${allGrps.length}</strong><br>
+            • الحصص: <strong>${allSess.length}</strong> | الامتحانات: <strong>${allEx.length}</strong><br>
+            • إجمالي خزنة الحصص: <strong style="color:#10b981;">${totalInc.toLocaleString()} ج.م</strong><br>
+            <div style="margin-top:8px; display:flex; gap:6px;">
+                <button class="ai-quick-btn" onclick="switchPage('analytics'); closeShefoChat();">📈 فتح الرادار الشامل</button>
+            </div>`;
+    }
+
+    // 9️⃣ إذا كتب اسم أو كود طالب، يعرض بطاقة تحكم كاملة بالطالب داخل الشات
+    let cleanQuery = rawInput.replace(/طالب|بحث عن|بيانات|ملف|كود|هات/g, '').trim();
+    let foundSt = window.extractStudentFromSentence(rawInput) || (typeof findStudentByCodeOrName === "function" ? findStudentByCodeOrName(cleanQuery) : null);
+    if (foundSt) {
+        let waParent = (foundSt.parentPhone && foundSt.parentPhone !== "0") ? `https://wa.me/20${foundSt.parentPhone.replace(/^0+/, '')}` : null;
+        return `
+            🎓 <strong>لوحة التحكم السريعة للطالب:</strong><br>
+            • <strong>الاسم:</strong> ${foundSt.name} (${foundSt.isSuspended ? '<span style="color:red;">موقوف ⛔</span>' : '<span style="color:#10b981;">نشط ✅</span>'})<br>
+            • <strong>الكود:</strong> <strong style="color:#3b82f6;">${foundSt.code}</strong> | <strong>المجموعة:</strong> ${foundSt.group}<br>
+            • <strong>ولي الأمر:</strong> <span dir="ltr">${foundSt.parentPhone || '--'}</span><br>
+            <div style="margin-top:10px; display:flex; gap:5px; flex-wrap:wrap;">
+                <button class="ai-quick-btn" style="background:#10b981; color:#fff; border-color:#10b981;" onclick="executeQuickAiCommand('حضر الطالب ${foundSt.code}')">✅ تحضير</button>
+                <button class="ai-quick-btn" style="background:#f59e0b; color:#fff; border-color:#f59e0b;" onclick="executeQuickAiCommand('تحصيل من الطالب ${foundSt.code}')">💰 تحصيل</button>
+                <button class="ai-quick-btn" onclick="executeQuickAiCommand('كافئ الطالب ${foundSt.code} بـ 5 نقاط')">⭐ +5 نقاط</button>
+                <button class="ai-quick-btn" onclick="openStudentProfile('${foundSt.code}'); closeShefoChat();">👤 الملف</button>
+                ${waParent ? `<button class="ai-quick-btn" style="border-color:#10b981; color:#10b981;" onclick="window.open('${waParent}', '_blank')">💬 واتس</button>` : ''}
+            </div>`;
+    }
+
+    return `🤖 لم أفهم الأمر بدقة يا مستر! اضغط على <button class="ai-quick-btn" onclick="executeQuickAiCommand('كل الاوامر')">📖 كتالوج الأوامر</button> لترى كل ما يمكنني تنفيذه لك تلقائياً.`;
 };

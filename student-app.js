@@ -140,7 +140,7 @@ window.updateWalletUI = function() {
     if (homeBal) homeBal.innerText = balance;
     
     let pageBal = document.getElementById("wallet-page-balance");
-    if (pageBal) pageBal.innerHTML = `${balance} <span style="font-size: 24px; color: rgba(255,255,255,0.7);">ج.م</span>`;
+    if (pageBal) pageBal.innerHTML = `${balance} <span style="font-size: 24px; color: rgba(0, 0, 0, 0.7);">ج.م</span>`;
 };
 
 // 1. دالة استرجاع ودمج الرصيد والكورسات المحمية للطالب
@@ -1029,115 +1029,7 @@ window.redeemCode = async function() {
 
 // دالة التنقل بين الأسئلة (السلايدز)
 window.currentSlideIndex = 0;
-window.navigateSlide = function(step) {
-    let slides = document.querySelectorAll('.q-slide');
-    if(slides.length === 0) return;
-    
-    // إخفاء السؤال الحالي
-    slides[window.currentSlideIndex].style.display = 'none';
-    
-    // حساب الاندكس الجديد
-    window.currentSlideIndex += step;
-    
-    // إظهار السؤال الجديد بأنيميشن
-    slides[window.currentSlideIndex].style.display = 'block';
-    slides[window.currentSlideIndex].style.animation = 'none';
-    setTimeout(() => slides[window.currentSlideIndex].style.animation = 'fadeInUp 0.4s ease forwards', 10);
-};
 
-window.startExam = function(examId) {
-    currentExam = allOnlineExams.find(e => e.id === examId); 
-    if(!currentExam) return;
-    if(!confirm(`هل أنت مستعد؟ المدة: ${currentExam.duration} دقيقة.`)) return;
-    
-    document.getElementById("online-exams-list-screen").style.display = "none"; 
-    document.getElementById("active-exam-screen").style.display = "block";
-    document.getElementById("active-exam-title").innerText = currentExam.title;
-    
-    // إخفاء الزرار القديم لأننا هنضيفه جوه آخر سلايد
-    let oldSubmitBtn = document.getElementById("submitExamBtn");
-    if(oldSubmitBtn) oldSubmitBtn.style.display = "none";
-
-    const container = document.getElementById("exam-questions-render"); 
-    container.innerHTML = "";
-    window.currentSlideIndex = 0; // تصفير السلايد
-    
-    currentExam.questions.forEach((q, index) => {
-        let displayStyle = index === 0 ? "block" : "none";
-        
-        // الكارت الأساسي للسؤال
-        let qHtml = `<div class="q-slide" id="slide_${index}" style="display: ${displayStyle}; background: white; padding: 35px 30px; border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.05); border: 1px solid var(--border); margin-bottom: 20px;">`;
-        
-        // الهيدر بتاع السؤال (الدرجات والترتيب من اليمين)
-        qHtml += `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 2px dashed var(--border); padding-bottom: 15px; direction: rtl;">
-            <span style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; padding: 8px 20px; border-radius: 12px; font-weight: 900; font-size: 16px; border: 1px solid rgba(245, 158, 11, 0.3);">🎯 ${q.points} درجات</span>
-            <span style="color: var(--text-muted); font-weight: 900; background: var(--bg-color); padding: 8px 15px; border-radius: 12px;">السؤال ${index + 1} من ${currentExam.questions.length}</span>
-        </div>`;
-
-        // نص السؤال والاختيارات (بالإنجليزي من الشمال لليمين LTR)
-        qHtml += `<div style="direction: ltr; text-align: left; font-family: 'Segoe UI', Tahoma, sans-serif;">`;
-        qHtml += `<h3 style="color: var(--secondary); font-size: 24px; line-height: 1.6; margin: 0 0 25px 0;">${index + 1}. ${q.text}</h3>`;
-
-        if (q.type === 'mcq') { 
-            qHtml += `<div class="q-options" style="display: flex; flex-direction: column; gap: 12px;">`; 
-            q.options.forEach((opt, optIndex) => { 
-                qHtml += `<label style="display: flex; align-items: center; gap: 15px; background: var(--bg-color); border: 2px solid var(--border); padding: 15px 20px; border-radius: 15px; cursor: pointer; transition: 0.3s; font-size: 18px; font-weight: 600;"
-                onmouseover="this.style.borderColor='var(--primary)'" 
-                onmouseout="if(!this.querySelector('input').checked) this.style.borderColor='var(--border)'"
-                onclick="document.querySelectorAll('input[name=ans_${q.id}]').forEach(inp => {inp.parentElement.style.borderColor='var(--border)'; inp.parentElement.style.background='var(--bg-color)';}); this.style.borderColor='var(--primary)'; this.style.background='rgba(14, 165, 233, 0.05)';">
-                    <input type="radio" name="ans_${q.id}" value="${optIndex}" style="width: 22px; height: 22px; accent-color: var(--primary);"> 
-                    <span style="flex: 1;">${opt}</span>
-                </label>`; 
-            }); 
-            qHtml += `</div>`; 
-        } 
-        else if (q.type === 'tf') { 
-            qHtml += `
-            <div class="q-options" style="display: flex; gap: 20px;">
-                <label style="flex: 1; text-align: center; background: rgba(16, 185, 129, 0.05); border: 2px solid #10b981; padding: 20px; border-radius: 15px; cursor: pointer; font-size: 22px; font-weight: bold; color: #10b981; transition: 0.3s;" onclick="document.querySelectorAll('input[name=ans_${q.id}]').forEach(i=>{i.parentElement.style.background='transparent'; i.parentElement.style.opacity='0.5'}); this.style.background='rgba(16, 185, 129, 0.15)'; this.style.opacity='1';">
-                    <input type="radio" name="ans_${q.id}" value="true" style="display:none;"> ✔️ True
-                </label>
-                <label style="flex: 1; text-align: center; background: rgba(239, 68, 68, 0.05); border: 2px solid #ef4444; padding: 20px; border-radius: 15px; cursor: pointer; font-size: 22px; font-weight: bold; color: #ef4444; transition: 0.3s;" onclick="document.querySelectorAll('input[name=ans_${q.id}]').forEach(i=>{i.parentElement.style.background='transparent'; i.parentElement.style.opacity='0.5'}); this.style.background='rgba(239, 68, 68, 0.15)'; this.style.opacity='1';">
-                    <input type="radio" name="ans_${q.id}" value="false" style="display:none;"> ❌ False
-                </label>
-            </div>`; 
-        } 
-        else if (q.type === 'blank') { 
-            qHtml += `<input type="text" id="ans_${q.id}" class="custom-input" placeholder="Type your answer here..." style="font-size: 18px; padding: 15px; border-radius: 12px; border: 2px solid var(--border); width: 100%; direction: ltr; text-align: left;">`; 
-        } 
-        else if (q.type === 'essay') { 
-            qHtml += `<textarea id="ans_${q.id}" class="custom-input" rows="5" placeholder="Write your detailed answer here..." style="font-size: 18px; padding: 15px; border-radius: 12px; border: 2px solid var(--border); resize: vertical; width: 100%; direction: ltr; text-align: left;"></textarea>`; 
-        }
-        qHtml += `</div>`; // إغلاق ديف الـ LTR
-
-        // زراير التنقل (السابق والتالي)
-        qHtml += `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 35px; padding-top: 25px; border-top: 1px solid var(--border); direction: rtl;">
-            <button class="btn btn-secondary" style="width: auto; padding: 12px 30px; font-size: 16px; border-radius: 12px; opacity: ${index === 0 ? '0.3' : '1'}; pointer-events: ${index === 0 ? 'none' : 'auto'};" onclick="navigateSlide(-1)">السابق</button>
-            
-            ${index === currentExam.questions.length - 1 ? 
-                `<button class="btn slide-submit-btn" style="width: auto; background: var(--success); padding: 12px 30px; font-size: 18px; font-weight: 900; border-radius: 12px; box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);" onclick="submitOnlineExam()">تسليم الامتحان نهائياً ✅</button>` : 
-                `<button class="btn" style="width: auto; padding: 12px 40px; font-size: 18px; font-weight: 900; border-radius: 12px; box-shadow: 0 10px 20px rgba(14, 165, 233, 0.3);" onclick="navigateSlide(1)">التالي ⬅️</button>`
-            }
-        </div>`;
-
-        container.innerHTML += qHtml + `</div>`;
-    });
-    
-    // تفعيل التايمر
-    let timeInSeconds = currentExam.duration * 60; const timerDisplay = document.getElementById('exam-timer');
-    examTimerInterval = setInterval(() => { 
-        let m = Math.floor(timeInSeconds / 60), s = timeInSeconds % 60; 
-        timerDisplay.innerText = `${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`; 
-        
-        // تلوين التايمر بالأحمر لو فاضل دقيقة واحدة
-        if(timeInSeconds <= 60) timerDisplay.parentElement.style.background = "var(--danger)";
-        
-        if (timeInSeconds <= 0) { clearInterval(examTimerInterval); submitOnlineExam(true); } 
-        timeInSeconds--; 
-    }, 1000);
-}
 
 window.submitOnlineExam = async function(isTimeOut = false) {
     if (!isTimeOut && !confirm("هل أنت متأكد من تسليم الامتحان؟ (تأكد من إجابتك على جميع الأسئلة)")) return; 
@@ -1177,56 +1069,7 @@ window.submitOnlineExam = async function(isTimeOut = false) {
     }
 }
 
-// تعديل شاشة عرض الإجابات عشان تظهر LTR برضه
-window.reviewExam = function(examId) {
-    let exam = allOnlineExams.find(e => e.id === examId); 
-    let examSubs = window.studentSubmissions[examId] || {};
-    let sub = examSubs[currentStudent.code];
-    if (!sub && currentStudent.phone && String(currentStudent.phone).trim() !== "0") sub = examSubs[currentStudent.phone];
 
-    if(!exam || !sub) return;
-    document.getElementById("online-exams-list-screen").style.display = "none"; 
-    document.getElementById("review-exam-screen").style.display = "block";
-    
-    document.getElementById("review-exam-title").innerText = exam.title; 
-    document.getElementById("review-exam-score").innerText = sub.score; 
-    document.getElementById("review-exam-total").innerText = exam.totalScore;
-    
-    let container = document.getElementById("review-questions-render"); 
-    container.innerHTML = "";
-    
-    exam.questions.forEach((q, index) => {
-        let studentAns = sub.answers[q.id]; let qScore = 0; let isCorrect = false; let ansHtml = "";
-        
-        if (q.type === 'mcq') {
-            isCorrect = (studentAns === q.correctAnswerIndex); qScore = isCorrect ? q.points : 0;
-            ansHtml = `<div class="q-options" style="display: flex; flex-direction: column; gap: 10px;">`;
-            q.options.forEach((opt, optIndex) => {
-                let bg = "var(--bg-color)"; let border = "var(--border)"; let icon = "";
-                if (optIndex === q.correctAnswerIndex) { bg = "#d1fae5"; border = "#10b981"; icon = "✅"; }
-                else if (optIndex === studentAns && !isCorrect) { bg = "#fee2e2"; border = "#ef4444"; icon = "❌"; }
-                ansHtml += `<div style="background:${bg}; border: 2px solid ${border}; padding: 12px 15px; border-radius: 12px; font-size: 16px; font-weight: bold; display: flex; justify-content: space-between;"><span>${opt}</span> <span>${icon}</span></div>`;
-            });
-            ansHtml += `</div>`;
-        } else if (q.type === 'tf') {
-            isCorrect = (String(studentAns) === String(q.correctAnswerTF || q.correctAnswer)); qScore = isCorrect ? q.points : 0;
-            ansHtml = `<div style="background: ${isCorrect?'#d1fae5':'#fee2e2'}; padding:15px; border-radius:12px; font-weight:bold; border:2px solid ${isCorrect?'#10b981':'#ef4444'}; font-size: 18px;">Your Answer: ${studentAns==='true'?'True ✔️':'False ❌'} <br> Correct: ${(q.correctAnswerTF || q.correctAnswer)==='true'?'True ✔️':'False ❌'}</div>`;
-        } else {
-            qScore = (sub.manualGrades && sub.manualGrades[q.id] !== undefined) ? sub.manualGrades[q.id] : (studentAns === q.correctAnswerText ? q.points : 0);
-            ansHtml = `<div style="background:var(--bg-color); padding:15px; border-radius:12px; border:2px solid var(--border); font-weight:bold; font-size: 16px;">Your Answer: <span style="color: var(--primary);">${studentAns || 'No Answer'}</span></div>`;
-        }
-
-        container.innerHTML += `
-        <div style="background: white; padding: 30px; border-radius: 20px; border: 1px solid var(--border); box-shadow: 0 5px 15px rgba(0,0,0,0.03); margin-bottom: 20px; text-align: left; direction: ltr; font-family: 'Segoe UI', Tahoma, sans-serif;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px dashed var(--border); padding-bottom: 15px; direction: rtl;">
-                <span style="background: ${qScore > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${qScore > 0 ? '#10b981' : '#ef4444'}; padding: 8px 20px; border-radius: 12px; font-weight: 900; font-size: 16px; border: 1px solid ${qScore > 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'};">الدرجة: ${qScore} / ${q.points}</span>
-                <span style="color: var(--secondary); font-weight: 900; background: var(--bg-color); padding: 8px 15px; border-radius: 12px;">السؤال ${index + 1}</span>
-            </div>
-            <h3 style="color: var(--secondary); font-size: 22px; line-height: 1.5; margin: 0 0 20px 0;">${q.text}</h3>
-            ${ansHtml}
-        </div>`;
-    });
-};
         window.closeReviewScreen = function() { document.getElementById("review-exam-screen").style.display = "none"; document.getElementById("online-exams-list-screen").style.display = "block"; };
         window.backToDashboard = function() { document.getElementById("online-exams-list-screen").style.display = "none"; document.getElementById("app-layout").style.display = "block"; }
 
@@ -1257,156 +1100,172 @@ window.reviewExam = function(examId) {
 // 🎬 مشغل الكورسات (Playlist & Video Player) المحدث
 // ==========================================
 
-window.openCoursePlayer = function(courseId, startVideoIndex = 0) {
+window.historiaPlyrInstance = null;
+window.videoProgressTimer = null;
+
+window.playCourseVideo = async function(url, videoTitle, courseId, videoIndex, element = null) {
     let course = window.allLectures.find(l => l.id === courseId);
-    if(!course) return;
+    if (!course) return;
 
-    // إخفاء الشاشة الرئيسية وإظهار المشغل
-    document.body.classList.add("no-select");
-    document.getElementById("app-layout").style.display = "none";
-    document.getElementById("protected-course-screen").style.display = "flex";
-    document.getElementById("player-course-title").innerText = `${course.title}`;
+    let maxViews = parseInt(course.maxViews) || 0; 
+    let usedKey = currentStudent.code;
+    let trackingUrlCode = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/course_tracking/${courseId}/${usedKey}/${videoIndex}.json`;
+    let resCode = await fetch(trackingUrlCode);
+    let data = await resCode.json();
+
+    if (!data && currentStudent.phone && currentStudent.phone !== "0") {
+        let trackingUrlPhone = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/course_tracking/${courseId}/${currentStudent.phone}/${videoIndex}.json`;
+        let resPhone = await fetch(trackingUrlPhone);
+        data = await resPhone.json();
+        if (data && data.views > 0) usedKey = currentStudent.phone;
+    }
     
-    let watermark = document.getElementById("video-watermark");
-    if(watermark) watermark.innerHTML = `${currentStudent.name} <br> ${currentStudent.phone}`;
+    data = data || { views: 0 };
+    let extraViews = parseInt(data.extraViews) || 0;
+    let totalAllowed = maxViews + extraViews;
 
-    let vids = course.videos || [];
-    if(vids.length === 0 && course.url) vids.push({title: "المحاضرة كاملة", url: course.url, type: "free"});
+    let now = new Date();
+    let isViewCounted = false;
 
-    let playlistHtml = `<h4 style="color:#94a3b8; margin:0 0 20px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">محتويات الكورس</h4>`;
-    let hasPurchasedWholeCourse = currentStudent.purchasedCourses && currentStudent.purchasedCourses.includes(courseId);
-    let firstUnlockedIndex = -1;
-
-    // فحص الفيديوهات وبناء قائمة التشغيل
-    vids.forEach((v, idx) => {
-        let safeTitle = v.title.replace(/'/g, "\\'");
-        
-        let specificVideoId = `${courseId}_v${idx}`; 
-        let isVideoFree = v.type === 'free' || !v.type; 
-        let hasPurchasedVideo = currentStudent.purchasedCourses && (currentStudent.purchasedCourses.includes(specificVideoId) || hasPurchasedWholeCourse);
-
-        // فحص الحضور
-        let didAttend = false;
-        let linkedArr = [];
-        if (v.linkedSessions && Array.isArray(v.linkedSessions)) linkedArr = linkedArr.concat(v.linkedSessions);
-        if (v.linkedSession && !linkedArr.includes(v.linkedSession)) linkedArr.push(v.linkedSession);
-
-        if (linkedArr.length > 0 && window.allClassSessions) {
-            for (let sessId of linkedArr) {
-                let sessionObj = window.allClassSessions.find(s => String(s.id) === String(sessId));
-                if (sessionObj && sessionObj.attendance) {
-                    let status = sessionObj.attendance[currentStudent.code] || sessionObj.attendance[currentStudent.phone];
-                    if (status === 'present' || status === 'late' || (typeof status === 'object' && status.status === 'makeup')) {
-                        didAttend = true; break;
-                    }
-                }
-            }
-        }
-
-        // فحص الامتحانات
-        let isLockedByExam = false;
-        if (v.requiredExam) {
-            let examSubs = window.studentSubmissions ? window.studentSubmissions[v.requiredExam] : null;
-            let studentSub = examSubs ? (examSubs[currentStudent.code] || examSubs[currentStudent.phone]) : null;
-            
-            if (!studentSub) isLockedByExam = true;
-            else {
-                let requiredExamObj = allOnlineExams.find(e => e.id === v.requiredExam);
-                if (requiredExamObj) {
-                    let passScore = requiredExamObj.passScore || (requiredExamObj.totalScore / 2);
-                    if (studentSub.score < passScore) isLockedByExam = true;
-                }
-            }
-        }
-
-        let canWatch = (isVideoFree || hasPurchasedVideo || didAttend) && !isLockedByExam;
-        if (canWatch && firstUnlockedIndex === -1) firstUnlockedIndex = idx;
-        let isActive = idx === startVideoIndex && canWatch;
-
-        // رسم العنصر
-        if (canWatch) {
-            let bgStyle = isActive ? "background: rgba(59, 130, 246, 0.15); border-right: 4px solid #3b82f6; color: #3b82f6; font-weight: 900;" : "background: transparent; color: #94a3b8; border-right: 4px solid transparent; font-weight: bold;";
-            let icon = isActive ? '▶️' : '📺';
-
-            playlistHtml += `
-            <div class="playlist-item" data-index="${idx}" style="${bgStyle} padding:15px; border-radius:8px; margin-bottom:8px; cursor:pointer; transition:0.3s; display: flex; align-items: center; gap: 10px;" 
-                    onmouseover="if(this.getAttribute('data-active') !== 'true') this.style.background='rgba(255,255,255,0.05)'" 
-                    onmouseout="if(this.getAttribute('data-active') !== 'true') this.style.background='transparent'" 
-                    onclick="playCourseVideo('${v.url}', '${safeTitle}', '${course.id}', ${idx}, this)"
-                    data-active="${isActive ? 'true' : 'false'}">
-                <span class="vid-icon" style="font-size: 18px;">${icon}</span> 
-                <span style="flex: 1; font-size: 15px;">${v.title}</span>
-            </div>`;
+    if (data.lastRawTime) {
+        let lastTime = new Date(data.lastRawTime);
+        let diffMins = Math.floor((now - lastTime) / 60000);
+        if (diffMins < 10) {
+            if(typeof showToast === 'function') showToast("إعادة استكمال المشاهدة (لن تُخصم فرصة مشاهدة جديدة) 🔄", "info");
         } else {
-            playlistHtml += `
-            <div class="playlist-item locked" style="background: rgba(239, 68, 68, 0.05); color: #ef4444; border-right: 4px solid transparent; font-weight: bold; padding:15px; border-radius:8px; margin-bottom:8px; cursor:not-allowed; display: flex; align-items: center; gap: 10px; opacity: 0.7;"
-                 onclick="if(typeof showToast === 'function') showToast('🚫 هذا المحتوى مغلق! يجب شراؤه أو اجتياز امتحانه أولاً للتمكن من مشاهدته.', 'error'); else alert('🚫 هذا المحتوى مغلق!');">
-                <span class="vid-icon" style="font-size: 18px;">🔒</span> 
-                <span style="flex: 1; font-size: 15px; text-decoration: line-through;">${v.title}</span>
-            </div>`;
+            isViewCounted = true;
         }
-    });
-
-    document.getElementById("player-playlist").innerHTML = playlistHtml;
-
-    // تحديد الفيديو المستهدف للتشغيل
-    let targetIndex = -1;
-    let requestedVideo = vids[startVideoIndex];
-    if (requestedVideo) {
-        let specificVideoId = `${courseId}_v${startVideoIndex}`; 
-        let isVideoFree = requestedVideo.type === 'free' || !requestedVideo.type; 
-        let hasPurchasedVideo = currentStudent.purchasedCourses && (currentStudent.purchasedCourses.includes(specificVideoId) || hasPurchasedWholeCourse);
-        
-        let didAttend = false;
-        let linkedArr = [];
-        if (requestedVideo.linkedSessions && Array.isArray(requestedVideo.linkedSessions)) linkedArr = linkedArr.concat(requestedVideo.linkedSessions);
-        if (requestedVideo.linkedSession && !linkedArr.includes(requestedVideo.linkedSession)) linkedArr.push(requestedVideo.linkedSession);
-
-        if (linkedArr.length > 0 && window.allClassSessions) {
-            for (let sessId of linkedArr) {
-                let sessionObj = window.allClassSessions.find(s => String(s.id) === String(sessId));
-                if (sessionObj && sessionObj.attendance) {
-                    let status = sessionObj.attendance[currentStudent.code] || sessionObj.attendance[currentStudent.phone];
-                    if (status === 'present' || status === 'late' || (typeof status === 'object' && status.status === 'makeup')) { didAttend = true; break; }
-                }
-            }
-        }
-        
-        let isLockedByExam = false;
-        if (requestedVideo.requiredExam) {
-            let examSubs = window.studentSubmissions ? window.studentSubmissions[requestedVideo.requiredExam] : null;
-            let studentSub = examSubs ? (examSubs[currentStudent.code] || examSubs[currentStudent.phone]) : null;
-            if (!studentSub) isLockedByExam = true;
-            else {
-                let requiredExamObj = allOnlineExams.find(e => e.id === requestedVideo.requiredExam);
-                if (requiredExamObj) {
-                    let passScore = requiredExamObj.passScore || (requiredExamObj.totalScore / 2);
-                    if (studentSub.score < passScore) isLockedByExam = true;
-                }
-            }
-        }
-
-        if ((isVideoFree || hasPurchasedVideo || didAttend) && !isLockedByExam) {
-            targetIndex = startVideoIndex;
-        }
-    }
-
-    if (targetIndex === -1) targetIndex = firstUnlockedIndex;
-
-    // تشغيل الفيديو المسموح به
-    if(targetIndex !== -1 && vids.length > targetIndex) {
-        let element = document.querySelector('.playlist-item[data-index="'+targetIndex+'"]');
-        playCourseVideo(vids[targetIndex].url, vids[targetIndex].title, course.id, targetIndex, element);
     } else {
-        let iframe = document.getElementById("video-iframe");
-        if(iframe) iframe.src = ""; 
+        isViewCounted = true;
     }
+
+    if (isViewCounted && maxViews > 0 && data.views >= totalAllowed) {
+        if(typeof showToast === 'function') showToast("🚫 لقد استنفدت العدد المسموح لمشاهدة هذا الفيديو. يرجى مراجعة إدارة المستر.", "error");
+        else alert("🚫 لقد استنفدت العدد المسموح لمشاهدة هذا الفيديو.");
+        return; 
+    }
+
+    // تحديث الشكل في القائمة الجانبية
+    if (element) {
+        document.querySelectorAll('.playlist-item').forEach(item => {
+            item.setAttribute('data-active', 'false');
+            item.style.background = 'transparent';
+            item.style.color = '#94a3b8';
+            item.style.borderRight = '4px solid transparent';
+            item.style.fontWeight = 'bold';
+            let iconSpan = item.querySelector('.vid-icon');
+            if(iconSpan) iconSpan.innerText = '📺'; 
+        });
+
+        element.setAttribute('data-active', 'true');
+        element.style.background = 'rgba(59, 130, 246, 0.15)';
+        element.style.color = '#3b82f6';
+        element.style.borderRight = '4px solid #3b82f6';
+        element.style.fontWeight = '900';
+        let activeIconSpan = element.querySelector('.vid-icon');
+        if(activeIconSpan) activeIconSpan.innerText = '▶';
+    }
+
+    // استخراج كود فيديو اليوتيوب
+    let youtubeId = null;
+    try {
+        let parsedUrl = new URL(url);
+        if (parsedUrl.hostname.includes('youtube.com') || parsedUrl.hostname.includes('youtu.be')) {
+            youtubeId = parsedUrl.searchParams.get('v');
+            if (!youtubeId && parsedUrl.hostname === 'youtu.be') youtubeId = parsedUrl.pathname.substring(1);
+            if (youtubeId) youtubeId = youtubeId.split('&')[0];
+        }
+    } catch(e) {}
+
+    // تنظيف أي مشغل سابق
+    if (window.videoProgressTimer) clearInterval(window.videoProgressTimer);
+    if (window.historiaPlyrInstance) {
+        try { window.historiaPlyrInstance.destroy(); } catch(e) {}
+        window.historiaPlyrInstance = null;
+    }
+
+    let mountEl = document.getElementById("plyr-video-Mount");
+    let progressStorageKey = `historia_vid_pos_${currentStudent.code}_${courseId}_${videoIndex}`;
+    let savedSeconds = parseFloat(localStorage.getItem(progressStorageKey)) || 0;
+
+    if (youtubeId && typeof Plyr !== 'undefined' && mountEl) {
+        mountEl.innerHTML = `<div id="plyr-active-player" data-plyr-provider="youtube" data-plyr-embed-id="${youtubeId}"></div>`;
+        
+        window.historiaPlyrInstance = new Plyr('#plyr-active-player', {
+            controls: ['play-large', 'rewind', 'play', 'fast-forward', 'progress', 'current-time', 'duration', 'mute', 'volume', 'settings', 'fullscreen'],
+            settings: ['speed', 'quality'],
+            speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] },
+            seekTime: 10,
+            youtube: { noCookie: true, rel: 0, showinfo: 0, iv_load_policy: 3, modestbranding: 1 }
+        });
+
+        window.historiaPlyrInstance.on('ready', () => {
+            if (savedSeconds > 15) {
+                window.historiaPlyrInstance.currentTime = savedSeconds;
+                let mins = Math.floor(savedSeconds / 60);
+                let secs = Math.floor(savedSeconds % 60);
+                if (typeof showToast === 'function') {
+                    showToast(`▶️ تم استكمال المحاضرة تلقائياً من الدقيقة ${mins}:${secs < 10 ? '0'+secs : secs}`, "success");
+                }
+            }
+        });
+
+        // حفظ ثانية المشاهدة كل 5 ثوانٍ لاستكمالها لاحقاً
+        window.videoProgressTimer = setInterval(() => {
+            if (window.historiaPlyrInstance && window.historiaPlyrInstance.playing) {
+                let cur = window.historiaPlyrInstance.currentTime;
+                let dur = window.historiaPlyrInstance.duration;
+                if (cur > 10 && (!dur || cur < dur - 15)) {
+                    localStorage.setItem(progressStorageKey, cur);
+                }
+            }
+        }, 5000);
+
+    } else if (mountEl) {
+        // دعم روابط Google Drive أو أي منصة خارجية
+        mountEl.innerHTML = `<iframe id="video-iframe" src="${url}" style="width: 100%; height: 100%; border: none;" allowfullscreen></iframe>`;
+    }
+
+    // إظهار ملزمة الـ PDF ومفكرة الطالب
+    if (typeof window.renderLectureToolsBox === 'function') {
+        window.renderLectureToolsBox(courseId, videoIndex);
+    }
+
+    // تحديث عدد المشاهدات في الفايربيز
+    let newViewsCount = isViewCounted ? data.views + 1 : data.views;
+    let dateStr = now.toLocaleDateString('ar-EG') + " | " + now.toLocaleTimeString('ar-EG', { hour: 'numeric', minute: 'numeric', hour12: true });
     
-    // تفعيل الحماية
-    document.addEventListener('contextmenu', blockContext);
-    document.addEventListener('keydown', blockKeys);
-    window.addEventListener('blur', applyBlackout);
-    window.addEventListener('focus', removeBlackout);
+    let updateUrl = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/course_tracking/${courseId}/${usedKey}/${videoIndex}.json`;
+    await fetch(updateUrl, {
+        method: 'PUT', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ 
+            videoTitle: videoTitle, 
+            views: newViewsCount, 
+            lastSeen: dateStr, 
+            lastRawTime: now.toISOString(),
+            extraViews: extraViews 
+        })
+    });
+};
+
+window.closeCoursePlayer = function() {
+    if (window.videoProgressTimer) clearInterval(window.videoProgressTimer);
+    if (window.historiaPlyrInstance) {
+        try { window.historiaPlyrInstance.destroy(); } catch(e) {}
+        window.historiaPlyrInstance = null;
+    }
+    let mountEl = document.getElementById("plyr-video-Mount");
+    if (mountEl) mountEl.innerHTML = "";
+
+    document.body.classList.remove("no-select");
+    document.getElementById("protected-course-screen").style.display = "none";
+    document.getElementById("app-layout").style.display = "block";
+    
+    document.removeEventListener('contextmenu', blockContext);
+    document.removeEventListener('keydown', blockKeys);
+    window.removeEventListener('blur', applyBlackout);
+    window.removeEventListener('focus', removeBlackout);
 };
 // دالة مساعدة سريعة للفحص
 function canPlay(idx, vids, courseId, hasPurchasedWholeCourse) {
@@ -1445,140 +1304,281 @@ function canPlay(idx, vids, courseId, hasPurchasedWholeCourse) {
 }
 
 // ==========================================
-// 🎬 مشغل الكورسات (Playlist & Video Player) المحدث
+// 🌙 1. تفعيل الوضع الليلي للطالب
 // ==========================================
+window.toggleStudentDarkMode = function() {
+    document.body.classList.toggle('dark-mode');
+    let isDark = document.body.classList.contains('dark-mode');
+    localStorage.setItem('historia_student_dark', isDark ? 'true' : 'false');
+    let btn = document.getElementById('student-theme-btn');
+    if (btn) btn.innerText = isDark ? '☀️' : '🌙';
+};
+if (localStorage.getItem('historia_student_dark') === 'true') {
+    document.body.classList.add('dark-mode');
+    setTimeout(() => {
+        let btn = document.getElementById('student-theme-btn');
+        if (btn) btn.innerText = '☀️';
+    }, 300);
+}
 
-window.playCourseVideo = async function(url, videoTitle, courseId, videoIndex, element = null) {
-    let course = window.allLectures.find(l => l.id === courseId);
-    if (!course) return;
+// ==========================================
+// 🚀 2. نظام الامتحانات العالمي لمادة التاريخ (RTL + خرائط + شبكة أسئلة)
+// ==========================================
+window.currentSlideIndex = 0;
 
-    let maxViews = parseInt(course.maxViews) || 0; 
-    
-    // جلب داتا التراكر الخاصة بالطالب (نجرب بالكود الأول، ولو ملقيناش نجرب بالرقم عشان الداتا القديمة)
-    let usedKey = currentStudent.code;
-    let trackingUrlCode = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/course_tracking/${courseId}/${usedKey}/${videoIndex}.json`;
-    let resCode = await fetch(trackingUrlCode);
-    let data = await resCode.json();
+window.goToSlide = function(targetIndex) {
+    let slides = document.querySelectorAll('.q-slide');
+    if (slides.length === 0 || targetIndex < 0 || targetIndex >= slides.length) return;
+    slides[window.currentSlideIndex].style.display = 'none';
+    window.currentSlideIndex = targetIndex;
+    slides[window.currentSlideIndex].style.display = 'block';
+    window.updateQuestionNavigatorUI();
+};
 
-    if (!data) {
-        let trackingUrlPhone = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/course_tracking/${courseId}/${currentStudent.phone}/${videoIndex}.json`;
-        let resPhone = await fetch(trackingUrlPhone);
-        data = await resPhone.json();
-        if (data && data.views > 0) usedKey = currentStudent.phone;
-    }
-    
-    data = data || { views: 0 };
-    
-    // 💡 التعديل هنا: قراءة السماحية الإضافية من المستر
-    let extraViews = parseInt(data.extraViews) || 0;
-    let totalAllowed = maxViews + extraViews;
+window.navigateSlide = function(step) {
+    window.goToSlide(window.currentSlideIndex + step);
+};
 
-    // 🚀 **ميزة حماية المشاهدات الجديدة: منع احتساب مشاهدة جديدة قبل مرور 10 دقائق**
-    let now = new Date();
-    let isViewCounted = false; // هل هنحسب مشاهدة جديدة ولا لأ؟
+window.markQuestionAnswered = function(index) {
+    let navBtn = document.getElementById(`q_nav_btn_${index}`);
+    if (navBtn) navBtn.setAttribute('data-answered', 'true');
+    window.updateQuestionNavigatorUI();
+};
 
-    if (data.lastRawTime) { // لو كان متسجل وقت قبل كده
-        let lastTime = new Date(data.lastRawTime);
-        let diffMs = now - lastTime;
-        let diffMins = Math.floor(diffMs / 60000); // الفرق بالدقائق
-
-        if (diffMins < 10) {
-            // لو عدى أقل من 10 دقائق، اعتبره لسه بيتفرج ومتحسبش مشاهدة
-            if(typeof showToast === 'function') {
-                showToast("إعادة استكمال المشاهدة (لن تُخصم فرصة مشاهدة جديدة) 🔄", "info");
-            }
+window.updateQuestionNavigatorUI = function() {
+    document.querySelectorAll('.q-nav-dot').forEach((btn, idx) => {
+        let isAnswered = btn.getAttribute('data-answered') === 'true';
+        let isCurrent = idx === window.currentSlideIndex;
+        if (isCurrent) {
+            btn.style.background = 'var(--primary)';
+            btn.style.color = '#fff';
+            btn.style.transform = 'scale(1.12)';
+            btn.style.borderColor = 'var(--primary)';
+        } else if (isAnswered) {
+            btn.style.background = '#d1fae5';
+            btn.style.color = '#047857';
+            btn.style.borderColor = '#10b981';
+            btn.style.transform = 'scale(1)';
         } else {
-            isViewCounted = true; // عدى 10 دقائق، دي مشاهدة جديدة
+            btn.style.background = 'var(--card-bg)';
+            btn.style.color = 'var(--text-muted)';
+            btn.style.borderColor = 'var(--border)';
+            btn.style.transform = 'scale(1)';
         }
-    } else {
-         isViewCounted = true; // أول مرة يتفرج
-    }
-
-    // التحقق من लिमिट المشاهدات لو هنحسب مشاهدة جديدة
-    if (isViewCounted && maxViews > 0 && data.views >= totalAllowed) {
-        if(typeof showToast === 'function') {
-            showToast("🚫 لقد استنفدت العدد المسموح لمشاهدة هذا الفيديو. يرجى مراجعة إدارة المستر لتجديد الفرصة.", "error");
-        } else {
-            alert("🚫 لقد استنفدت العدد المسموح لمشاهدة هذا الفيديو.");
-        }
-        return; 
-    }
-
-    // التعديل الديناميكي للشكل في القائمة الجانبية
-    if (element) {
-        document.querySelectorAll('.playlist-item').forEach(item => {
-            item.setAttribute('data-active', 'false');
-            item.style.background = 'transparent';
-            item.style.color = '#94a3b8';
-            item.style.borderRight = '4px solid transparent';
-            item.style.fontWeight = 'bold';
-            let iconSpan = item.querySelector('.vid-icon');
-            if(iconSpan) iconSpan.innerText = '📺'; 
-        });
-
-        element.setAttribute('data-active', 'true');
-        element.style.background = 'rgba(59, 130, 246, 0.15)';
-        element.style.color = '#3b82f6';
-        element.style.borderRight = '4px solid #3b82f6';
-        element.style.fontWeight = '900';
-        let activeIconSpan = element.querySelector('.vid-icon');
-        if(activeIconSpan) activeIconSpan.innerText = '▶️️';
-    }
-
-    
-    let embedUrl = url;
-    try {
-        let parsedUrl = new URL(url);
-        if (parsedUrl.hostname.includes('youtube.com') || parsedUrl.hostname.includes('youtu.be')) {
-            let videoId = parsedUrl.searchParams.get('v');
-            if (!videoId && parsedUrl.hostname === 'youtu.be') videoId = parsedUrl.pathname.substring(1);
-            if (videoId) {
-                // استخدام النطاق الآمن ليوتيوب لمنع خطأ 153 ولإخفاء الفيديوهات المقترحة واللوجو
-                let cleanId = videoId.split('&')[0];
-                
-                // 🚀 أقوى بارامترات لإخفاء الهوية الخاصة باليوتيوب
-                embedUrl = `https://www.youtube-nocookie.com/embed/${cleanId}?rel=0&modestbranding=1&controls=1&iv_load_policy=3&fs=0&disablekb=1&playsinline=1&widget_referrer=${window.location.origin}`;
-            }
-        }
-    } catch(e) { 
-        if(url.includes("watch?v=")) embedUrl = url.replace("watch?v=", "youtube-nocookie.com/embed/");
-        else if(url.includes("youtu.be/")) embedUrl = url.replace("youtu.be/", "youtube-nocookie.com/embed/");
-        
-        if(embedUrl.includes("?")) embedUrl += "&rel=0&modestbranding=1&iv_load_policy=3"; 
-        else embedUrl += "?rel=0&modestbranding=1&iv_load_policy=3";
-    }
-    
-    document.getElementById("video-iframe").src = embedUrl;
-
-    // 🔄 **تحديث الداتا بناءً على شرط الـ 10 دقائق**
-    let newViewsCount = isViewCounted ? data.views + 1 : data.views;
-    let dateStr = now.toLocaleDateString('ar-EG') + " | " + now.toLocaleTimeString('ar-EG', { hour: 'numeric', minute: 'numeric', hour12: true });
-    
-    let updateUrl = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/course_tracking/${courseId}/${usedKey}/${videoIndex}.json`;
-    await fetch(updateUrl, {
-        method: 'PUT', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ 
-            videoTitle: videoTitle, 
-            views: newViewsCount, 
-            lastSeen: dateStr, 
-            lastRawTime: now.toISOString(), // ⏰ أضفنا ده عشان نحسب بيه الـ 10 دقايق بدقة
-            extraViews: extraViews 
-        })
     });
 };
 
-        window.closeCoursePlayer = function() {
-            document.getElementById("video-iframe").src = ""; 
-            document.body.classList.remove("no-select");
-            document.getElementById("protected-course-screen").style.display = "none";
-            document.getElementById("app-layout").style.display = "block";
-            
-            document.removeEventListener('contextmenu', blockContext);
-            document.removeEventListener('keydown', blockKeys);
-            window.removeEventListener('blur', applyBlackout);
-            window.removeEventListener('focus', removeBlackout);
-        };
+window.startExam = function(examId) {
+    currentExam = allOnlineExams.find(e => e.id === examId); 
+    if(!currentExam) return;
+    if(!confirm(`هل أنت مستعد لبدء الامتحان؟\n⏱️ المدة: ${currentExam.duration} دقيقة.`)) return;
+    
+    document.getElementById("online-exams-list-screen").style.display = "none"; 
+    document.getElementById("active-exam-screen").style.display = "block";
+    document.getElementById("active-exam-title").innerText = currentExam.title;
+    
+    let oldSubmitBtn = document.getElementById("submitExamBtn");
+    if(oldSubmitBtn) oldSubmitBtn.style.display = "none";
+
+    const container = document.getElementById("exam-questions-render"); 
+    window.currentSlideIndex = 0;
+
+    // 🧭 شريط شبكة أرقام الأسئلة العلوي (Question Navigator)
+    let navBarHtml = `
+    <div style="background: var(--card-bg); padding: 15px; border-radius: 18px; border: 1px solid var(--border); margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; box-shadow: var(--glass-shadow); direction: rtl;">
+        ${currentExam.questions.map((q, idx) => `
+            <button type="button" id="q_nav_btn_${idx}" class="q-nav-dot" onclick="goToSlide(${idx})" style="width: 38px; height: 38px; border-radius: 10px; border: 2px solid var(--border); font-weight: 900; font-size: 14px; cursor: pointer; transition: 0.2s;">
+                ${idx + 1}
+            </button>
+        `).join('')}
+    </div>`;
+
+    let slidesHtml = "";
+    const arabicLetters = ["أ", "ب", "ج", "د", "هـ", "و"];
+
+    currentExam.questions.forEach((q, index) => {
+        let displayStyle = index === 0 ? "block" : "none";
+        let imageHtml = q.imageUrl ? `
+            <div style="margin: 0 0 20px 0; text-align: center;">
+                <img src="${q.imageUrl}" alt="خريطة / صورة السؤال" style="max-width: 100%; max-height: 320px; border-radius: 16px; border: 2px solid var(--border); box-shadow: 0 8px 20px rgba(0,0,0,0.08); cursor: zoom-in;" onclick="window.open(this.src, '_blank')">
+                <span style="display: block; font-size: 11px; color: var(--text-muted); margin-top: 5px;">🔍 اضغط على الخريطة/الصورة لتكبيرها</span>
+            </div>` : "";
+
+        let qHtml = `<div class="q-slide" id="slide_${index}" style="display: ${displayStyle}; background: var(--card-bg); padding: 30px 25px; border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.05); border: 1px solid var(--border); margin-bottom: 20px; direction: rtl; text-align: right;">`;
+        
+        qHtml += `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 2px dashed var(--border); padding-bottom: 15px;">
+            <span style="color: var(--secondary); font-weight: 900; background: var(--bg-color); padding: 8px 16px; border-radius: 12px;">📜 السؤال ${index + 1} من ${currentExam.questions.length}</span>
+            <span style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; padding: 8px 20px; border-radius: 12px; font-weight: 900; font-size: 15px; border: 1px solid rgba(245, 158, 11, 0.3);">🎯 ${q.points} درجات</span>
+        </div>`;
+
+        qHtml += `<h3 style="color: var(--secondary); font-size: 21px; line-height: 1.7; margin: 0 0 20px 0; font-weight: 900;">${index + 1}. ${q.text}</h3>`;
+        qHtml += imageHtml;
+
+        if (q.type === 'mcq') { 
+            qHtml += `<div class="q-options" style="display: flex; flex-direction: column; gap: 12px;">`; 
+            q.options.forEach((opt, optIndex) => { 
+                let letterBadge = arabicLetters[optIndex] || (optIndex + 1);
+                
+                // دعم ذكي: قراءة الاختيار كنص (الامتحانات القديمة) أو كصورة ونص (الامتحانات الجديدة)
+                let optText = typeof opt === 'object' ? opt.text : opt;
+                let optImage = (typeof opt === 'object' && opt.image) ? `<img src="${opt.image}" style="max-height: 90px; border-radius: 8px; margin-right: 15px; border: 1px solid var(--border);">` : '';
+
+                qHtml += `<label style="display: flex; align-items: center; gap: 15px; background: var(--bg-color); border: 2px solid var(--border); padding: 15px 20px; border-radius: 16px; cursor: pointer; transition: 0.25s; font-size: 17px; font-weight: 700;"
+                onclick="document.querySelectorAll('input[name=ans_${q.id}]').forEach(inp => {inp.parentElement.style.borderColor='var(--border)'; inp.parentElement.style.background='var(--bg-color)';}); this.style.borderColor='var(--primary)'; this.style.background='rgba(152, 0, 0, 0.06)'; markQuestionAnswered(${index});">
+                    <input type="radio" name="ans_${q.id}" value="${optIndex}" style="width: 20px; height: 20px; accent-color: var(--primary);"> 
+                    <span style="background: var(--primary); color: white; width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 900;">${letterBadge}</span>
+                    <span style="flex: 1; display: flex; align-items: center;">${optText} ${optImage}</span>
+                </label>`; 
+            }); 
+            qHtml += `</div>`; 
+        }
+        else if (q.type === 'tf') { 
+            qHtml += `
+            <div class="q-options" style="display: flex; gap: 15px;">
+                <label style="flex: 1; text-align: center; background: rgba(16, 185, 129, 0.05); border: 2px solid #10b981; padding: 18px; border-radius: 16px; cursor: pointer; font-size: 20px; font-weight: 900; color: #10b981; transition: 0.3s;" onclick="document.querySelectorAll('input[name=ans_${q.id}]').forEach(i=>{i.parentElement.style.background='transparent'; i.parentElement.style.opacity='0.5'}); this.style.background='rgba(16, 185, 129, 0.15)'; this.style.opacity='1'; markQuestionAnswered(${index});">
+                    <input type="radio" name="ans_${q.id}" value="true" style="display:none;"> ✔️ العبارة صحيحة
+                </label>
+                <label style="flex: 1; text-align: center; background: rgba(239, 68, 68, 0.05); border: 2px solid #ef4444; padding: 18px; border-radius: 16px; cursor: pointer; font-size: 20px; font-weight: 900; color: #ef4444; transition: 0.3s;" onclick="document.querySelectorAll('input[name=ans_${q.id}]').forEach(i=>{i.parentElement.style.background='transparent'; i.parentElement.style.opacity='0.5'}); this.style.background='rgba(239, 68, 68, 0.15)'; this.style.opacity='1'; markQuestionAnswered(${index});">
+                    <input type="radio" name="ans_${q.id}" value="false" style="display:none;"> ❌ العبارة خاطئة
+                </label>
+            </div>`; 
+        } 
+        else if (q.type === 'blank') { 
+            qHtml += `<input type="text" id="ans_${q.id}" oninput="markQuestionAnswered(${index})" placeholder="اكتب إجابتك هنا..." style="font-size: 17px; padding: 15px; border-radius: 14px; border: 2px solid var(--border); width: 100%; direction: rtl; text-align: right; font-weight: bold;">`; 
+        } 
+        else if (q.type === 'essay') { 
+            qHtml += `<textarea id="ans_${q.id}" oninput="markQuestionAnswered(${index})" rows="4" placeholder="اكتب إجابتك المقالية بالتفصيل هنا..." style="font-size: 17px; padding: 15px; border-radius: 14px; border: 2px solid var(--border); resize: vertical; width: 100%; direction: rtl; text-align: right; font-weight: bold;"></textarea>`; 
+        }
+
+        qHtml += `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border);">
+            <button class="btn btn-secondary" style="width: auto; padding: 12px 28px; font-size: 16px; border-radius: 12px; opacity: ${index === 0 ? '0.3' : '1'}; pointer-events: ${index === 0 ? 'none' : 'auto'};" onclick="navigateSlide(-1)">➡️ السؤال السابق</button>
+            ${index === currentExam.questions.length - 1 ? 
+                `<button class="btn slide-submit-btn" style="width: auto; background: var(--success); padding: 12px 30px; font-size: 17px; font-weight: 900; border-radius: 12px;" onclick="submitOnlineExam()">تسليم الامتحان نهائياً ✅</button>` : 
+                `<button class="btn" style="width: auto; padding: 12px 35px; font-size: 17px; font-weight: 900; border-radius: 12px;" onclick="navigateSlide(1)">السؤال التالي ⬅️</button>`
+            }
+        </div></div>`;
+
+        slidesHtml += qHtml;
+    });
+
+    container.innerHTML = navBarHtml + slidesHtml;
+    window.updateQuestionNavigatorUI();
+    
+    let timeInSeconds = currentExam.duration * 60; 
+    const timerDisplay = document.getElementById('exam-timer');
+    if (examTimerInterval) clearInterval(examTimerInterval);
+    examTimerInterval = setInterval(() => { 
+        let m = Math.floor(timeInSeconds / 60), s = timeInSeconds % 60; 
+        timerDisplay.innerText = `${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`; 
+        if(timeInSeconds <= 60) timerDisplay.parentElement.style.background = "var(--danger)";
+        if (timeInSeconds <= 0) { clearInterval(examTimerInterval); submitOnlineExam(true); } 
+        timeInSeconds--; 
+    }, 1000);
+};
+
+// شاشة المراجعة بالعربية مع عرض الخريطة وتفسير ناتج التعلم
+window.reviewExam = function(examId) {
+    let exam = allOnlineExams.find(e => e.id === examId); 
+    let examSubs = window.studentSubmissions[examId] || {};
+    let sub = examSubs[currentStudent.code] || (currentStudent.phone !== "0" ? examSubs[currentStudent.phone] : null);
+
+    if(!exam || !sub) return;
+    document.getElementById("online-exams-list-screen").style.display = "none"; 
+    document.getElementById("review-exam-screen").style.display = "block";
+    
+    document.getElementById("review-exam-title").innerText = exam.title; 
+    document.getElementById("review-exam-score").innerText = sub.score; 
+    document.getElementById("review-exam-total").innerText = exam.totalScore;
+    
+    let container = document.getElementById("review-questions-render"); 
+    container.innerHTML = "";
+    
+    exam.questions.forEach((q, index) => {
+        let studentAns = sub.answers ? sub.answers[q.id] : undefined; 
+        let qScore = 0; let isCorrect = false; let ansHtml = "";
+        
+        if (q.type === 'mcq') { 
+            qHtml += `<div class="q-options" style="display: flex; flex-direction: column; gap: 12px;">`; 
+            q.options.forEach((opt, optIndex) => { 
+                let letterBadge = arabicLetters[optIndex] || (optIndex + 1);
+                
+                // دعم ذكي: قراءة الاختيار كنص (الامتحانات القديمة) أو كصورة ونص (الامتحانات الجديدة)
+                let optText = typeof opt === 'object' ? opt.text : opt;
+                let optImage = (typeof opt === 'object' && opt.image) ? `<img src="${opt.image}" style="max-height: 90px; border-radius: 8px; margin-right: 15px; border: 1px solid var(--border);">` : '';
+
+                qHtml += `<label style="display: flex; align-items: center; gap: 15px; background: var(--bg-color); border: 2px solid var(--border); padding: 15px 20px; border-radius: 16px; cursor: pointer; transition: 0.25s; font-size: 17px; font-weight: 700;"
+                onclick="document.querySelectorAll('input[name=ans_${q.id}]').forEach(inp => {inp.parentElement.style.borderColor='var(--border)'; inp.parentElement.style.background='var(--bg-color)';}); this.style.borderColor='var(--primary)'; this.style.background='rgba(152, 0, 0, 0.06)'; markQuestionAnswered(${index});">
+                    <input type="radio" name="ans_${q.id}" value="${optIndex}" style="width: 20px; height: 20px; accent-color: var(--primary);"> 
+                    <span style="background: var(--primary); color: white; width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 900;">${letterBadge}</span>
+                    <span style="flex: 1; display: flex; align-items: center;">${optText} ${optImage}</span>
+                </label>`; 
+            }); 
+            qHtml += `</div>`; 
+        } else if (q.type === 'tf') {
+            isCorrect = (String(studentAns) === String(q.correctAnswerTF || q.correctAnswer)); qScore = isCorrect ? q.points : 0;
+            ansHtml = `<div style="background: ${isCorrect?'#d1fae5':'#fee2e2'}; color: #0f172a; padding:15px; border-radius:12px; font-weight:bold; border:2px solid ${isCorrect?'#10b981':'#ef4444'}; font-size: 16px;">إجابتك: ${studentAns==='true'?'صحيحة ✔️':'خاطئة ❌'} <br> الإجابة النموذجية: ${(q.correctAnswerTF || q.correctAnswer)==='true'?'صحيحة ✔️':'خاطئة ❌'}</div>`;
+        } else {
+            qScore = (sub.manualGrades && sub.manualGrades[q.id] !== undefined) ? sub.manualGrades[q.id] : (studentAns === q.correctAnswerText ? q.points : 0);
+            ansHtml = `<div style="background:var(--bg-color); padding:15px; border-radius:12px; border:2px solid var(--border); font-weight:bold; font-size: 16px;">إجابتك: <span style="color: var(--primary);">${studentAns || 'لم يتم الإجابة'}</span></div>`;
+        }
+
+        let explanationHtml = q.explanation ? `
+            <div style="margin-top: 15px; background: rgba(16, 185, 129, 0.08); border-right: 4px solid #10b981; padding: 12px 15px; border-radius: 10px; font-size: 14px; font-weight: bold; color: var(--secondary);">
+                💡 <strong style="color: #059669;">تفسير ناتج التعلم:</strong> ${q.explanation}
+            </div>` : '';
+
+        let imgHtml = q.imageUrl ? `<img src="${q.imageUrl}" style="max-width:100%; max-height:220px; border-radius:12px; margin-bottom:15px; display:block;">` : '';
+
+        container.innerHTML += `
+        <div style="background: var(--card-bg); padding: 25px; border-radius: 20px; border: 1px solid var(--border); margin-bottom: 20px; text-align: right; direction: rtl;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px dashed var(--border); padding-bottom: 12px;">
+                <span style="color: var(--secondary); font-weight: 900;">السؤال ${index + 1}</span>
+                <span style="background: ${qScore > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${qScore > 0 ? '#10b981' : '#ef4444'}; padding: 6px 16px; border-radius: 10px; font-weight: 900;">الدرجة: ${qScore} / ${q.points}</span>
+            </div>
+            <h3 style="color: var(--secondary); font-size: 19px; line-height: 1.6; margin: 0 0 15px 0;">${q.text}</h3>
+            ${imgHtml}
+            ${ansHtml}
+            ${explanationHtml}
+        </div>`;
+    });
+};
+
+// ==========================================
+// 📄📝 3. عرض ملزمة الـ PDF ومفكرة الملاحظات داخل مشغل الفيديو
+// ==========================================
+window.renderLectureToolsBox = function(courseId, videoIndex) {
+    let course = window.allLectures.find(l => l.id === courseId);
+    if (!course) return;
+    let vid = (course.videos || [])[videoIndex] || {};
+    let playlistEl = document.getElementById("player-playlist");
+    if (!playlistEl) return;
+
+    let oldBox = document.getElementById("student-lecture-tools-box");
+    if (oldBox) oldBox.remove();
+
+    let noteKey = `historia_note_${currentStudent.code}_${courseId}_${videoIndex}`;
+    let savedNote = localStorage.getItem(noteKey) || "";
+
+    let pdfBtnHtml = vid.pdfUrl ? `
+        <a href="${vid.pdfUrl}" target="_blank" style="display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(45deg, #8b5cf6, #6d28d9); color: white; text-decoration: none; padding: 12px; border-radius: 12px; font-weight: 900; font-size: 14px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);">
+            📄 تحميل ملزمة المحاضرة (PDF)
+        </a>` : '';
+
+    let toolsDiv = document.createElement("div");
+    toolsDiv.id = "student-lecture-tools-box";
+    toolsDiv.style.cssText = "margin-top: 25px; padding-top: 20px; border-top: 1px dashed #334155;";
+    toolsDiv.innerHTML = `
+        ${pdfBtnHtml}
+        <h4 style="color: #f59e0b; margin: 0 0 10px 0; font-size: 14px;">📝 دون ملاحظاتك على المحاضرة:</h4>
+        <textarea id="studentLectureNoteInput" rows="4" placeholder="اكتب أهم التواريخ والشخصيات هنا ليتم حفظها لك..." style="width: 100%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; border-radius: 12px; padding: 12px; font-size: 13px; font-weight: bold; resize: vertical;">${savedNote}</textarea>
+        <button onclick="localStorage.setItem('${noteKey}', document.getElementById('studentLectureNoteInput').value); alert('✅ تم حفظ ملاحظاتك على هذه المحاضرة بنجاح!');" style="width: 100%; margin-top: 8px; background: #10b981; color: white; border: none; padding: 10px; border-radius: 10px; font-weight: 900; cursor: pointer;">💾 حفظ الملاحظات</button>
+    `;
+    playlistEl.appendChild(toolsDiv);
+};
+
+        
 
         function blockContext(e) { e.preventDefault(); }
         function blockKeys(e) { if(e.keyCode == 123 || e.keyCode == 44) { e.preventDefault(); return false; } }
@@ -1779,11 +1779,16 @@ window.openStudentCourseDetails = async function(courseId) {
                 <button class="btn" style="background: #94a3b8; padding: 8px 15px; width: auto; font-size: 13px; font-weight: bold; border-radius: 10px; cursor: not-allowed;" disabled>مغلق 🔐</button>
             </div>`;
         } else if (canWatch) {
-            // مفتوح وجاهز للتشغيل
+            // إضافة زر الـ PDF إذا كان متوفراً
+            let pdfBtn = v.pdfUrl ? `<a href="${v.pdfUrl}" target="_blank" class="btn" style="background: #8b5cf6; padding: 8px 15px; width: auto; font-size: 14px; font-weight: bold; border-radius: 10px; color: white; text-decoration: none;">📄 الملزمة</a>` : "";
+            
             playlistHtml += `
-            <div style="background: #f0fdf4; padding: 15px 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #10b981; margin-bottom: 10px;">
+            <div style="background: #f0fdf4; padding: 15px 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #10b981; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
                 <span style="font-weight: 900; color: #065f46; font-size: 16px;">▶️ ${v.title}</span>
-                <button class="btn" style="background: var(--success); padding: 8px 20px; width: auto; font-size: 14px; font-weight: bold; border-radius: 10px;" onclick="document.getElementById('studentCourseDetailsModal').style.display='none'; openCoursePlayer('${course.id}', ${idx})">تشغيل المحاضرة ▶️</button>
+                <div style="display: flex; gap: 10px;">
+                    ${pdfBtn}
+                    <button class="btn" style="background: var(--success); padding: 8px 20px; width: auto; font-size: 14px; font-weight: bold; border-radius: 10px;" onclick="document.getElementById('studentCourseDetailsModal').style.display='none'; openCoursePlayer('${course.id}', ${idx})">تشغيل المحاضرة ▶️</button>
+                </div>
             </div>`;
         } else {
             // محتاج يشتري
@@ -2168,3 +2173,519 @@ window.stopWalletScanner = function() {
     }
 };
 
+// ==========================================
+// 📲 نظام طلبات شحن المحفظة بالصورة (فودافون كاش / InstaPay)
+// ==========================================
+window.compressStudentReceiptImage = function(fileInputId) {
+    return new Promise((resolve) => {
+        let fileInput = document.getElementById(fileInputId);
+        if (!fileInput || !fileInput.files || !fileInput.files[0]) return resolve(null);
+        let file = fileInput.files[0];
+        let reader = new FileReader();
+        reader.onload = function(e) {
+            let img = new Image();
+            img.onload = function() {
+                let canvas = document.createElement('canvas');
+                let max = 650;
+                let w = img.width, h = img.height;
+                if (w > h && w > max) { h *= max / w; w = max; }
+                else if (h > max) { w *= max / h; h = max; }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', 0.6));
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+};
+
+window.submitWalletTopupRequest = async function() {
+    if (!currentStudent || !currentStudent.code) return alert("يرجى تسجيل الدخول أولاً!");
+    let method = document.getElementById("topupMethod").value;
+    let amount = parseFloat(document.getElementById("topupAmount").value);
+    let senderPhone = document.getElementById("topupSenderPhone").value.trim();
+    let fileInput = document.getElementById("topupReceiptFile");
+
+    if (!amount || amount <= 0 || !senderPhone) {
+        return alert("⚠️ يرجى إدخال المبلغ المحول والرقم المحول منه!");
+    }
+    if (!fileInput.files || fileInput.files.length === 0) {
+        return alert("📸 يرجى إرفاق صورة إيصال التحويل (Screenshot) لتأكيد العملية!");
+    }
+
+    let btn = document.getElementById("submitTopupReqBtn");
+    let origText = btn.innerHTML;
+    btn.innerHTML = "جاري رفع الإيصال وإرسال الطلب... ⏳";
+    btn.disabled = true;
+
+    try {
+        let receiptBase64 = await window.compressStudentReceiptImage("topupReceiptFile");
+        let reqId = "topup_" + Date.now();
+        let reqData = {
+            id: reqId,
+            studentCode: currentStudent.code,
+            studentName: currentStudent.name,
+            studentGroup: currentStudent.group,
+            method: method,
+            amount: amount,
+            senderPhone: senderPhone,
+            receiptImage: receiptBase64,
+            status: "pending", // pending | approved | rejected
+            date: new Date().toLocaleString('ar-EG')
+        };
+
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/wallet_requests/${reqId}.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(reqData)
+        });
+
+        document.getElementById("topupAmount").value = "";
+        document.getElementById("topupSenderPhone").value = "";
+        fileInput.value = "";
+
+        alert("🎉 تم إرسال طلب الشحن بنجاح! سيتم مراجعته من الإدارة وإضافة الرصيد لمحفظتك قريباً.");
+        window.loadStudentTopupRequests();
+    } catch (e) {
+        alert("حدث خطأ في الاتصال بالإنترنت!");
+    } finally {
+        btn.innerHTML = origText;
+        btn.disabled = false;
+    }
+};
+
+window.loadStudentTopupRequests = async function() {
+    let tbody = document.getElementById("student-topup-requests-tbody");
+    if (!tbody || !currentStudent) return;
+
+    try {
+        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/wallet_requests.json`);
+        let allReqs = await res.json() || {};
+        let myReqs = Object.values(allReqs).filter(r => r && String(r.studentCode) === String(currentStudent.code)).reverse();
+
+        if (myReqs.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">لا توجد طلبات شحن سابقة.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = myReqs.map(r => {
+            let badge = r.status === 'approved' 
+                ? `<span class="badge badge-present">تم الشحن ✅</span>` 
+                : r.status === 'rejected' 
+                ? `<span class="badge badge-absent">مرفوض ❌</span>` 
+                : `<span class="badge" style="background: #fef3c7; color: #d97706;">قيد المراجعة ⏳</span>`;
+            return `<tr>
+                <td style="font-size: 13px;">${r.date}</td>
+                <td>${r.method}</td>
+                <td><strong style="color: var(--primary);">${r.amount} ج.م</strong></td>
+                <td>${badge}</td>
+            </tr>`;
+        }).join('');
+    } catch (e) {}
+};
+
+
+
+// =========================================================
+// 💳 1. أنيميشن الكتابة الحية على بطاقة بنك هيستوريا (16 رقماً)
+// =========================================================
+window.formatAndAnimateBankCard = function(input) {
+    // قبول الأرقام فقط بحد أقصى 16 رقماً
+    let rawDigits = input.value.replace(/\D/g, '').substring(0, 16);
+    
+    // تقسيم الأرقام في حقل الإدخال كل 4 أرقام بمسافة
+    let formattedInput = rawDigits.replace(/(\d{4})(?=\d)/g, '$1 ');
+    input.value = formattedInput;
+
+    // تحديث اسم الطالب على البطاقة
+    let holderEl = document.getElementById('cardHolderStudentName');
+    if (holderEl && window.currentStudent && window.currentStudent.name) {
+        holderEl.innerText = window.currentStudent.name;
+    }
+
+    // تحريك البطاقة وإضاءة المجموعات الأربع أثناء الكتابة
+    let cardEl = document.getElementById('historiaVisualCard');
+    if (cardEl) {
+        cardEl.classList.add('typing-active');
+        clearTimeout(window.cardTypingTimer);
+        window.cardTypingTimer = setTimeout(() => cardEl.classList.remove('typing-active'), 600);
+    }
+
+    for (let g = 0; g < 4; g++) {
+        let groupSpan = document.getElementById(`cg-${g}`);
+        if (!groupSpan) continue;
+        let part = rawDigits.substring(g * 4, (g + 1) * 4);
+        let padded = part.padEnd(4, '#');
+        groupSpan.innerText = padded;
+
+        // تمييز المجموعة التي يكتب فيها الطالب الآن باللون الذهبي
+        let currentGroupIndex = Math.floor(Math.max(0, rawDigits.length - 1) / 4);
+        if (rawDigits.length > 0 && g === currentGroupIndex) {
+            groupSpan.classList.add('active-group');
+        } else {
+            groupSpan.classList.remove('active-group');
+        }
+    }
+};
+
+// =========================================================
+// 💰 2. دالة شحن الكود المحدثة (تقرأ الـ 16 رقماً الصافية)
+// =========================================================
+window.redeemCode = async function() {
+    if (window.isProcessingTransaction) return;
+
+    const codeInput = document.getElementById("rechargeCodeInput");
+    if (!codeInput) return;
+
+    // استخراج الأرقام فقط (إزالة المسافات أو الشرطات)
+    const cleanCode = codeInput.value.replace(/\D/g, '');
+    
+    const notify = (msg, type = 'success') => {
+        if (typeof showToast === 'function') showToast(msg, type);
+        else alert(msg);
+    };
+
+    if (!cleanCode || cleanCode.length !== 16) {
+        return notify("⚠️ يرجى إدخال رقم كارت الشحن كاملاً (16 رقماً)!", "error");
+    }
+    if (!currentStudent || !currentStudent.code) {
+        return notify("يرجى تسجيل الدخول أولاً!", "error");
+    }
+
+    window.isProcessingTransaction = true;
+    let btn = document.querySelector('button[onclick="redeemCode()"]');
+    let origText = btn ? btn.innerHTML : "شحن البطاقة الآن 🚀";
+    
+    if (btn) {
+        btn.innerHTML = "جاري التحقق والشحن... ⏳";
+        btn.disabled = true;
+        btn.style.opacity = "0.7";
+    }
+
+    try {
+        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/chargeCodes/${cleanCode}.json`);
+        let codeData = await res.json();
+        
+        if (!codeData) {
+            notify(`❌ رقم البطاقة (${cleanCode}) غير صحيح! تأكد من الأرقام.`, "error");
+            return;
+        }
+        
+        if (codeData.status === 'used') {
+            notify("⚠️ هذا الكارت تم شحنه واستخدامه مسبقاً!", "error");
+            return;
+        }
+
+        let amount = parseFloat(codeData.amount) || 0;
+
+        await window.syncStudentSafeVault();
+        currentStudent.walletBalance = (parseFloat(currentStudent.walletBalance) || 0) + amount;
+        await window.saveToStudentSafeVault();
+
+        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/chargeCodes/${cleanCode}.json`, { 
+            method: 'PATCH', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ 
+                status: "used",
+                usedBy: `${currentStudent.name} (${currentStudent.code})`,
+                usedAt: new Date().toLocaleString('ar-EG')
+            }) 
+        });
+
+        window.updateWalletUI();
+        codeInput.value = "";
+        window.formatAndAnimateBankCard(codeInput); // تصفير شكل البطاقة
+        notify(`🎉 تم شحن ${amount} ج.م بنجاح! رصيدك الآن ${currentStudent.walletBalance} ج.م`, "success");
+
+    } catch (e) { 
+        notify("حدث خطأ في الاتصال بالإنترنت!", "error"); 
+    } finally {
+        window.isProcessingTransaction = false;
+        if (btn) {
+            btn.innerHTML = origText;
+            btn.disabled = false;
+            btn.style.opacity = "1";
+        }
+    }
+};
+
+// تحديث التحقق من كود الضيف ليقرأ الـ 16 رقماً بدون مسافات
+window.verifyGuestCode = async function() {
+    let rawInput = document.getElementById("guestChargeCode").value;
+    let code = rawInput.replace(/\D/g, ''); // أرقام صافية فقط
+    let errorMsg = document.getElementById("guestErrorMsg1");
+    let btn = document.getElementById("verifyGuestCodeBtn");
+
+    if (!code || code.length !== 16) {
+        errorMsg.innerText = "يرجى إدخال رقم الكارت المكون من 16 رقماً!";
+        errorMsg.style.display = "block";
+        return;
+    }
+
+    errorMsg.style.display = "none";
+    btn.innerText = "جاري التحقق... ⏳";
+    btn.disabled = true;
+
+    try {
+        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/chargeCodes/${code}.json`);
+        let codeData = await res.json();
+
+        if (!codeData || codeData.status === 'used') {
+            errorMsg.innerText = "رقم الكارت غير صحيح أو تم استخدامه مسبقاً!";
+            errorMsg.style.display = "block";
+        } else {
+            window.validatedGuestCourseId = codeData.linkedCourseId || null;
+            window.validatedGuestCodeAmount = parseFloat(codeData.amount);
+            window.validatedGuestCodeString = code;
+            document.getElementById("guestCodeValueDisplay").innerText = window.validatedGuestCodeAmount;
+            document.getElementById("guest-step-1").style.display = "none";
+            document.getElementById("guest-step-2").style.display = "block";
+        }
+    } catch(e) {
+        errorMsg.innerText = "خطأ في الاتصال بالإنترنت!";
+        errorMsg.style.display = "block";
+    }
+    btn.innerText = "التحقق من الكود 🔍";
+    btn.disabled = false;
+};
+
+
+
+// =========================================================
+// ⚡ محرك OTP Animation V15 للدخول التلقائي الفوري
+// =========================================================
+window.focusFirstOtpBox = function() {
+    const boxes = document.querySelectorAll('#parentPhoneOtpContainer .otp-digit-box');
+    if (boxes.length > 0) boxes[0].focus();
+};
+
+window.syncOtpBoxesFromHiddenPhone = function(phoneStr) {
+    const boxes = document.querySelectorAll('#parentPhoneOtpContainer .otp-digit-box');
+    if (!boxes.length) return;
+    const clean = String(phoneStr || '').replace(/\D/g, '').substring(0, 11);
+    boxes.forEach((box, i) => {
+        box.value = clean[i] || '';
+        box.classList.toggle('filled', !!clean[i]);
+        box.classList.remove('error-state', 'success-state');
+    });
+    const hiddenInput = document.getElementById('parentPhone');
+    if (hiddenInput) hiddenInput.value = clean;
+};
+
+window.initOtpLoginSystem = function() {
+    const boxes = document.querySelectorAll('#parentPhoneOtpContainer .otp-digit-box');
+    const hiddenInput = document.getElementById('parentPhone');
+    if (!boxes.length || !hiddenInput) return;
+
+    const updateHiddenAndCheckAutoSubmit = () => {
+        let combined = '';
+        boxes.forEach(b => { combined += (b.value || ''); });
+        hiddenInput.value = combined;
+
+        // إذا اكتمل الـ 11 رقم (أو كتب 0 للطالب بدون رقم)، نفذ الدخول التلقائي فوراً
+        if (combined.length === 11) {
+            let codeVal = document.getElementById('studentCode')?.value.trim();
+            if (!codeVal) {
+                document.getElementById('studentCode')?.focus();
+                return;
+            }
+            // تفعيل أنيميشن Verifying مثل الصورة
+            let btn = document.getElementById('login-btn-action');
+            let btnTxt = document.getElementById('login-btn-text');
+            if (btn) btn.classList.add('verifying');
+            if (btnTxt) btnTxt.innerText = 'جاري التحقق والدخول...';
+            boxes.forEach(b => b.classList.add('success-state'));
+
+            setTimeout(() => {
+                fetchStudentData(false);
+            }, 250);
+        }
+    };
+
+    boxes.forEach((box, idx) => {
+        // عند كتابة رقم
+        box.addEventListener('input', (e) => {
+            let val = e.target.value.replace(/\D/g, '');
+            e.target.value = val ? val[val.length - 1] : '';
+            
+            boxes.forEach(b => b.classList.remove('error-state'));
+            document.getElementById('error-msg').style.display = 'none';
+
+            if (e.target.value) {
+                e.target.classList.add('filled');
+                if (idx < boxes.length - 1) {
+                    boxes[idx + 1].focus();
+                } else {
+                    e.target.blur(); // إغلاق الكيبورد على الموبايل عند آخر رقم
+                }
+            } else {
+                e.target.classList.remove('filled');
+            }
+            updateHiddenAndCheckAutoSubmit();
+        });
+
+        // التعامل مع زر المسح Backspace والأسهم
+        box.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace') {
+                if (!box.value && idx > 0) {
+                    boxes[idx - 1].value = '';
+                    boxes[idx - 1].classList.remove('filled', 'success-state');
+                    boxes[idx - 1].focus();
+                    e.preventDefault();
+                    updateHiddenAndCheckAutoSubmit();
+                } else {
+                    box.classList.remove('filled', 'success-state');
+                }
+            } else if (e.key === 'ArrowLeft' && idx > 0) {
+                boxes[idx - 1].focus();
+            } else if (e.key === 'ArrowRight' && idx < boxes.length - 1) {
+                boxes[idx + 1].focus();
+            }
+        });
+
+        // دعم لصق الرقم كاملاً (Paste) في أي مربع
+        box.addEventListener('paste', (e) => {
+            e.preventDefault();
+            let pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').substring(0, 11);
+            if (!pasted) return;
+            boxes.forEach((b, i) => {
+                b.value = pasted[i] || '';
+                b.classList.toggle('filled', !!pasted[i]);
+            });
+            let nextFocus = Math.min(pasted.length, boxes.length - 1);
+            boxes[nextFocus].focus();
+            updateHiddenAndCheckAutoSubmit();
+        });
+    });
+};
+
+// تهيئة الـ OTP فور تحميل الصفحة وربط حالة الخطأ
+document.addEventListener('DOMContentLoaded', () => {
+    window.initOtpLoginSystem();
+
+    // لو كان هناك رقم محفوظ في الـ localStorage، نوزعه في المربعات
+    const savedPhone = localStorage.getItem("historia_parent_phone");
+    if (savedPhone) window.syncOtpBoxesFromHiddenPhone(savedPhone);
+});
+
+// مراقبة رسائل الخطأ لإعادة زر الـ OTP لحالته وتنبيه المربعات باللون الأحمر
+const otpErrorObserver = new MutationObserver(() => {
+    const errEl = document.getElementById('error-msg');
+    const btn = document.getElementById('login-btn-action');
+    const btnTxt = document.getElementById('login-btn-text');
+    if (errEl && errEl.style.display === 'block') {
+        if (btn) { btn.classList.remove('verifying'); btn.disabled = false; }
+        if (btnTxt) btnTxt.innerText = 'تسجيل الدخول 🚀';
+        document.querySelectorAll('#parentPhoneOtpContainer .otp-digit-box').forEach(b => {
+            b.classList.remove('success-state');
+            b.classList.add('error-state');
+        });
+    }
+});
+if (document.getElementById('error-msg')) {
+    otpErrorObserver.observe(document.getElementById('error-msg'), { attributes: true, attributeFilter: ['style'] });
+}
+
+
+// =========================================================
+// 🎨 تطوير واجهة كروت الكورسات، الامتحانات، المتجر، والمشغل (V14 UI)
+// =========================================================
+
+// 1. دالة فتح مشغل الكورس المحمي وبناء القائمة الجانبية
+window.openCoursePlayer = function(courseId, startVideoIndex = 0) {
+    let course = window.allLectures.find(l => l.id === courseId);
+    if (!course) return;
+
+    document.getElementById("app-layout").style.display = "none";
+    let screen = document.getElementById("protected-course-screen");
+    screen.style.display = "flex";
+    document.body.classList.add("no-select");
+
+    document.getElementById("player-course-title").innerText = `🎬 ${course.title}`;
+    
+    let wm = document.getElementById("video-watermark");
+    if (wm && currentStudent) {
+        wm.innerHTML = `${currentStudent.name}<br>${currentStudent.code}`;
+    }
+
+    let playlistEl = document.getElementById("player-playlist");
+    let vids = course.videos || [];
+    let hasPurchasedWholeCourse = currentStudent.purchasedCourses && currentStudent.purchasedCourses.includes(courseId);
+
+    let html = `<h4 style="color:#f8fafc; margin:0 0 15px 0; font-size:16px; border-bottom:1px solid #1e293b; padding-bottom:12px;">📋 قائمة محاضرات الكورس</h4>`;
+    vids.forEach((v, idx) => {
+        let allowed = canPlay(idx, vids, courseId, hasPurchasedWholeCourse);
+        let safeTitle = (v.title || "").replace(/'/g, "\\'");
+        if (allowed) {
+            html += `
+            <div class="playlist-item" id="pl_item_${idx}" onclick="playCourseVideo('${v.url}', '${safeTitle}', '${course.id}', ${idx}, this)"
+                 style="padding: 14px 16px; border-radius: 14px; margin-bottom: 10px; cursor: pointer; display: flex; align-items: center; gap: 10px; color: #94a3b8; font-weight: bold; transition: 0.25s; background: rgba(255,255,255,0.03);">
+                <span class="vid-icon">📺</span>
+                <span style="flex: 1; font-size: 14px;">${v.title}</span>
+            </div>`;
+        } else {
+            html += `
+            <div style="padding: 14px 16px; border-radius: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; color: #475569; font-weight: bold; background: rgba(0,0,0,0.2); cursor: not-allowed;">
+                <span>🔒</span>
+                <span style="flex: 1; font-size: 14px;">${v.title} (مغلق)</span>
+            </div>`;
+        }
+    });
+
+    playlistEl.innerHTML = html;
+
+    document.addEventListener('contextmenu', blockContext);
+    document.addEventListener('keydown', blockKeys);
+
+    // تشغيل الفيديو المختار تلقائياً
+    let targetEl = document.getElementById(`pl_item_${startVideoIndex}`);
+    if (vids[startVideoIndex] && canPlay(startVideoIndex, vids, courseId, hasPurchasedWholeCourse)) {
+        playCourseVideo(vids[startVideoIndex].url, vids[startVideoIndex].title, course.id, startVideoIndex, targetEl);
+    }
+};
+
+// 2. تحديث شكل كروت الكورسات (Bento Course Cards)
+window.renderStudentLectures = function() {
+    let list = document.getElementById("studentLecturesList");
+    if (!list) return;
+    list.innerHTML = "";
+
+    let filteredLectures = window.allLectures.filter(lec => {
+        if (!lec || lec.isHidden === true) return false;
+        if (currentStudent.guestCourseOnly) return lec.id === currentStudent.guestCourseOnly;
+        let levelMatch = (lec.level === "all" || lec.level === currentStudent.level);
+        let trackMatch = (!lec.track || lec.track === 'all' || lec.track === (currentStudent.track || 'عام'));
+        return levelMatch && trackMatch;
+    });
+
+    if (filteredLectures.length === 0) {
+        list.innerHTML = `<div class="v14-surface-card" style="grid-column: 1/-1; text-align:center; padding: 45px; font-weight:bold; color:var(--text-muted);">📭 لا توجد كورسات متاحة لصفك الدراسي حالياً.</div>`;
+        return;
+    }
+
+    filteredLectures.forEach(lec => {
+        let maxViews = parseInt(lec.maxViews) || 0;
+        let viewsInfo = maxViews > 0 ? `👁️ ${maxViews} مشاهدات` : `👁️ مفتوح`;
+        let videosCount = (lec.videos || []).length;
+        let pdfCount = (lec.videos || []).filter(v => v && v.pdfUrl).length;
+
+        list.innerHTML += `
+        <div class="v14-course-card">
+            <div style="position: relative; height: 195px; overflow: hidden;">
+                <img src="${lec.image}" style="width: 100%; height: 100%; object-fit: cover;">
+                <div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(15,23,42,0.85), transparent 60%);"></div>
+                <div style="position: absolute; top: 14px; right: 14px; display: flex; gap: 6px; flex-wrap: wrap;">
+                    <span style="background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(8px); color: #fbbf24; padding: 5px 12px; border-radius: 50px; font-size: 12px; font-weight: 900;">${viewsInfo}</span>
+                    <span style="background: var(--primary); color: white; padding: 5px 12px; border-radius: 50px; font-size: 12px; font-weight: 900;">🎬 ${videosCount} محاضرة</span>
+                    ${pdfCount > 0 ? `<span style="background: #8b5cf6; color: white; padding: 5px 12px; border-radius: 50px; font-size: 12px; font-weight: 900;">📄 ${pdfCount} ملزمة</span>` : ''}
+                </div>
+                <h3 style="position: absolute; bottom: 14px; right: 18px; left: 18px; margin: 0; color: #ffffff; font-size: 20px; font-weight: 900;">${lec.title}</h3>
+            </div>
+            <div style="padding: 22px; display: flex; flex-direction: column; flex: 1;">
+                <p style="margin: 0 0 20px 0; font-size: 14px; color: var(--text-muted); font-weight: bold; line-height: 1.7;">${lec.desc || 'شاهد محاضرات الكورس وحمل ملازم الـ PDF الخاصة بالشرح.'}</p>
+                <button class="btn" style="margin-top: auto; border-radius: 16px; padding: 14px;" onclick="openStudentCourseDetails('${lec.id}')">▶️ استعراض محتويات الكورس</button>
+            </div>
+        </div>`;
+    });
+};
