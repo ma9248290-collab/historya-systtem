@@ -416,7 +416,7 @@ let licenseKey = "Historia_System_Master"; // 🔒 تثبيت إجباري لل�
 
 // الدالة دي بتولد مسار الداتابيز المخصوص للمدرس
 function getFirebaseUrl() {
-    return `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master/data.json`;
+    return `https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master/data.json`;
 }
 
 // ==========================================
@@ -454,7 +454,7 @@ let code = "Historia_System_Master";
 
         try {
             // 👑 فحص المدير
-            let settingsRes = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${code}/data/settings.json`);
+            let settingsRes = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${code}/data/settings.json`);
             let settings = await settingsRes.json();
             
             // 🔒 التعديل هنا: لو الداتابيز فاضية، هيدخلك باليوزر الافتراضي (admin) والباسورد (12345)
@@ -470,7 +470,7 @@ let code = "Historia_System_Master";
             }
             
             // 👥 فحص المساعد
-            let asstRes = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${code}/assistants/${user}.json`);
+            let asstRes = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${code}/assistants/${user}.json`);
             let asstData = await asstRes.json();
             
             if (asstData && asstData.password === pass) {
@@ -511,7 +511,7 @@ window.createAssistant = async function() {
     let orig = btn.innerText; btn.innerText = "جاري... ⏳";
 
     try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/assistants/${user}.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${uid}/assistants/${user}.json`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ password: pass, permissions: selectedPerms, createdAt: new Date().toISOString() })
         });
@@ -537,7 +537,7 @@ window.renderAssistants = async function() {
 
     tbody.innerHTML = `<tr><td colspan="3" style="text-align: center;">جاري التحميل...</td></tr>`;
     try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/assistants.json`);
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/assistants.json`);
         let data = await res.json() || {};
         
         tbody.innerHTML = "";
@@ -568,7 +568,7 @@ window.openEditPermissionsModal = async function(user) {
     
     try {
         // جلب صلاحيات المساعد الحالية من السيرفر
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/assistants/${user}.json`);
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/assistants/${user}.json`);
         let data = await res.json();
         let perms = data.permissions || ['dashboard','schedule','students','groups','attendance','homework','exams','leaderboard']; 
 
@@ -593,7 +593,7 @@ window.saveEditedPermissions = async function() {
     
     try {
         // تحديث الصلاحيات فقط في الفايربيز (بدون مسح الباسورد)
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/assistants/${user}.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/assistants/${user}.json`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ permissions: selectedPerms })
@@ -611,7 +611,7 @@ window.saveEditedPermissions = async function() {
 window.deleteAssistant = async function(user) {
     if(!confirm(`هل تريد حذف المساعد: ${user} نهائياً؟`)) return;
     try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/assistants/${user}.json`, { method: 'DELETE' });
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/assistants/${user}.json`, { method: 'DELETE' });
         renderAssistants();
     } catch(e) {}
 };
@@ -733,23 +733,332 @@ async function activateSoftware() {
     } catch (e) { showToast("عطل في الاتصال بالخادم", "error"); }
 }
 
- 
+// =========================================================
+// 🛡️ محرك المزامنة الذكي المزدوج (Smart Two-Way Sync Engine)
+// يمنع ضياع الحضور الأوفلاين ويحمي تعديلات الأجهزة الأخرى الأونلاين
+// =========================================================
 
-window.isIncomingSync = false; 
+window.isIncomingSync = false;
+window.isSyncingNow = false;
+window.hasPendingOfflineChanges = localStorage.getItem("hasPendingOfflineChanges") === "true";
+
 const originalSetItem = localStorage.setItem;
 const keysToSync = ["students", "classSessions", "exams", "homeworks", "schedule", "groups", "financeRecords", "expenses", "books", "monthlyPayments", "onlineExams"];
 
+// 1️⃣ مراقبة أي تعديل محلي وتسجيل ختم زمني له (Timestamp)
 localStorage.setItem = function(k, v) {
     originalSetItem.apply(this, arguments);
-    
-    // 🚀 التعديل السحري (Debounce): تجميع كل الحفظ ورفعه مرة واحدة للسيرفر كل 3 ثواني بدل ما يرفع مع كل طالب ويهنج المتصفح
+
     if (keysToSync.includes(k) && !window.isIncomingSync) {
+        // تسجيل أن هناك تعديلات محلية لم تُرفع بعد (مهم جداً لوضع الأوفلاين)
+        originalSetItem.call(localStorage, "hasPendingOfflineChanges", "true");
+        originalSetItem.call(localStorage, "lastLocalEditTime", Date.now().toString());
+        window.hasPendingOfflineChanges = true;
+
+        updateNetworkBadgeUI(navigator.onLine ? "syncing" : "offline");
+
         clearTimeout(window.syncTimeoutTimer);
         window.syncTimeoutTimer = setTimeout(() => {
-            if(typeof syncDataToBot === 'function') syncDataToBot();
-        }, 3000); 
+            if (navigator.onLine) {
+                window.smartTwoWaySync();
+            } else {
+                updateNetworkBadgeUI("offline");
+            }
+        }, 2500);
     }
 };
+
+// 2️⃣ تحديث شكل مؤشر الإنترنت في القائمة الجانبية
+function updateNetworkBadgeUI(state) {
+    const dot = document.getElementById("network-status-dot");
+    const txt = document.getElementById("network-status-text");
+    const badge = document.getElementById("network-status-badge");
+    if (!dot || !txt || !badge) return;
+
+    if (state === "online") {
+        dot.style.background = "#10b981";
+        dot.style.boxShadow = "0 0 6px #10b981";
+        txt.innerText = "متصل ومزامن ✅";
+        badge.style.color = "#10b981";
+        badge.style.background = "rgba(16, 185, 129, 0.1)";
+    } else if (state === "syncing") {
+        dot.style.background = "#f59e0b";
+        dot.style.boxShadow = "0 0 6px #f59e0b";
+        txt.innerText = "جاري دمج وحفظ البيانات... ⏳";
+        badge.style.color = "#f59e0b";
+        badge.style.background = "rgba(245, 158, 11, 0.1)";
+    } else {
+        dot.style.background = "#ef4444";
+        dot.style.boxShadow = "0 0 6px #ef4444";
+        txt.innerText = "أوفلاين (محفوظ بالجهاز) 🔒";
+        badge.style.color = "#ef4444";
+        badge.style.background = "rgba(239, 68, 68, 0.1)";
+    }
+}
+
+// 3️⃣ خوارزمية الدمج الذكي (تدمج الداتا المحلية مع السحابية بدون مسح أي طرف)
+function mergeLocalAndCloudData(cloudData) {
+    cloudData = cloudData || {};
+
+    // أ. دمج الحصص وسجل الحضور (الأولوية القصوى لعدم ضياع أي تحضير)
+    const cloudSessions = Array.isArray(cloudData.classSessions) ? cloudData.classSessions : Object.values(cloudData.classSessions || {}).filter(Boolean);
+    const localSessions = Array.isArray(classSessions) ? classSessions : [];
+    const sessionMap = new Map();
+
+    // وضع حصص السحابة أولاً
+    cloudSessions.forEach(cs => {
+        if (cs && cs.id) sessionMap.set(String(cs.id), JSON.parse(JSON.stringify(cs)));
+    });
+
+    // دمج حصص الجهاز المحلي فوقها بذكاء
+    localSessions.forEach(ls => {
+        if (!ls || !ls.id) return;
+        const idStr = String(ls.id);
+        if (!sessionMap.has(idStr)) {
+            // حصة تم إنشاؤها في الأوفلاين -> نحتفظ بها كاملة
+            sessionMap.set(idStr, ls);
+        } else {
+            const cs = sessionMap.get(idStr);
+            
+            // 🔥 دمج كشف الحضور طالب بطالب
+            const mergedAtt = { ...(cs.attendance || {}) };
+            const localAtt = ls.attendance || {};
+
+            Object.keys(localAtt).forEach(stCode => {
+                const localVal = localAtt[stCode];
+                const cloudVal = mergedAtt[stCode];
+
+                // إذا كان الطالب محضراً محلياً (حاضر / متأخر / تعويض) وكان في السحابة غير مسجل أو غائب، نأخذ الحضور المحلي!
+                if (!cloudVal || cloudVal === 'absent' || cloudVal === 'none') {
+                    mergedAtt[stCode] = localVal;
+                } else {
+                    // لو متسجل في الاتنين، نأخذ التعديل الأحدث بناءً على وقت التسجيل
+                    const localTs = ls.attendanceLog?.[stCode]?.ts || 0;
+                    const cloudTs = cs.attendanceLog?.[stCode]?.ts || 0;
+                    if (localTs >= cloudTs) {
+                        mergedAtt[stCode] = localVal;
+                    }
+                }
+            });
+
+            // دمج سجل أوقات الحضور (Attendance Log)
+            const mergedLog = { ...(cs.attendanceLog || {}), ...(ls.attendanceLog || {}) };
+            // دمج تقارير الواتساب
+            const mergedReport = ls.reportData || cs.reportData || null;
+
+            sessionMap.set(idStr, {
+                ...cs,
+                ...ls,
+                status: (ls.status === 'closed' || cs.status === 'closed') ? 'closed' : 'open',
+                attendance: mergedAtt,
+                attendanceLog: mergedLog,
+                reportData: mergedReport
+            });
+        }
+    });
+    classSessions = Array.from(sessionMap.values());
+
+    // ب. دمج الطلاب (حماية الطلاب الجدد في الأونلاين والأوفلاين + الحفاظ على الرصيد والنقاط)
+    const cloudStudents = Array.isArray(cloudData.students) ? cloudData.students : Object.values(cloudData.students || {}).filter(Boolean);
+    const localStudents = Array.isArray(students) ? students : [];
+    const studentMap = new Map();
+
+    cloudStudents.forEach(cst => {
+        if (cst && cst.code) studentMap.set(String(cst.code).trim(), cst);
+    });
+
+    localStudents.forEach(lst => {
+        if (!lst || !lst.code) return;
+        const codeKey = String(lst.code).trim();
+        if (!studentMap.has(codeKey)) {
+            // طالب أضيف في الأوفلاين
+            studentMap.set(codeKey, lst);
+        } else {
+            const cst = studentMap.get(codeKey);
+            // إذا كان هناك تعديل محلي معلق، ندمج مع الحفاظ على محفظة ونقاط وكورسات الطالب من السحابة
+            const base = window.hasPendingOfflineChanges ? { ...cst, ...lst } : { ...lst, ...cst };
+            base.walletBalance = Math.max(parseFloat(cst.walletBalance) || 0, parseFloat(lst.walletBalance) || 0);
+            base.behaviorPoints = Math.max(parseFloat(cst.behaviorPoints) || 0, parseFloat(lst.behaviorPoints) || 0);
+            
+            const cCourses = Array.isArray(cst.purchasedCourses) ? cst.purchasedCourses : Object.values(cst.purchasedCourses || {});
+            const lCourses = Array.isArray(lst.purchasedCourses) ? lst.purchasedCourses : Object.values(lst.purchasedCourses || {});
+            base.purchasedCourses = [...new Set([...cCourses, ...lCourses])];
+
+            studentMap.set(codeKey, base);
+        }
+    });
+    students = Array.from(studentMap.values());
+
+    // ج. دمج المجموعات
+    const cloudGroups = Array.isArray(cloudData.groups) ? cloudData.groups : Object.values(cloudData.groups || {}).filter(Boolean);
+    const groupMap = new Map();
+    cloudGroups.forEach(g => { if (g && g.name) groupMap.set(g.name, g); });
+    (groups || []).forEach(g => { if (g && g.name) groupMap.set(g.name, window.hasPendingOfflineChanges ? g : (groupMap.get(g.name) || g)); });
+    groups = Array.from(groupMap.values());
+
+    // د. دمج الامتحانات الورقية ودرجاتها
+    const cloudExams = Array.isArray(cloudData.exams) ? cloudData.exams : Object.values(cloudData.exams || {}).filter(Boolean);
+    const examMap = new Map();
+    cloudExams.forEach(ex => { if (ex && ex.id) examMap.set(String(ex.id), ex); });
+    (exams || []).forEach(lex => {
+        if (!lex || !lex.id) return;
+        const idStr = String(lex.id);
+        if (!examMap.has(idStr)) examMap.set(idStr, lex);
+        else {
+            const cex = examMap.get(idStr);
+            examMap.set(idStr, { ...cex, ...lex, grades: { ...(cex.grades || {}), ...(lex.grades || {}) } });
+        }
+    });
+    exams = Array.from(examMap.values());
+
+    // هـ. دمج الواجبات ودرجاتها
+    const cloudHw = Array.isArray(cloudData.homeworks) ? cloudData.homeworks : Object.values(cloudData.homeworks || {}).filter(Boolean);
+    const hwMap = new Map();
+    cloudHw.forEach(hw => { if (hw && hw.id) hwMap.set(String(hw.id), hw); });
+    (homeworks || []).forEach(lhw => {
+        if (!lhw || !lhw.id) return;
+        const idStr = String(lhw.id);
+        if (!hwMap.has(idStr)) hwMap.set(idStr, lhw);
+        else {
+            const chw = hwMap.get(idStr);
+            hwMap.set(idStr, { ...chw, ...lhw, grades: { ...(chw.grades || {}), ...(lhw.grades || {}) } });
+        }
+    });
+    homeworks = Array.from(hwMap.values());
+
+    // و. دمج الخزنة والماليات والاشتراكات الشهرية (حصة بحصة وطالب بطالب)
+    const cloudFin = cloudData.financeRecords || {};
+    const mergedFin = { ...cloudFin };
+    Object.keys(financeRecords || {}).forEach(sessKey => {
+        mergedFin[sessKey] = { ...(cloudFin[sessKey] || {}), ...(financeRecords[sessKey] || {}) };
+    });
+    financeRecords = mergedFin;
+
+    const cloudMonthly = cloudData.monthlyPayments || {};
+    const localMonthly = window.monthlyPayments || {};
+    const mergedMonthly = { ...cloudMonthly };
+    Object.keys(localMonthly).forEach(stCode => {
+        mergedMonthly[stCode] = { ...(cloudMonthly[stCode] || {}), ...(localMonthly[stCode] || {}) };
+    });
+    window.monthlyPayments = mergedMonthly;
+
+    // ز. دمج المصروفات والكتب والجدول والامتحانات الأونلاين
+    const mergeById = (cloudArr, localArr) => {
+        const map = new Map();
+        (Array.isArray(cloudArr) ? cloudArr : Object.values(cloudArr || {}).filter(Boolean)).forEach(i => { if (i && i.id) map.set(String(i.id), i); });
+        (Array.isArray(localArr) ? localArr : []).forEach(i => { if (i && i.id) map.set(String(i.id), window.hasPendingOfflineChanges ? i : (map.get(String(i.id)) || i)); });
+        return Array.from(map.values());
+    };
+
+    expenses = mergeById(cloudData.expenses, expenses);
+    books = mergeById(cloudData.books, books);
+    schedule = mergeById(cloudData.schedule, schedule);
+    if (cloudData.onlineExams) {
+        window.fetchedOnlineExams = mergeById(cloudData.onlineExams, window.fetchedOnlineExams);
+    }
+
+    // حفظ النسخة المدمجة محلياً بدون إطلاق حدث المزامنة مرة أخرى
+    window.isIncomingSync = true;
+    originalSetItem.call(localStorage, "students", JSON.stringify(students));
+    originalSetItem.call(localStorage, "classSessions", JSON.stringify(classSessions));
+    originalSetItem.call(localStorage, "groups", JSON.stringify(groups));
+    originalSetItem.call(localStorage, "exams", JSON.stringify(exams));
+    originalSetItem.call(localStorage, "homeworks", JSON.stringify(homeworks));
+    originalSetItem.call(localStorage, "financeRecords", JSON.stringify(financeRecords));
+    originalSetItem.call(localStorage, "monthlyPayments", JSON.stringify(window.monthlyPayments));
+    originalSetItem.call(localStorage, "expenses", JSON.stringify(expenses));
+    originalSetItem.call(localStorage, "books", JSON.stringify(books));
+    originalSetItem.call(localStorage, "schedule", JSON.stringify(schedule));
+    if (window.fetchedOnlineExams) originalSetItem.call(localStorage, "onlineExams", JSON.stringify(window.fetchedOnlineExams));
+    window.isIncomingSync = false;
+}
+
+// 4️⃣ الدالة الموحدة (اسحب -> ادمج -> ارفع)
+window.smartTwoWaySync = async function() {
+    if (window.isSyncingNow || !navigator.onLine) {
+        if (!navigator.onLine) updateNetworkBadgeUI("offline");
+        return;
+    }
+
+    window.isSyncingNow = true;
+    updateNetworkBadgeUI("syncing");
+
+    try {
+        // خطوة 1: سحب أحدث نسخة من السحابة أولاً (لمنع مسح شغل الأجهزة الأخرى)
+        const res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data.json`);
+        if (!res.ok) throw new Error("Network response was not ok");
+        const cloudData = await res.json() || {};
+
+        // خطوة 2: دمج بيانات السحابة مع بيانات الجهاز المحلي
+        mergeLocalAndCloudData(cloudData);
+
+        // خطوة 3: رفع البيانات المدمجة بالكامل للسحابة
+        const payload = {
+            students: students,
+            classSessions: classSessions,
+            exams: exams,
+            homeworks: homeworks,
+            groups: groups,
+            financeRecords: financeRecords,
+            expenses: expenses,
+            books: books,
+            schedule: schedule,
+            monthlyPayments: window.monthlyPayments || {},
+            onlineExams: window.fetchedOnlineExams || cloudData.onlineExams || []
+        };
+
+        const pushRes = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data.json`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!pushRes.ok) throw new Error("Push failed");
+
+        // تم الرفع والدمج بنجاح! نصفر علامة الأوفلاين
+        window.hasPendingOfflineChanges = false;
+        originalSetItem.call(localStorage, "hasPendingOfflineChanges", "false");
+        updateNetworkBadgeUI("online");
+        refreshVisibleViewsAfterSync();
+
+    } catch (err) {
+        console.warn("Offline or Sync Error - Data is safely kept locally:", err);
+        updateNetworkBadgeUI("offline");
+    } finally {
+        window.isSyncingNow = false;
+    }
+};
+
+// ربط الدوال القديمة بالمحرك الجديد لضمان توافق كل أزرار السيستم
+window.syncDataToBot = window.smartTwoWaySync;
+window.loadDataFromFirebase = window.smartTwoWaySync;
+
+// تحديث الشاشات المفتوحة بعد الدمج بهدوء
+function refreshVisibleViewsAfterSync() {
+    if (document.getElementById("dashboard-view")?.style.display === "block" && typeof renderDashboardCharts === "function") renderDashboardCharts();
+    if (document.getElementById("students-overview")?.style.display === "block" && typeof renderTable === "function") renderTable();
+    if (document.getElementById("groups-overview")?.style.display === "block" && typeof renderGroupCards === "function") renderGroupCards();
+    if (document.getElementById("sessions-overview")?.style.display === "block" && typeof renderSessionCards === "function") renderSessionCards();
+    
+    // تحديث جدول الحصة المفتوحة حالياً أثناء الرصد دون فقدان التركيز من خانة الباركود
+    if (document.getElementById("session-details-view")?.style.display === "block" && currentActiveSessionId) {
+        const activeSess = classSessions.find(s => String(s.id) === String(currentActiveSessionId));
+        if (activeSess && typeof renderAttendanceTable === "function") {
+            renderAttendanceTable(activeSess);
+        }
+    }
+}
+
+// 5️⃣ الاستماع الفوري لعودة الإنترنت أو انقطاعه
+window.addEventListener('online', () => {
+    if (typeof showToast === 'function') showToast("🌐 عاد الاتصال بالإنترنت! جاري دمج وحفظ الحضور...", "info");
+    window.smartTwoWaySync();
+});
+
+window.addEventListener('offline', () => {
+    updateNetworkBadgeUI("offline");
+    if (typeof showToast === 'function') showToast("🔒 انقطع الإنترنت! يمكنك استكمال الرصد وسيتم الحفظ على الجهاز.", "warning");
+});
 
 // ==========================================
 // 5. إدارة الجدول الأسبوعي (النسخة المرنة الديناميكية)
@@ -1500,16 +1809,142 @@ window.processAttendanceBarcode = function(val) {
     }
 };
 
-// 2. الاستماع للخانة مباشرة (عندما تكون محددة)
-document.getElementById('attendanceBarcode')?.addEventListener('keypress', function(e) { 
-    if(e.key === 'Enter') { 
-        e.preventDefault(); 
-        let val = this.value;
-        this.value = ''; // 🧹 تفريغ إجباري ومباشر من الـ DOM قبل المعالجة
-        window.processAttendanceBarcode(val);
-    }
-});
+// ==========================================
+// 🧠 محرك البحث الذكي لخانة الباركود (يدعم الأسهم واختيار أول اسم بـ Enter)
+// ==========================================
+let currentFocus = -1;
 
+const attendanceInput = document.getElementById('attendanceBarcode');
+
+if (attendanceInput) {
+    // 1. عند الكتابة في الخانة (إنشاء القائمة)
+    attendanceInput.addEventListener('input', function(e) {
+        let val = this.value.trim();
+        closeAllLists();
+        if (!val) return;
+        currentFocus = -1;
+
+        // إنشاء حاوية القائمة المنسدلة
+        let listNode = document.createElement("DIV");
+        listNode.setAttribute("id", this.id + "autocomplete-list");
+        listNode.setAttribute("class", "smart-autocomplete-dropdown");
+        this.parentNode.appendChild(listNode);
+        listNode.style.display = "block";
+
+        // البحث الذكي
+        let normalizedVal = window.smartArabicNormalize(val);
+        let inputWords = normalizedVal.split(' ');
+
+        let matches = students.filter(s => {
+            let dbName = window.smartArabicNormalize(s.name);
+            let matchCode = String(s.code).includes(val);
+            let matchPhone = String(s.phone).includes(val);
+            let matchName = dbName.includes(normalizedVal) || inputWords.every(w => dbName.includes(w));
+            return matchCode || matchPhone || matchName;
+        });
+
+        const session = classSessions.find(s => s.id === currentActiveSessionId);
+        const activeGroup = session ? session.group : "";
+
+        // 🌟 الذكاء الإضافي: ترتيب النتائج (طلاب نفس المجموعة يظهرون أولاً)
+        matches.sort((a, b) => {
+            if (a.group === activeGroup && b.group !== activeGroup) return -1;
+            if (a.group !== activeGroup && b.group === activeGroup) return 1;
+            return 0;
+        });
+
+        matches = matches.slice(0, 10); // عرض أول 10 نتائج لسرعة الأداء
+
+        // رسم العناصر داخل القائمة
+        matches.forEach((st, index) => {
+            let itemNode = document.createElement("DIV");
+            itemNode.className = "autocomplete-item";
+            
+            // تمييز الطالب لو في نفس المجموعة
+            let groupBadge = st.group === activeGroup 
+                ? `<span class="badge-same-group">مجموعته ✅</span>` 
+                : `<span class="badge-other-group">ضيف: ${st.group}</span>`;
+
+            itemNode.innerHTML = `
+                <div><strong style="color:var(--primary-color)">${st.code}</strong> - ${st.name}</div>
+                ${groupBadge}
+            `;
+
+            // حفظ كود الطالب في عنصر مخفي
+            itemNode.innerHTML += `<input type="hidden" value="${st.code}">`;
+
+            // عند الضغط بالماوس
+            itemNode.addEventListener("click", function(e) {
+                let selectedCode = this.getElementsByTagName("input")[0].value;
+                attendanceInput.value = ''; // تفريغ الخانة
+                closeAllLists();
+                window.processAttendanceBarcode(selectedCode); // تسجيل الحضور
+            });
+
+            listNode.appendChild(itemNode);
+        });
+    });
+
+    // 2. عند استخدام الكيبورد (الأسهم و Enter)
+    attendanceInput.addEventListener('keydown', function(e) {
+        let listNode = document.getElementById(this.id + "autocomplete-list");
+        let items = listNode ? listNode.getElementsByClassName("autocomplete-item") : null;
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            currentFocus++;
+            addActive(items);
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            currentFocus--;
+            addActive(items);
+        } else if (e.key === "Enter") {
+            e.preventDefault(); // منع الإرسال الافتراضي
+            
+            if (items && items.length > 0) {
+                // 🌟 لو مداسش أسهم، يختار أول اسم في القائمة تلقائياً
+                if (currentFocus === -1) currentFocus = 0;
+                items[currentFocus].click(); 
+            } else {
+                // لو القائمة فاضية (كتب الكود كامل وضغط انتر بسرعة)
+                let val = this.value.trim();
+                this.value = '';
+                closeAllLists();
+                if(val) window.processAttendanceBarcode(val);
+            }
+        }
+    });
+}
+
+function addActive(items) {
+    if (!items) return false;
+    removeActive(items);
+    if (currentFocus >= items.length) currentFocus = 0; 
+    if (currentFocus < 0) currentFocus = (items.length - 1); 
+    
+    items[currentFocus].classList.add("autocomplete-active");
+    // سكرول تلقائي لو نزل بالأسهم لتحت
+    items[currentFocus].scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+function removeActive(items) {
+    for (let i = 0; i < items.length; i++) {
+        items[i].classList.remove("autocomplete-active");
+    }
+}
+
+function closeAllLists(elmnt) {
+    let x = document.getElementsByClassName("smart-autocomplete-dropdown");
+    for (let i = 0; i < x.length; i++) {
+        if (elmnt !== x[i] && elmnt !== attendanceInput) {
+            x[i].parentNode.removeChild(x[i]);
+        }
+    }
+}
+
+document.addEventListener("click", function (e) {
+    closeAllLists(e.target);
+});
 // 3. 🌐 الاستماع العام للسكانر (Global Scanner Listener)
 window.globalBarcodeBuffer = "";
 window.globalBarcodeTimeout = null;
@@ -2124,102 +2559,289 @@ function generateLeaderboard() {
     top5.forEach((st, index) => { container.innerHTML += `<div class="stat-card" style="display:flex; justify-content:space-between; align-items:center; border-left: 5px solid var(--exam-color);"><div style="display:flex; gap:15px; align-items:center;"><span style="font-size:30px;">${medals[index] || "🏅"}</span><div><h3 style="margin-bottom:5px;">${st.name}</h3><p style="color:var(--primary-color);">الكود: ${st.code}</p></div></div><div style="text-align:center;"><p style="color:var(--text-muted); font-size:12px;">مجموع النقاط</p><p style="font-size:24px; font-weight:bold; color:var(--exam-color);">${st.score}</p></div></div>`; });
 }
 
-// ==========================================
-// 16. الإكسيل (Import / Export)
-// ==========================================
-// ==========================================
-// 16. الإكسيل (Import / Export) - النسخة الشاملة
-// ==========================================
 
-// دالة التصدير (تحميل النسخة الاحتياطية)
-window.exportData = function() { 
-    const data = { 
-        students: students || [], 
-        groups: groups || [], 
-        classSessions: classSessions || [], 
-        exams: exams || [], 
-        homeworks: homeworks || [], 
-        financeRecords: financeRecords || {}, 
-        expenses: expenses || [], 
+
+// =========================================================
+// 🔍 2. نظام القراءة والاستعراض قبل الاسترجاع
+// =========================================================
+window.pendingBackupData = null; // متغير لحفظ الداتا مؤقتاً
+
+window.previewBackupFile = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const imp = JSON.parse(e.target.result);
+
+            const importedStudents = imp.students || (imp.data && imp.data.students);
+            const importedGroups = imp.groups || (imp.data && imp.data.groups);
+
+            if (!importedStudents || !importedGroups) {
+                if (typeof showToast === "function") showToast("❌ ملف غير صالح أو لا يحتوي على بيانات النظام الأساسية!", "error");
+                event.target.value = "";
+                return;
+            }
+
+            // استخراج الأرقام للعرض
+            let stCount = importedStudents ? importedStudents.length : 0;
+            let grpCount = importedGroups ? importedGroups.length : 0;
+            let lecCount = 0;
+            let codesCount = 0;
+
+            if (imp.firebaseCloud) {
+                if (imp.firebaseCloud.lectures) lecCount = Object.keys(imp.firebaseCloud.lectures).length;
+                if (imp.firebaseCloud.chargeCodes) codesCount = Object.keys(imp.firebaseCloud.chargeCodes).length;
+            }
+
+            // تعبئة الأرقام في النافذة
+            document.getElementById('prev-st-count').innerText = stCount;
+            document.getElementById('prev-grp-count').innerText = grpCount;
+            document.getElementById('prev-lec-count').innerText = lecCount;
+            document.getElementById('prev-code-count').innerText = codesCount;
+
+            // حفظ الداتا مؤقتاً
+            window.pendingBackupData = imp;
+
+            // إظهار نافذة التأكيد
+            openModal('backupPreviewModal');
+
+        } catch (err) {
+            console.error(err);
+            if (typeof showToast === "function") showToast("❌ حدث خطأ أثناء قراءة الملف!", "error");
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = ""; // تصفير حقل الإدخال عشان لو حب يختار نفس الملف تاني
+};
+
+window.cancelBackupRestore = function() {
+    window.pendingBackupData = null;
+    closeModal('backupPreviewModal');
+};
+
+// 1. دالة التصدير الشاملة (تم حل مشكلة فقدان الامتحانات الإلكترونية)
+window.exportData = async function() {
+    const uid = typeof getSafeUid === "function" ? getSafeUid() : "Historia_System_Master";
+    const dbBaseUrl = `https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${uid}`;
+    
+    const exportBtn = document.querySelector('button[onclick="exportData()"]');
+    const origBtnHtml = exportBtn ? exportBtn.innerHTML : "";
+    if (exportBtn) {
+        exportBtn.innerHTML = `<span>⏳</span> جاري سحب جميع البيانات...`;
+        exportBtn.disabled = true;
+    }
+    if (typeof showToast === "function") showToast("جاري تجميع الكورسات والامتحانات وبيانات السحابة... ⏳", "info");
+
+    let cloudSnapshot = {};
+    try {
+        let res = await fetch(`${dbBaseUrl}.json`);
+        if (res.ok) {
+            cloudSnapshot = await res.json() || {};
+        }
+    } catch (e) {
+        console.warn("تعذر الاتصال بالسحابة، سيتم أخذ النسخة من البيانات المحلية:", e);
+    }
+
+    // 🔥 التعديل السحري: سحب الامتحانات الإلكترونية من السحابة مباشرة
+    let safeOnlineExams = [];
+    if (cloudSnapshot.data && cloudSnapshot.data.onlineExams) {
+        safeOnlineExams = cloudSnapshot.data.onlineExams;
+    } else if (window.fetchedOnlineExams && window.fetchedOnlineExams.length > 0) {
+        safeOnlineExams = window.fetchedOnlineExams;
+    }
+
+    const localData = {
+        students: students || [],
+        groups: groups || [],
+        classSessions: classSessions || [],
+        exams: exams || [],
+        homeworks: homeworks || [],
+        financeRecords: financeRecords || {},
+        expenses: expenses || [],
         schedule: schedule || [],
-        // 👇 البيانات الإضافية لضمان نسخة شاملة 100% 👇
-        books: books || [], 
-        onlineExams: typeof onlineExams !== 'undefined' ? onlineExams : (JSON.parse(localStorage.getItem("onlineExams")) || []),
-        monthlyPayments: typeof monthlyPayments !== 'undefined' ? monthlyPayments : (JSON.parse(localStorage.getItem("monthlyPayments")) || {})
-    }; 
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }); 
-    const url = URL.createObjectURL(blob); 
-    const a = document.createElement("a"); 
-    a.href = url; 
-    // تسمية الملف بالتاريخ لسهولة الرجوع إليه
-    a.download = `EduTrack_Full_Backup_${new Date().toISOString().split('T')[0]}.json`; 
-    a.click(); 
-    URL.revokeObjectURL(url); 
-    
-    if(typeof showToast === 'function') {
-        showToast("تم تحميل النسخة الاحتياطية الشاملة بنجاح ✅"); 
-    } else {
-        alert("تم تحميل النسخة الاحتياطية بنجاح");
+        books: books || [],
+        onlineExams: safeOnlineExams, // 👈 هنا تم حل المشكلة
+        monthlyPayments: window.monthlyPayments || JSON.parse(localStorage.getItem("monthlyPayments")) || {},
+        systemLogs: typeof systemLogs !== "undefined" ? systemLogs : (JSON.parse(localStorage.getItem("systemLogs")) || []),
+        activeLevels: window.activeLevels || JSON.parse(localStorage.getItem("activeLevels")) || ["الصف الأول الثانوي", "الصف الثاني الثانوي", "الصف الثالث الثانوي"],
+        settings: {
+            teacherName: localStorage.getItem("teacherName") || "أسامة رفعت",
+            centerName: localStorage.getItem("centerName") || "هيستوريا",
+            adminUser: localStorage.getItem("adminUser") || "admin",
+            adminPass: localStorage.getItem("adminPass") || "12345",
+            adminPin: localStorage.getItem("adminPin") || "1234",
+            phoneNumbers: localStorage.getItem("teacherPhones") || "",
+            parentMsgTemplate: localStorage.getItem("parentMsgTemplate") || "",
+            studentMsgTemplate: localStorage.getItem("studentMsgTemplate") || "",
+            botEnabled: localStorage.getItem("botEnabled") || "false",
+            botName: localStorage.getItem("botName") || "أوكتو",
+            botInstructions: localStorage.getItem("botInstructions") || ""
+        }
+    };
+
+    const fullBackupPayload = {
+        backupVersion: "HISTORIA_FULL_V3",
+        exportedAt: new Date().toISOString(),
+        students: localData.students,
+        groups: localData.groups,
+        classSessions: localData.classSessions,
+        exams: localData.exams,
+        homeworks: localData.homeworks,
+        financeRecords: localData.financeRecords,
+        expenses: localData.expenses,
+        schedule: localData.schedule,
+        books: localData.books,
+        onlineExams: localData.onlineExams,
+        monthlyPayments: localData.monthlyPayments,
+        systemLogs: localData.systemLogs,
+        activeLevels: localData.activeLevels,
+        settings: localData.settings,
+        firebaseCloud: {
+            lectures: cloudSnapshot.lectures || {},
+            chargeCodes: cloudSnapshot.chargeCodes || {},
+            student_vault: cloudSnapshot.student_vault || {},
+            course_tracking: cloudSnapshot.course_tracking || {},
+            onlineSubmissions: cloudSnapshot.onlineSubmissions || {}, // 👈 إجابات الطلاب للامتحانات الإلكترونية
+            notifications: cloudSnapshot.notifications || {},
+            store: cloudSnapshot.store || {},
+            forum: cloudSnapshot.forum || {},
+            assistants: cloudSnapshot.assistants || {},
+            join_requests: cloudSnapshot.join_requests || {},
+            wallet_requests: cloudSnapshot.wallet_requests || {}
+        }
+    };
+
+    const blob = new Blob([JSON.stringify(fullBackupPayload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const dateStr = new Date().toISOString().split('T')[0];
+    a.download = `Historia_Master_Backup_${dateStr}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    if (exportBtn) {
+        exportBtn.innerHTML = origBtnHtml;
+        exportBtn.disabled = false;
+    }
+    if (typeof showToast === "function") {
+        showToast("✅ تم تحميل النسخة الاحتياطية الشاملة بنجاح!", "success");
     }
 };
 
-// دالة الاسترجاع (استيراد النسخة الاحتياطية مع الرفع السحابي)
-window.importData = function(event) { 
-    const file = event.target.files[0]; 
-    if(!file) return; 
+// 2. دالة التأكيد والاسترجاع الفعلي ورفع البيانات للسحابة
+window.confirmBackupRestore = async function() {
+    if (!window.pendingBackupData) return;
     
-    const reader = new FileReader(); 
-    // خلينا الـ onload تبقى async عشان نقدر نستنى السحابة
-    reader.onload = async function(e) { 
-        try { 
-            const imp = JSON.parse(e.target.result); 
-            // التحقق من وجود البيانات الأساسية لضمان سلامة الملف
-            if(imp.students && imp.groups) { 
-                // 1. حفظ الداتا في المتصفح
-                localStorage.setItem("students", JSON.stringify(imp.students)); 
-                localStorage.setItem("groups", JSON.stringify(imp.groups)); 
-                localStorage.setItem("classSessions", JSON.stringify(imp.classSessions || [])); 
-                localStorage.setItem("exams", JSON.stringify(imp.exams || [])); 
-                localStorage.setItem("homeworks", JSON.stringify(imp.homeworks || [])); 
-                localStorage.setItem("financeRecords", JSON.stringify(imp.financeRecords || {})); 
-                localStorage.setItem("expenses", JSON.stringify(imp.expenses || [])); 
-                localStorage.setItem("schedule", JSON.stringify(imp.schedule || [])); 
-                localStorage.setItem("books", JSON.stringify(imp.books || [])); 
-                localStorage.setItem("onlineExams", JSON.stringify(imp.onlineExams || [])); 
-                localStorage.setItem("monthlyPayments", JSON.stringify(imp.monthlyPayments || {})); 
+    let btn = document.getElementById("confirmRestoreBtn");
+    let origText = btn.innerHTML;
+    btn.innerHTML = "جاري الكتابة والرفع للسحابة... ⏳";
+    btn.disabled = true;
 
-                // 2. تحديث المتغيرات في الذاكرة عشان السحابة تقرأها صح
-                students = imp.students;
-                groups = imp.groups;
-                classSessions = imp.classSessions || [];
-                exams = imp.exams || [];
-                homeworks = imp.homeworks || [];
-                financeRecords = imp.financeRecords || {};
-                expenses = imp.expenses || [];
-                schedule = imp.schedule || [];
-                books = imp.books || [];
-                window.onlineExams = imp.onlineExams || [];
-                window.monthlyPayments = imp.monthlyPayments || {};
+    if (typeof showToast === "function") showToast("⏳ جاري استرجاع البيانات ورفع الكورسات والامتحانات للسحابة...", "info");
+    window.isIncomingSync = true; // إيقاف المزامنة التلقائية مؤقتاً
 
-                // 3. رفع الداتا للسحابة إجبارياً قبل ما الصفحة تعمل ريفريش
-                if(typeof showToast === 'function') showToast("جاري دمج البيانات ورفعها للسحابة... ⏳", "info");
-                
-                if (typeof syncDataToBot === "function") {
-                    await syncDataToBot(); // بنستنى لحد ما الرفع يخلص
-                }
-                
-                alert("تم استرجاع ورفع جميع البيانات بنجاح! سيتم إعادة تحميل الصفحة لتطبيق التغييرات."); 
-                location.reload(); 
-            } else {
-                if(typeof showToast === 'function') showToast("ملف غير صالح أو لا يحتوي على بيانات النظام الأساسية!", "error");
+    try {
+        const imp = window.pendingBackupData;
+        const importedStudents = imp.students || (imp.data && imp.data.students) || [];
+        const importedGroups = imp.groups || (imp.data && imp.data.groups) || [];
+
+        // أ. استرجاع البيانات المحلية في LocalStorage
+        localStorage.setItem("students", JSON.stringify(importedStudents));
+        localStorage.setItem("groups", JSON.stringify(importedGroups));
+        localStorage.setItem("classSessions", JSON.stringify(imp.classSessions || []));
+        localStorage.setItem("exams", JSON.stringify(imp.exams || []));
+        localStorage.setItem("homeworks", JSON.stringify(imp.homeworks || []));
+        localStorage.setItem("financeRecords", JSON.stringify(imp.financeRecords || {}));
+        localStorage.setItem("expenses", JSON.stringify(imp.expenses || []));
+        localStorage.setItem("schedule", JSON.stringify(imp.schedule || []));
+        localStorage.setItem("books", JSON.stringify(imp.books || []));
+        localStorage.setItem("onlineExams", JSON.stringify(imp.onlineExams || []));
+        localStorage.setItem("monthlyPayments", JSON.stringify(imp.monthlyPayments || {}));
+        
+        if (imp.systemLogs) localStorage.setItem("systemLogs", JSON.stringify(imp.systemLogs));
+        if (imp.activeLevels) localStorage.setItem("activeLevels", JSON.stringify(imp.activeLevels));
+
+        if (imp.settings) {
+            if (imp.settings.teacherName) localStorage.setItem("teacherName", imp.settings.teacherName);
+            if (imp.settings.centerName) localStorage.setItem("centerName", imp.settings.centerName);
+            if (imp.settings.adminUser) localStorage.setItem("adminUser", imp.settings.adminUser);
+            if (imp.settings.adminPass) localStorage.setItem("adminPass", imp.settings.adminPass);
+            if (imp.settings.adminPin) localStorage.setItem("adminPin", imp.settings.adminPin);
+            if (imp.settings.phoneNumbers !== undefined) localStorage.setItem("teacherPhones", imp.settings.phoneNumbers);
+            if (imp.settings.parentMsgTemplate) localStorage.setItem("parentMsgTemplate", imp.settings.parentMsgTemplate);
+            if (imp.settings.studentMsgTemplate) localStorage.setItem("studentMsgTemplate", imp.settings.studentMsgTemplate);
+            if (imp.settings.botEnabled) localStorage.setItem("botEnabled", imp.settings.botEnabled);
+            if (imp.settings.botName) localStorage.setItem("botName", imp.settings.botName);
+            if (imp.settings.botInstructions) localStorage.setItem("botInstructions", imp.settings.botInstructions);
+        }
+
+        // ب. تحديث المتغيرات في الذاكرة لتجهيز الرفع
+        students = importedStudents;
+        groups = importedGroups;
+        classSessions = imp.classSessions || [];
+        exams = imp.exams || [];
+        homeworks = imp.homeworks || [];
+        financeRecords = imp.financeRecords || {};
+        expenses = imp.expenses || [];
+        schedule = imp.schedule || [];
+        books = imp.books || [];
+        // 👈 التأكد من سحب الامتحانات الإلكترونية في حالة النسخ القديمة
+        window.fetchedOnlineExams = imp.onlineExams || (imp.data && imp.data.onlineExams) || []; 
+        window.monthlyPayments = imp.monthlyPayments || {};
+
+        // ج. رفع واسترجاع جميع أقسام الفايربيز السحابية دفعة واحدة
+        const uid = typeof getSafeUid === "function" ? getSafeUid() : "Historia_System_Master";
+        const dbBaseUrl = `https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${uid}`;
+
+        const cloudRestorePayload = {
+            data: {
+                students: students,
+                groups: groups,
+                classSessions: classSessions,
+                exams: exams,
+                homeworks: homeworks,
+                financeRecords: financeRecords,
+                expenses: expenses,
+                schedule: schedule,
+                books: books,
+                onlineExams: window.fetchedOnlineExams,
+                monthlyPayments: window.monthlyPayments,
+                settings: imp.settings || {}
             }
-        } catch(err) { 
-            if(typeof showToast === 'function') showToast("حدث خطأ أثناء قراءة الملف!", "error"); 
-        } 
-    }; 
-    reader.readAsText(file); 
-    event.target.value = ""; // تصفير زرار الرفع عشان لو حب يرفع نفس الملف تاني
+        };
+
+        if (imp.firebaseCloud) {
+            Object.keys(imp.firebaseCloud).forEach(cloudKey => {
+                if (imp.firebaseCloud[cloudKey] !== undefined) {
+                    cloudRestorePayload[cloudKey] = imp.firebaseCloud[cloudKey];
+                }
+            });
+        }
+
+        await fetch(`${dbBaseUrl}.json`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cloudRestorePayload)
+        });
+
+        window.isIncomingSync = false;
+        
+        window.pendingBackupData = null;
+        closeModal('backupPreviewModal');
+
+        alert("🎉 تم استرجاع النسخة الشاملة (بيانات السنتر + الكورسات + الامتحانات الإلكترونية) بنجاح!");
+        location.reload();
+
+    } catch (err) {
+        window.isIncomingSync = false;
+        console.error("Backup Restore Error:", err);
+        btn.innerHTML = origText;
+        btn.disabled = false;
+        if (typeof showToast === "function") showToast("❌ حدث خطأ أثناء رفع بيانات النسخة الاحتياطية!", "error");
+    }
 };
 
 function downloadExcelTemplate() { const headers = [["الاسم", "الصف", "المجموعة", "هاتف الطالب", "هاتف ولي الأمر", "الجنس"]]; const worksheet = XLSX.utils.aoa_to_sheet(headers); worksheet['!cols'] = [{wch: 25}, {wch: 15}, {wch: 20}, {wch: 15}, {wch: 15}, {wch: 10}]; const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, "الطلاب"); XLSX.writeFile(workbook, "نموذج_إضافة_الطلاب.xlsx"); showToast("تم تحميل النموذج!"); }
@@ -3293,7 +3915,7 @@ document.getElementById('demoRegistrationForm')?.addEventListener('submit', func
     localStorage.setItem("demo_device_id", demoId); // حفظ البصمة
 
     // رفع بيانات العميل للوحة الإدارة (الفايربيز) بالحالة نشط
-    fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/demo_users/${demoId}.json`, {
+    fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/demo_users/${demoId}.json`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -3328,7 +3950,7 @@ document.getElementById('requestIdCardsForm')?.addEventListener('submit', functi
     }
 
     // رفع الطلب لقاعدة بيانات الإدارة العليا (dashb.html)
-    fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/id_orders/${Date.now()}.json`, {
+    fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/id_orders/${Date.now()}.json`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -3352,7 +3974,7 @@ document.getElementById('requestIdCardsForm')?.addEventListener('submit', functi
 // 💸 نظام الإحالات المتكامل (Stats & Checkout)
 // ==========================================
 
-const DB_URL = "https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app";
+const DB_URL = "https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app";
 window.availableAffiliateBalance = 0; // متغير جلوبال لتخزين الرصيد المتاح للسحب
 
 // 1. توليد كود إحالة عشوائي وفريد ومستحيل يتكرر
@@ -4074,7 +4696,7 @@ window.downloadNewCodesExcel = function() {
 // 📥 تحميل جميع أكواد السنتر في ملف إكسيل
 window.exportAllCodesToExcel = async function() {
     try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/chargeCodes.json`);
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/chargeCodes.json`);
         let codes = await res.json() || {};
         let data = Object.keys(codes).map(codeStr => ({
             "كود الشحن": codeStr,
@@ -4148,7 +4770,7 @@ window.generateChargeCodes = async function() {
     }
 
     try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/chargeCodes.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${uid}/chargeCodes.json`, {
             method: 'PATCH', 
             headers: { 'Content-Type': 'application/json' }, 
             body: JSON.stringify(newCodes)
@@ -4192,7 +4814,7 @@ window.renderChargeCodes = async function() {
         </tbody>`;
         
     try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/chargeCodes.json`);
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/chargeCodes.json`);
         let codes = await res.json() || {};
         let tbody = document.getElementById("codes-tbody");
         tbody.innerHTML = "";
@@ -4247,7 +4869,7 @@ window.renderChargeCodes = async function() {
 window.reactivateChargeCode = async function(codeStr) {
     if(!confirm(`هل تريد إعادة تفعيل الكود (${codeStr}) ليصبح متاحاً للشحن مرة أخرى؟`)) return;
     try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/chargeCodes/${codeStr}.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/chargeCodes/${codeStr}.json`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: "unused", usedBy: null, usedAt: null })
@@ -4260,7 +4882,7 @@ window.reactivateChargeCode = async function(codeStr) {
 window.deleteChargeCode = async function(codeStr) {
     if(!confirm("⚠️ هل أنت متأكد من حذف هذا الكود نهائياً؟")) return;
     try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/chargeCodes/${codeStr}.json`, { method: 'DELETE' });
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/chargeCodes/${codeStr}.json`, { method: 'DELETE' });
         renderChargeCodes();
         showToast("تم حذف الكود بنجاح 🗑️");
     } catch(e) { alert("حدث خطأ"); }
@@ -4405,7 +5027,7 @@ window.loadSentNotifications = async function() {
     container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);">جاري جلب الإشعارات من السيرفر... ⏳</div>`;
 
     try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/notifications.json`);
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/notifications.json`);
         let data = await res.json() || {};
         let notifs = Object.values(data).reverse(); 
         
@@ -4508,7 +5130,7 @@ window.switchPlatformTab = function(tabName) {
 
     if(tabName === 'codes') {
         renderChargeCodes();
-        fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/lectures.json`)
+        fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/lectures.json`)
         .then(res => res.json())
         .then(data => {
             let select = document.getElementById("codeLinkedCourse");
@@ -4567,7 +5189,7 @@ window.renderLectures = async function() {
     let list = document.getElementById("lectures-list"); if(!list) return;
     list.innerHTML = `<div style="grid-column: 1/-1; text-align:center;">جاري التحميل...</div>`;
     try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/lectures.json`);
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/lectures.json`);
         let lectures = await res.json() || {};
         list.innerHTML = ""; let keys = Object.keys(lectures).reverse();
         if(keys.length === 0) return list.innerHTML = `<div style="grid-column: 1/-1; text-align:center; color:var(--text-muted);">لا توجد كورسات منشورة.</div>`;
@@ -4690,7 +5312,7 @@ window.openVideoAnalytics = async function(courseId, videoIndex, videoTitle) {
     let defaultMaxViews = course ? (parseInt(course.maxViews) || 0) : 0;
 
     try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/course_tracking/${courseId}.json`);
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/course_tracking/${courseId}.json`);
         let trackingData = await res.json() || {};
         
         tbody.innerHTML = ""; 
@@ -4844,7 +5466,7 @@ window.addExtraViews = async function(courseId, videoIndex, studentKey, currentE
     btn.disabled = true;
 
     try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/course_tracking/${courseId}/${studentKey}/${videoIndex}.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/course_tracking/${courseId}/${studentKey}/${videoIndex}.json`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ extraViews: newExtraTotal })
@@ -4868,7 +5490,7 @@ window.openCourseAnalytics = async function(courseId) {
     openModal("courseAnalyticsModal");
 
     try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/course_tracking/${courseId}.json`);
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/course_tracking/${courseId}.json`);
         let trackingData = await res.json() || {};
         
         tbody.innerHTML = ""; let hasData = false;
@@ -4904,7 +5526,7 @@ window.openCourseAnalytics = async function(courseId) {
 window.deleteLecture = async function(id) {
     if(!confirm("هل تريد حذف المحاضرة نهائياً؟")) return;
     try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/lectures/${id}.json`, { method: 'DELETE' });
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/lectures/${id}.json`, { method: 'DELETE' });
         renderLectures();
     } catch(e) {}
 };
@@ -4992,7 +5614,7 @@ window.saveOnlineExam = async function() {
     btn.disabled = true;
 
     try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams.json`);
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams.json`);
         let existingExams = await res.json() || [];
         existingExams = Array.isArray(existingExams) ? existingExams : Object.values(existingExams).filter(e => e !== null);
 
@@ -5027,7 +5649,7 @@ window.saveOnlineExam = async function() {
             existingExams.push(newExam);
         }
 
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams.json`, { 
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams.json`, { 
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(existingExams) 
         });
 
@@ -5052,7 +5674,7 @@ window.renderOnlineExams = async function() {
     container.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding:20px; color:var(--text-muted);">جاري التحميل... ⏳</div>`;
     
     try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams.json`);
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams.json`);
         let exams = await res.json() || [];
         window.fetchedOnlineExams = Array.isArray(exams) ? exams : Object.values(exams).filter(e => e !== null);
         
@@ -5333,7 +5955,7 @@ window.openOnlineExamDetails = async function(id) {
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">جاري تحليل البيانات ومقارنة الطلاب... ⏳</td></tr>`;
 
     try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/onlineSubmissions/${id}.json`);
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/onlineSubmissions/${id}.json`);
         let subs = await res.json() || {};
         exam.submissions = subs; 
         
@@ -5470,7 +6092,7 @@ window.renderExamSubmissionsList = function(showSubmitted) {
 window.deleteStudentSubmission = async function(examId, subKey) {
     if(!confirm("هل أنت متأكد من حذف إجابة هذا الطالب نهائياً ليتمكن من إعادة الامتحان؟")) return;
     try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/onlineSubmissions/${examId}/${subKey}.json`, { method: 'DELETE' });
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/onlineSubmissions/${examId}/${subKey}.json`, { method: 'DELETE' });
         showToast("تم الحذف بنجاح. يمكن للطالب الآن دخول الامتحان مرة أخرى!", "success");
         openOnlineExamDetails(examId); // ريفريش للجدول
     } catch(e) { showToast("حدث خطأ أثناء الحذف", "error"); }
@@ -5589,7 +6211,7 @@ window.saveManualGrades = async function() {
 
         sub.isGraded = true; 
 
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/onlineSubmissions/${examId}/${subKey}.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/onlineSubmissions/${examId}/${subKey}.json`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub)
         });
 
@@ -5619,7 +6241,7 @@ window.saveManualGrades = async function() {
 window.toggleExamStatus = async function(index, currentStatus) {
     let newStatus = currentStatus === 'open' ? 'closed' : 'open';
     try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams/${index}/status.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newStatus) });
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams/${index}/status.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newStatus) });
         renderOnlineExams();
     } catch(e) {}
 };
@@ -5628,7 +6250,7 @@ window.deleteOnlineExam = async function(index) {
     if(!confirm("⚠️ تأكيد الحذف النهائي؟")) return;
     try {
         let exams = [...window.fetchedOnlineExams]; exams.splice(index, 1);
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(exams) });
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data/onlineExams.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(exams) });
         renderOnlineExams();
     } catch(e) {}
 };
@@ -5646,7 +6268,7 @@ window.sendPlatformNotification = async function(target, title, message) {
         date: new Date().toLocaleDateString('ar-EG')
     };
     try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/notifications/${notif.id}.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/notifications/${notif.id}.json`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(notif)
         });
     } catch(e) { console.error("Notification Error", e); }
@@ -5673,7 +6295,7 @@ window.loadPlatformForumQuestions = async function() {
     if(!tbody) return;
     tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">جاري جلب الأسئلة... ⏳</td></tr>`;
     try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/forum.json`);
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/forum.json`);
         let data = await res.json() || {};
         tbody.innerHTML = "";
         let keys = Object.keys(data).reverse();
@@ -5701,7 +6323,7 @@ window.answerForumQuestion = async function(id) {
     let reply = prompt("اكتب الرد النموذجي للسؤال:");
     if(!reply) return;
     try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/forum/${id}.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/forum/${id}.json`, {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ replyText: reply })
         });
         showToast("تم إرسال الرد وتحديث المنصة لجميع زملائه! ✅");
@@ -5722,7 +6344,7 @@ window.loadStoreData = async function() {
     if(grid) grid.innerHTML = `<div style="grid-column: 1/-1; text-align:center;">جاري تحميل المتجر... ⏳</div>`;
     
     try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/store.json`);
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/store.json`);
         let data = await res.json() || { items: {}, logs: {} };
         
         window.currentStoreItems = data.items ? Object.values(data.items) : [];
@@ -5798,7 +6420,7 @@ window.saveStoreItem = async function() {
         };
 
         // حفظ العنصر
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/store/items/${id}.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/store/items/${id}.json`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(itemData)
         });
 
@@ -5848,7 +6470,7 @@ window.resetStoreForm = function() {
 window.deleteStoreItem = async function(id, name) {
     if(!confirm(`هل أنت متأكد من حذف (${name}) من المتجر نهائياً؟`)) return;
     try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/store/items/${id}.json`, { method: 'DELETE' });
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/store/items/${id}.json`, { method: 'DELETE' });
         showToast("تم الحذف بنجاح! 🗑️");
         loadStoreData();
     } catch(e) { showToast("حدث خطأ أثناء الحذف", "error"); }
@@ -7193,7 +7815,7 @@ window.markAttendance = function(codeOrPhone, status, isManual = false) {
         renderAttendanceTable(s);
 
         // 3. 🚀 المزامنة اللحظية للطالب ده بس في الفايربيز
-        let baseUrl = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data`;
+        let baseUrl = `https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/data`;
 
         fetch(`${baseUrl}/classSessions/${sIndex}/attendance.json`, {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(firebaseStatusUpdate)
@@ -7269,7 +7891,7 @@ window.moveStudentAndAttend = function() {
         localStorage.setItem("students", JSON.stringify(students));
         
         // 2. تحديث المزامنة مع الفايربيز اللحظية
-        let baseUrl = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid ? window.getSafeUid() : 'Historia_System_Master'}/data`;
+        let baseUrl = `https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid ? window.getSafeUid() : 'Historia_System_Master'}/data`;
         fetch(`${baseUrl}/students/${studentIndex}.json`, { 
             method: 'PATCH', 
             headers: { 'Content-Type': 'application/json' }, 
@@ -7316,7 +7938,7 @@ window.markAttendanceInActualGroup = function() {
 
     // نستخدم دالة getSafeUid إذا كانت موجودة لضمان المسار الصحيح
     let uid = window.getSafeUid ? window.getSafeUid() : 'Historia_System_Master';
-    let baseUrl = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/data`;
+    let baseUrl = `https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${uid}/data`;
 
     // أ. تسجيله في الحصة الحالية كـ (تعويض) ورفع التحديث اللحظي
     if (currentSession) {
@@ -7400,7 +8022,7 @@ window.notifyParentApp = async function(studentCode, title, message) {
         
         // حفظ نسخة في الداتا بيز عشان "سجل الإشعارات" يفضل شغال في تطبيق ولي الأمر
         let notifId = "notif_" + Date.now();
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/notifications/${notifId}.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/notifications/${notifId}.json`, {
             method: 'PUT', 
             headers: { 'Content-Type': 'application/json' }, 
             body: JSON.stringify({
@@ -7528,7 +8150,7 @@ window.loadJoinRequests = async function() {
     let tbody = document.getElementById("join-requests-tbody");
     if(!tbody) return;
     try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests.json`);
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests.json`);
         let data = await res.json() || {};
         window.currentJoinRequests = data;
         
@@ -7698,7 +8320,7 @@ window.confirmApproveRequest = async function() {
         localStorage.setItem("students", JSON.stringify(students));
         
         // 🚀 الرفع الفوري للسيرفر لمنع ضياع البيانات بعد دقيقتين 🚀
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/data/students.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/data/students.json`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(students)
         });
 
@@ -7715,7 +8337,7 @@ window.confirmApproveRequest = async function() {
             markAttendance(newCode, attStatus);
             
             // 🚀 الرفع الفوري للحضور عشان ميضيعش 🚀
-            await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/data/classSessions.json`, {
+            await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/data/classSessions.json`, {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(classSessions)
             });
 
@@ -7733,7 +8355,7 @@ window.confirmApproveRequest = async function() {
         // 2. عمليات الخلفية (مسح المكررات والواتساب)
         (async () => {
             try {
-                await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests/${id}.json`, { method: 'DELETE' });
+                await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests/${id}.json`, { method: 'DELETE' });
 
                 let reqNameNorm = window.smartArabicNormalize(req.name);
                 let reqWords = reqNameNorm.split(' ');
@@ -7751,7 +8373,7 @@ window.confirmApproveRequest = async function() {
 
                     if (isDup) {
                         delete window.currentJoinRequests[otherId];
-                        fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests/${otherId}.json`, { method: 'DELETE' }); 
+                        fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests/${otherId}.json`, { method: 'DELETE' }); 
                     }
                 }
 
@@ -7776,7 +8398,7 @@ window.confirmApproveRequest = async function() {
 window.rejectRequest = async function(id) {
     if(!confirm("هل أنت متأكد من رفض هذا الطلب وحذفه؟")) return;
     try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests/${id}.json`, { method: 'DELETE' });
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/join_requests/${id}.json`, { method: 'DELETE' });
         showToast("تم حذف الطلب 🗑️");
         loadJoinRequests();
     } catch(e) { showToast("خطأ في الاتصال!", "error"); }
@@ -8366,7 +8988,7 @@ function startRealTimeSync() {
     if (sessionStorage.getItem("isLoggedIn") !== "true" || localStorage.getItem("is_demo_mode") === "true") return;
 
     // الاتصال المباشر والمستمر بالفايربيز بدون ضغط على السيرفر
-    const syncUrl = `https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master/syncSignal.json`;
+    const syncUrl = `https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/Historia_System_Master/syncSignal.json`;
     const source = new EventSource(syncUrl);
 
     source.addEventListener('put', async function(e) {
@@ -9872,7 +10494,7 @@ window.renderWalletTopupRequests = async function() {
     tbody.innerHTML = `<tr><td colspan="6" style="text-align: center;">جاري التحميل... ⏳</td></tr>`;
 
     try {
-        let res = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/wallet_requests.json`);
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/wallet_requests.json`);
         let reqs = await res.json() || {};
         let list = Object.values(reqs).filter(r => r !== null).reverse();
 
@@ -9934,11 +10556,11 @@ window.approveWalletTopupRequest = async function(reqId) {
 
     try {
         // 1. جلب خزنة الطالب المحمية وإضافة المبلغ إليها
-        let vaultRes = await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/student_vault/${stCode}.json`);
+        let vaultRes = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${uid}/student_vault/${stCode}.json`);
         let vault = await vaultRes.json() || {};
         let newBalance = (parseFloat(vault.walletBalance) || 0) + amount;
 
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/student_vault/${stCode}.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${uid}/student_vault/${stCode}.json`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ walletBalance: newBalance, lastUpdated: new Date().toISOString() })
@@ -9952,7 +10574,7 @@ window.approveWalletTopupRequest = async function(reqId) {
         }
 
         // 3. تحديث حالة الطلب إلى مقبول
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${uid}/wallet_requests/${reqId}.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${uid}/wallet_requests/${reqId}.json`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: "approved", approvedAt: new Date().toLocaleString('ar-EG') })
@@ -9973,7 +10595,7 @@ window.approveWalletTopupRequest = async function(reqId) {
 window.rejectWalletTopupRequest = async function(reqId) {
     if (!confirm("هل أنت متأكد من رفض طلب الشحن هذا؟")) return;
     try {
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/wallet_requests/${reqId}.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/wallet_requests/${reqId}.json`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: "rejected" })
@@ -10283,7 +10905,7 @@ window.saveLecture = async function() {
         };
 
         // رفع الكورس لقاعدة البيانات
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/lectures/${newLecture.id}.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/lectures/${newLecture.id}.json`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newLecture)
@@ -10380,7 +11002,7 @@ window.saveEditedCourse = async function() {
         };
 
         // تحديث الكورس في قاعدة البيانات
-        await fetch(`https://el-senior-system-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/lectures/${id}.json`, {
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${window.getSafeUid()}/lectures/${id}.json`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updatedLecture)

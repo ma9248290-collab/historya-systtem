@@ -26,7 +26,11 @@
     --text-muted: #8b9bb4;
     --card-shadow: 0 14px 34px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
-
+.autocomplete-item.autocomplete-active {
+    background-color: rgba(59, 130, 246, 0.1) !important;
+    color: var(--primary-color) !important;
+    border-right: 4px solid var(--primary-color);
+}
 [data-theme="light"] {
     /* ☀️ الوضع الفاتح (هُوية هيستوريا: الأحمر الداكن الملكي الأصلي) */
     --bg-color: #f4f6fb;

@@ -1321,7 +1321,7 @@
             <button class="admin-btn" style="background-color: #475569;" onclick="document.getElementById('importFile').click()">
                 <span>📤</span> استرجاع نسخة من ملف
             </button>
-            <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
+            <input type="file" id="importFile" accept=".json" style="display: none;" onchange="previewBackupFile(event)">
         </div>
     </div>
 
@@ -3154,6 +3154,57 @@
     .sa-table tr:last-child td { border-bottom: none; }
     .sa-code { color: var(--primary-color); font-weight: bold; font-family: monospace; }
 </style>
+
+<!-- 🔍 نافذة تأكيد واستعراض النسخة الاحتياطية قبل الاسترجاع -->
+<div id="backupPreviewModal" class="modal" style="z-index: 1000005;">
+    <div class="modal-content" style="width: 550px; max-width: 95%; text-align: center; border-top: 5px solid #f59e0b; background: var(--bg-color);">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px;">
+            <h2 style="margin: 0; color: #f59e0b; display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 24px;">⚠️</span> تأكيد استرجاع البيانات
+            </h2>
+            <span class="close" onclick="cancelBackupRestore()" style="font-size: 28px; cursor: pointer; color: var(--danger-color);">&times;</span>
+        </div>
+
+        <p style="color: var(--text-main); font-weight: bold; font-size: 15px; margin-bottom: 20px;">
+            لقد قمت باختيار ملف نسخة احتياطية. إليك محتوياته، هل أنت متأكد من رغبتك في استبدال بيانات النظام الحالية بهذه النسخة؟
+        </p>
+
+        <!-- كروت عرض محتوى النسخة الاحتياطية -->
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 25px;">
+            
+            <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; border-right: 4px solid #3b82f6; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+                <p style="margin: 0 0 5px 0; font-size: 13px; color: var(--text-muted); font-weight: bold;">🎓 عدد الطلاب</p>
+                <h3 id="prev-st-count" style="margin: 0; font-size: 26px; color: #3b82f6;">0</h3>
+            </div>
+            
+            <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; border-right: 4px solid #10b981; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+                <p style="margin: 0 0 5px 0; font-size: 13px; color: var(--text-muted); font-weight: bold;">📚 المجموعات الدراسية</p>
+                <h3 id="prev-grp-count" style="margin: 0; font-size: 26px; color: #10b981;">0</h3>
+            </div>
+            
+            <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; border-right: 4px solid #8b5cf6; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+                <p style="margin: 0 0 5px 0; font-size: 13px; color: var(--text-muted); font-weight: bold;">🎬 الكورسات والمحاضرات</p>
+                <h3 id="prev-lec-count" style="margin: 0; font-size: 26px; color: #8b5cf6;">0</h3>
+            </div>
+            
+            <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; border-right: 4px solid #ec4899; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+                <p style="margin: 0 0 5px 0; font-size: 13px; color: var(--text-muted); font-weight: bold;">💳 كروت الشحن</p>
+                <h3 id="prev-code-count" style="margin: 0; font-size: 26px; color: #ec4899;">0</h3>
+            </div>
+
+        </div>
+
+        <div style="background: rgba(239, 68, 68, 0.05); padding: 10px; border-radius: 8px; font-size: 13px; color: var(--danger-color); font-weight: bold; margin-bottom: 20px; border: 1px dashed #fca5a5;">
+            🚨 تحذير: هذه العملية لا يمكن التراجع عنها وستقوم بالكتابة فوق قاعدة البيانات السحابية والمحلية بالكامل!
+        </div>
+
+        <div style="display: flex; gap: 15px;">
+            <button id="confirmRestoreBtn" class="save-btn" style="flex: 2; margin: 0; background: var(--danger-color); font-size: 16px; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);" onclick="confirmBackupRestore()">نعم، تأكيد واسترجاع البيانات 🚀</button>
+            <button class="theme-btn" style="flex: 1; margin: 0; border-color: var(--text-muted); color: var(--text-muted); font-weight: bold;" onclick="cancelBackupRestore()">إلغاء ❌</button>
+        </div>
+    </div>
+</div>
 
 
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
