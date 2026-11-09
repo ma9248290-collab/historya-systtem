@@ -1,3 +1,4 @@
+
 // ==========================================
 // 1. قواعد البيانات والتهيئة الأساسية
 // ==========================================
@@ -973,8 +974,8 @@ function mergeLocalAndCloudData(cloudData) {
     window.isIncomingSync = false;
 }
 
-// 4️⃣ الدالة الموحدة (اسحب -> ادمج -> ارفع)
-window.smartTwoWaySync = async function() {
+// 4️⃣ الدالة الموحدة الآمنة (تسحب دائماً، ولا ترفع إلا عند وجود تعديل حقيقي)
+window.smartTwoWaySync = async function(forcePush = false) {
     if (window.isSyncingNow || !navigator.onLine) {
         if (!navigator.onLine) updateNetworkBadgeUI("offline");
         return;
@@ -984,45 +985,55 @@ window.smartTwoWaySync = async function() {
     updateNetworkBadgeUI("syncing");
 
     try {
-        // خطوة 1: سحب أحدث نسخة من السحابة أولاً (لمنع مسح شغل الأجهزة الأخرى)
-        const res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data.json`);
-        if (!res.ok) throw new Error("Network response was not ok");
-        const cloudData = await res.json() || {};
+        const uid = getSafeUid();
+        // خطوة 1: سحب أحدث نسخة من مسار المدرس في السحابة
+        let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${uid}/data.json`);
+        let cloudData = await res.json();
+
+        // 🔄 حماية ذكية: لو مسار Historia_System_Master كان فارغاً بينما الداتا موجودة في الجذر القديم (/data)
+        if (!cloudData && uid === "Historia_System_Master") {
+            let rootRes = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/data.json`);
+            cloudData = await rootRes.json();
+        }
+        cloudData = cloudData || {};
+
+        const hadLocalEdits = window.hasPendingOfflineChanges || forcePush;
 
         // خطوة 2: دمج بيانات السحابة مع بيانات الجهاز المحلي
         mergeLocalAndCloudData(cloudData);
 
-        // خطوة 3: رفع البيانات المدمجة بالكامل للسحابة
-        const payload = {
-            students: students,
-            classSessions: classSessions,
-            exams: exams,
-            homeworks: homeworks,
-            groups: groups,
-            financeRecords: financeRecords,
-            expenses: expenses,
-            books: books,
-            schedule: schedule,
-            monthlyPayments: window.monthlyPayments || {},
-            onlineExams: window.fetchedOnlineExams || cloudData.onlineExams || []
-        };
+        // خطوة 3: لا ترفع للسحابة إلا إذا كان هناك تعديل محلي فعلي (يمنع المتصفح الفارغ من الكتابة بدون داعي)
+        if (hadLocalEdits && (students.length > 0 || groups.length > 0)) {
+            const payload = {
+                students: students,
+                classSessions: classSessions,
+                exams: exams,
+                homeworks: homeworks,
+                groups: groups,
+                financeRecords: financeRecords,
+                expenses: expenses,
+                books: books,
+                schedule: schedule,
+                monthlyPayments: window.monthlyPayments || {},
+                onlineExams: window.fetchedOnlineExams || cloudData.onlineExams || []
+            };
 
-        const pushRes = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/data.json`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+            const pushRes = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${uid}/data.json`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-        if (!pushRes.ok) throw new Error("Push failed");
+            if (!pushRes.ok) throw new Error("Push failed");
+        }
 
-        // تم الرفع والدمج بنجاح! نصفر علامة الأوفلاين
         window.hasPendingOfflineChanges = false;
         originalSetItem.call(localStorage, "hasPendingOfflineChanges", "false");
         updateNetworkBadgeUI("online");
         refreshVisibleViewsAfterSync();
 
     } catch (err) {
-        console.warn("Offline or Sync Error - Data is safely kept locally:", err);
+        console.warn("Offline or Sync Error:", err);
         updateNetworkBadgeUI("offline");
     } finally {
         window.isSyncingNow = false;
@@ -1817,7 +1828,7 @@ let currentFocus = -1;
 const attendanceInput = document.getElementById('attendanceBarcode');
 
 if (attendanceInput) {
-    // 1. عند الكتابة في الخانة (إنشاء القائمة)
+    // 1. عند الكتابة في الخانة (إنشاء القائمة الذكية بدقة 100%)
     attendanceInput.addEventListener('input', function(e) {
         let val = this.value.trim();
         closeAllLists();
@@ -1831,36 +1842,61 @@ if (attendanceInput) {
         this.parentNode.appendChild(listNode);
         listNode.style.display = "block";
 
-        // البحث الذكي
         let normalizedVal = window.smartArabicNormalize(val);
         let inputWords = normalizedVal.split(' ');
+        let isNumericInput = /^\d+$/.test(val); // فحص هل المدخل أرقام فقط؟
 
         let matches = students.filter(s => {
-            let dbName = window.smartArabicNormalize(s.name);
-            let matchCode = String(s.code).includes(val);
-            let matchPhone = String(s.phone).includes(val);
-            let matchName = dbName.includes(normalizedVal) || inputWords.every(w => dbName.includes(w));
-            return matchCode || matchPhone || matchName;
+            let sCode = String(s.code).trim();
+            let sPhone = String(s.phone || "").trim();
+            let sParentPhone = String(s.parentPhone || "").trim();
+
+            if (isNumericInput) {
+                // 🎯 لو المدخل صغير (أقل من 4 أرقام مثل 72 أو 183) -> ابحث في كود الطالب فقط!
+                if (val.length <= 4) {
+                    return sCode === val || sCode.startsWith(val);
+                } 
+                // 📱 لو كتب 5 أرقام فأكثر (يبحث برقم الموبايل أو كود طويل) -> ابحث في الكود والهاتف
+                else {
+                    return sCode.includes(val) || sPhone.includes(val) || sParentPhone.includes(val);
+                }
+            } else {
+                // 🔤 لو المدخل حروف أو كود مختلط (مثل GUEST أو O-1001 أو اسم طالب)
+                let dbName = window.smartArabicNormalize(s.name);
+                let matchCode = sCode.toLowerCase().includes(val.toLowerCase());
+                let matchName = dbName.includes(normalizedVal) || inputWords.every(w => dbName.includes(w));
+                return matchCode || matchName;
+            }
         });
 
         const session = classSessions.find(s => s.id === currentActiveSessionId);
         const activeGroup = session ? session.group : "";
 
-        // 🌟 الذكاء الإضافي: ترتيب النتائج (طلاب نفس المجموعة يظهرون أولاً)
+        // 🌟 الترتيب الذكي الصارم:
+        // 1. التطابق التام مع الكود يظهر في المركز الأول دائماً (72 يظهر أول واحد فوراً)
+        // 2. يليه طلاب نفس المجموعة الحالية
+        // 3. يليه الترتيب التصاعدي للأكواد
         matches.sort((a, b) => {
-            if (a.group === activeGroup && b.group !== activeGroup) return -1;
-            if (a.group !== activeGroup && b.group === activeGroup) return 1;
-            return 0;
+            let aExact = String(a.code).trim().toLowerCase() === val.toLowerCase();
+            let bExact = String(b.code).trim().toLowerCase() === val.toLowerCase();
+            if (aExact && !bExact) return -1;
+            if (!aExact && bExact) return 1;
+
+            let aSameGroup = a.group === activeGroup;
+            let bSameGroup = b.group === activeGroup;
+            if (aSameGroup && !bSameGroup) return -1;
+            if (!aSameGroup && bSameGroup) return 1;
+
+            return String(a.code).localeCompare(String(b.code), undefined, { numeric: true });
         });
 
         matches = matches.slice(0, 10); // عرض أول 10 نتائج لسرعة الأداء
 
         // رسم العناصر داخل القائمة
-        matches.forEach((st, index) => {
+        matches.forEach((st) => {
             let itemNode = document.createElement("DIV");
             itemNode.className = "autocomplete-item";
             
-            // تمييز الطالب لو في نفس المجموعة
             let groupBadge = st.group === activeGroup 
                 ? `<span class="badge-same-group">مجموعته ✅</span>` 
                 : `<span class="badge-other-group">ضيف: ${st.group}</span>`;
@@ -1868,17 +1904,14 @@ if (attendanceInput) {
             itemNode.innerHTML = `
                 <div><strong style="color:var(--primary-color)">${st.code}</strong> - ${st.name}</div>
                 ${groupBadge}
+                <input type="hidden" value="${st.code}">
             `;
 
-            // حفظ كود الطالب في عنصر مخفي
-            itemNode.innerHTML += `<input type="hidden" value="${st.code}">`;
-
-            // عند الضغط بالماوس
             itemNode.addEventListener("click", function(e) {
                 let selectedCode = this.getElementsByTagName("input")[0].value;
-                attendanceInput.value = ''; // تفريغ الخانة
+                attendanceInput.value = '';
                 closeAllLists();
-                window.processAttendanceBarcode(selectedCode); // تسجيل الحضور
+                window.processAttendanceBarcode(selectedCode);
             });
 
             listNode.appendChild(itemNode);
