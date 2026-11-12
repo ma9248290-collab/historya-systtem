@@ -11939,3 +11939,471 @@ window.processOctoAiBrain = async function(rawInput) {
 
     return `🤖 لم أفهم الأمر بدقة يا مستر! اضغط على <button class="ai-quick-btn" onclick="executeQuickAiCommand('كل الاوامر')">📖 كتالوج الأوامر</button> لترى كل ما يمكنني تنفيذه لك تلقائياً.`;
 };
+
+
+
+// =========================================================
+// 🤖 نظام إدارة المساعد الذكي وقراءة المذكرات (PDF / TXT)
+// =========================================================
+
+// تحميل مكتبة PDF.js تلقائياً لقراءة ملفات الـ PDF عند رفعها
+(function loadPdfJsLibrary() {
+    if (!window.pdfjsLib) {
+        const script = document.createElement("script");
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+        script.onload = () => {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        };
+        document.head.appendChild(script);
+    }
+})();
+
+window.updateKnowledgeStats = function() {
+    const el = document.getElementById("settingBotKnowledge");
+    const stat = document.getElementById("botKnowledgeStats");
+    if (el && stat) {
+        stat.innerText = `حجم بنك المعرفة الحالي: ${el.value.length.toLocaleString()} حرف`;
+    }
+};
+
+// =========================================================
+// 📄 محرك قراءة الكتب الذكي (يدعم PDF النصي + PDF المصور بالـ AI + Word)
+// =========================================================
+
+// تحميل مكتبة Mammoth لقراءة ملفات Word (.docx) مباشرة إن وجدت
+(function loadDocxLibrary() {
+    if (!window.mammoth) {
+        const script = document.createElement("script");
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js";
+        document.head.appendChild(script);
+    }
+})();
+
+window.extractTextFromUploadedFile = async function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const knowledgeBox = document.getElementById("settingBotKnowledge");
+    const apiKey = document.getElementById("settingGeminiApiKey")?.value.trim() || localStorage.getItem("geminiApiKey") || "";
+
+    try {
+        // 1️⃣ إذا كان الملف Word (.docx)
+        if (file.name.toLowerCase().endsWith(".docx")) {
+            showToast(`⏳ جاري استخراج النص من ملف الوورد: ${file.name}...`, "info");
+            const arrayBuffer = await file.arrayBuffer();
+            const result = await window.mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+            knowledgeBox.value += `\n\n=== 📘 محتوى ملف: ${file.name} ===\n` + result.value;
+            updateKnowledgeStats();
+            showToast(`✅ تم استخراج محتوى ملف الوورد بنجاح!`, "success");
+            event.target.value = "";
+            return;
+        }
+
+        // 2️⃣ إذا كان الملف PDF (نصي أو صور مجمعة)
+        if (file.name.toLowerCase().endsWith(".pdf")) {
+            if (!window.pdfjsLib) {
+                return showToast("يرجى الانتظار ثانية لتحميل قارئ الـ PDF ثم حاول مجدداً", "warning");
+            }
+
+            showToast(`⏳ جاري فحص صفحات الكتاب: ${file.name}...`, "info");
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+            let extractedText = `\n\n=== 📘 محتوى ملف: ${file.name} ===\n`;
+            let emptyPagesList = [];
+
+            // محاولة القراءة النصية السريعة أولاً
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(" ").trim();
+
+                // لو الصفحة فيها كلام حقيقي أكثر من 20 حرف
+                if (pageText.length > 20) {
+                    extractedText += `[صفحة ${i}]: ${pageText}\n`;
+                } else {
+                    emptyPagesList.push(i); // الصفحة عبارة عن صورة!
+                }
+            }
+
+            // إذا كان الكتاب كله أو معظمه صور مجمعة (Scanned PDF)
+            if (emptyPagesList.length > 0) {
+                if (!apiKey) {
+                    showToast("⚠️ هذا الكتاب عبارة عن صور! يرجى وضع مفتاح Gemini API Key أولاً ليقوم الذكاء الاصطناعي بقراءة الصور.", "error");
+                    event.target.value = "";
+                    return;
+                }
+
+                // سؤال المدرس عن نطاق الصفحات المراد قراءتها لو الكتاب كبير جداً (أكثر من 15 صفحة)
+                let pagesToScan = emptyPagesList;
+                if (emptyPagesList.length > 15) {
+                    const rangeInput = prompt(
+                        `📸 هذا الكتاب مكون من (${pdf.numPages}) صفحة مصورة.\n` +
+                        `لقراءة الصور بدقة وسرعة، حدد أرقام الصفحات أو الفصل الذي تريد رفعه الآن (مثال: 1-15 أو 16-30):`,
+                        "1-15"
+                    );
+                    if (!rangeInput) {
+                        event.target.value = "";
+                        return;
+                    }
+                    const parts = rangeInput.split("-").map(n => parseInt(n.trim()));
+                    const startP = Math.max(1, parts[0] || 1);
+                    const endP = Math.min(pdf.numPages, parts[1] || startP);
+                    pagesToScan = [];
+                    for (let p = startP; p <= endP; p++) pagesToScan.push(p);
+                }
+
+                showToast(`🤖 جاري قراءة (${pagesToScan.length}) صفحة مصورة بالذكاء الاصطناعي...`, "info");
+
+                // معالجة كل 3 صفحات معاً في دفعة واحدة لسرعة فائقة
+                const batchSize = 3;
+                for (let b = 0; b < pagesToScan.length; b += batchSize) {
+                    const currentBatch = pagesToScan.slice(b, b + batchSize);
+                    const imageParts = [];
+
+                    for (let pageNum of currentBatch) {
+                        const page = await pdf.getPage(pageNum);
+                        const viewport = page.getViewport({ scale: 1.5 }); // جودة ممتازة للقراءة
+                        const canvas = document.createElement("canvas");
+                        const ctx = canvas.getContext("2d");
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+
+                        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                        const base64Img = canvas.toDataURL("image/jpeg", 0.75).split(",")[1];
+
+                        imageParts.push({
+                            inline_data: { mime_type: "image/jpeg", data: base64Img }
+                        });
+                    }
+
+                    // إرسال الصور لـ Gemini 2.5 Flash لاستخراج النص العربي بالكامل
+                    const ocrRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [
+                                    { text: `قم باستخراج وكتابة كل النصوص العربية والأسئلة والمعلومات الموجودة في هذه الصفحات (${currentBatch.join(", ")}) بدقة تامة وبنفس ترتيبها، مع وضع رقم كل صفحة قبل نصها كالتالي [صفحة X]: بدون أي مقدمات.` },
+                                    ...imageParts
+                                ]
+                            }]
+                        })
+                    });
+
+                    const ocrData = await ocrRes.json();
+                    const batchText = ocrData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                    if (batchText) {
+                        knowledgeBox.value += `\n` + batchText + `\n`;
+                        updateKnowledgeStats();
+                    }
+                }
+
+                showToast(`🎉 تم استخراج النصوص من الصفحات المصورة بنجاح!`, "success");
+            } else {
+                // الكتاب كان نصياً بالكامل
+                knowledgeBox.value += extractedText;
+                updateKnowledgeStats();
+                showToast(`✅ تم استخراج (${pdf.numPages}) صفحات نصية بنجاح!`, "success");
+            }
+        } else {
+            // 3️⃣ ملفات TXT أو MD أو JSON
+            const text = await file.text();
+            knowledgeBox.value += `\n\n=== 📄 محتوى ملف: ${file.name} ===\n` + text;
+            updateKnowledgeStats();
+            showToast(`✅ تم إرفاق محتوى الملف بنجاح!`, "success");
+        }
+    } catch (err) {
+        console.error("File Read Error:", err);
+        showToast("❌ حدث خطأ أثناء معالجة الملف!", "error");
+    }
+    event.target.value = "";
+};
+
+// 💾 دالة حفظ إعدادات المساعد الذكي ورفعها للفايربيز وسيرفر الواتساب
+window.saveBotSettings = async function() {
+    const enabled = document.getElementById("settingBotEnabled")?.checked || false;
+    const name = document.getElementById("settingBotName")?.value.trim() || "أوكتو";
+    const apiKey = document.getElementById("settingGeminiApiKey")?.value.trim() || "";
+    const instructions = document.getElementById("settingBotInstructions")?.value.trim() || "";
+    const knowledgeBase = document.getElementById("settingBotKnowledge")?.value.trim() || "";
+
+    const btn = document.getElementById("saveBotSettingsBtn");
+    const origText = btn ? btn.innerText : "";
+    if (btn) { btn.innerText = "⏳ جاري الحفظ وتنشيط البوت..."; btn.disabled = true; }
+
+    // 1. الحفظ المحلي
+    localStorage.setItem("botEnabled", enabled ? "true" : "false");
+    localStorage.setItem("botName", name);
+    localStorage.setItem("geminiApiKey", apiKey);
+    localStorage.setItem("botInstructions", instructions);
+    localStorage.setItem("botKnowledgeBase", knowledgeBase);
+
+    const botConfigPayload = {
+        botEnabled: enabled,
+        botName: name,
+        geminiApiKey: apiKey,
+        botInstructions: instructions,
+        botKnowledgeBase: knowledgeBase,
+        teacherName: localStorage.getItem("teacherName") || TEACHER_NAME,
+        centerName: localStorage.getItem("centerName") || TEACHER_NAME,
+        updatedAt: new Date().toISOString()
+    };
+
+    try {
+        const uid = getSafeUid();
+        // 2. الرفع إلى Firebase تحت قسم botConfig
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${uid}/botConfig.json`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(botConfigPayload)
+        });
+
+        // 3. إرسال التحديث الفوري لسيرفر الواتساب المحلي (localhost:3000) لو شغال
+        try {
+            await fetch(`${WHATSAPP_SERVER_URL}/update-bot-config`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ clientId: uid, config: botConfigPayload })
+            });
+        } catch (localErr) {
+            console.log("سيقوم سيرفر الواتساب بقراءة الإعدادات مباشرة من الفايربيز.");
+        }
+
+        showToast(enabled ? "🤖 تم تفعيل المساعد الذكي وتحديث بنك المعرفة بنجاح!" : "تم إيقاف المساعد الذكي وحفظ الإعدادات.", "success");
+    } catch (e) {
+        showToast("❌ حدث خطأ أثناء رفع إعدادات البوت للسحابة!", "error");
+    } finally {
+        if (btn) { btn.innerText = origText; btn.disabled = false; }
+    }
+};
+
+// تعبئة الخانات تلقائياً عند فتح صفحة المساعد الذكي
+const oldSwitchForBot = window.switchPage;
+window.switchPage = async function(pageId) {
+    if (oldSwitchForBot) oldSwitchForBot(pageId);
+    if (pageId === "bot") {
+        // محاولة جلب أحدث إعدادات من الفايربيز
+        try {
+            let res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${getSafeUid()}/botConfig.json`);
+            let cfg = await res.json();
+            if (cfg) {
+                localStorage.setItem("botEnabled", cfg.botEnabled ? "true" : "false");
+                if (cfg.botName) localStorage.setItem("botName", cfg.botName);
+                if (cfg.geminiApiKey) localStorage.setItem("geminiApiKey", cfg.geminiApiKey);
+                if (cfg.botInstructions !== undefined) localStorage.setItem("botInstructions", cfg.botInstructions);
+                if (cfg.botKnowledgeBase !== undefined) localStorage.setItem("botKnowledgeBase", cfg.botKnowledgeBase);
+            }
+        } catch (e) {}
+
+        if (document.getElementById("settingBotEnabled")) document.getElementById("settingBotEnabled").checked = localStorage.getItem("botEnabled") === "true";
+        if (document.getElementById("settingBotName")) document.getElementById("settingBotName").value = localStorage.getItem("botName") || "أوكتو";
+        if (document.getElementById("settingGeminiApiKey")) document.getElementById("settingGeminiApiKey").value = localStorage.getItem("geminiApiKey") || "";
+        if (document.getElementById("settingBotInstructions")) document.getElementById("settingBotInstructions").value = localStorage.getItem("botInstructions") || "";
+        if (document.getElementById("settingBotKnowledge")) {
+            document.getElementById("settingBotKnowledge").value = localStorage.getItem("botKnowledgeBase") || "";
+            updateKnowledgeStats();
+        }
+    }
+};
+
+
+// =========================================================
+// 🛠️ إصلاح شامل لحفظ درجات الامتحانات والواجبات (يدوي + باركود)
+// =========================================================
+
+// 1. تحديث دالة رسم جدول الدرجات لفصل ID الامتحان عن الواجب ومنع التداخل
+window.renderGradesTable = function(itemDetails, tbodyId, saveFunction, itemId, itemType) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody || !itemDetails) return;
+
+    const gStudents = students.filter(s => s.group === itemDetails.group);
+    if (gStudents.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">لا يوجد طلاب في هذه المجموعة</td></tr>`;
+        return;
+    }
+
+    if (!itemDetails.grades) itemDetails.grades = {};
+
+    let prevItem = null;
+    if (itemType === 'exam') {
+        const grpItems = exams.filter(e => e.group === itemDetails.group).sort((a, b) => new Date(a.date) - new Date(b.date));
+        prevItem = grpItems[grpItems.findIndex(e => String(e.id) === String(itemDetails.id)) - 1];
+    } else if (itemType === 'hw') {
+        const grpItems = homeworks.filter(h => h.group === itemDetails.group).sort((a, b) => new Date(a.date) - new Date(b.date));
+        prevItem = grpItems[grpItems.findIndex(h => String(h.id) === String(itemDetails.id)) - 1];
+    }
+
+    const isHw = (itemType === 'hw' || tbodyId === 'hw-grades-list');
+    const btnColor = isHw ? 'var(--hw-color)' : 'var(--exam-color)';
+    const fnName = isHw ? 'saveHwGrade' : 'saveExamGrade';
+    const inputPrefix = isHw ? 'hw_grade_' : 'exam_grade_';
+
+    let htmlContent = "";
+
+    gStudents.forEach(st => {
+        let grade = itemDetails.grades[st.code] !== undefined
+            ? itemDetails.grades[st.code]
+            : (st.phone && st.phone !== "0" && itemDetails.grades[st.phone] !== undefined ? itemDetails.grades[st.phone] : '');
+
+        let pHT = `<span style="color:var(--text-muted)">--</span>`;
+        if (prevItem && prevItem.grades) {
+            let pG = prevItem.grades[st.code] !== undefined
+                ? prevItem.grades[st.code]
+                : (st.phone && st.phone !== "0" ? prevItem.grades[st.phone] : undefined);
+            if (pG !== undefined) {
+                pHT = `<strong style="color:${btnColor}">${pG} / ${prevItem.maxScore}</strong>`;
+            }
+        }
+
+        let noteIcon = "";
+        if (typeof openStudentNoteModal === "function") {
+            noteIcon = st.note && st.note.trim() !== ""
+                ? `<span style="cursor: pointer; margin-right: 8px; font-size: 16px;" title="عرض الملاحظة" onclick="openStudentNoteModal('${st.code}')">📝</span>`
+                : `<span style="cursor: pointer; margin-right: 8px; font-size: 14px; opacity: 0.3;" title="إضافة ملاحظة" onclick="openStudentNoteModal('${st.code}')">📝</span>`;
+        }
+
+        htmlContent += `
+        <tr>
+            <td><strong>${st.code}</strong></td>
+            <td>${st.name} ${noteIcon}</td>
+            <td>${st.phone}</td>
+            <td style="direction:ltr;">${pHT}</td>
+            <td style="direction: ltr;">
+                <span style="color:var(--text-muted);">/ ${itemDetails.maxScore}</span>
+                <input type="number" id="${inputPrefix}${st.code}" class="custom-input" 
+                    style="width:75px; padding:6px; text-align:center; font-weight:bold;" 
+                    value="${grade}" min="0" max="${itemDetails.maxScore}"
+                    onkeypress="if(event.key==='Enter'){ event.preventDefault(); ${fnName}('${st.code}'); }">
+            </td>
+            <td>
+                <button type="button" class="btn-present" onclick="${fnName}('${st.code}')" style="background-color: ${btnColor}; color: #fff; cursor: pointer;">حفظ</button>
+            </td>
+        </tr>`;
+    });
+
+    tbody.innerHTML = htmlContent;
+};
+
+// 2. دالة حفظ درجة الامتحان (الزر اليدوي أو Enter)
+window.saveExamGrade = function(studentCode) {
+    const exam = exams.find(e => String(e.id) === String(currentActiveExamId));
+    if (!exam) return showToast("لم يتم تحديد الامتحان!", "error");
+
+    const inputEl = document.getElementById(`exam_grade_${studentCode}`) || document.getElementById(`grade_${studentCode}`);
+    if (!inputEl) return;
+
+    const rawVal = inputEl.value.trim();
+    if (!exam.grades) exam.grades = {};
+
+    const student = students.find(s => String(s.code) === String(studentCode));
+
+    // لو فرّغ الخانة وضغط حفظ -> يمسح الدرجة المرصودة
+    if (rawVal === "") {
+        delete exam.grades[studentCode];
+        if (student && student.phone && student.phone !== "0") delete exam.grades[student.phone];
+        localStorage.setItem("exams", JSON.stringify(exams));
+        showToast(`تم مسح درجة الطالب: ${student ? student.name : studentCode}`, "warning");
+        return;
+    }
+
+    const score = parseFloat(rawVal);
+    const maxScore = parseFloat(exam.maxScore);
+
+    if (isNaN(score) || score < 0 || score > maxScore) {
+        return showToast(`يرجى إدخال درجة صحيحة بين 0 و ${maxScore}!`, "error");
+    }
+
+    exam.grades[studentCode] = score;
+    localStorage.setItem("exams", JSON.stringify(exams));
+
+    // تأثير بصري سريع يوضح نجاح الحفظ في الخانة
+    inputEl.style.borderColor = "var(--success-color)";
+    inputEl.style.backgroundColor = "rgba(16, 185, 129, 0.1)";
+    setTimeout(() => { inputEl.style.borderColor = ""; inputEl.style.backgroundColor = ""; }, 800);
+
+    showToast(`تم حفظ درجة (${student ? student.name : studentCode}): ${score} / ${maxScore} ✅`, "success");
+    if (typeof addSystemLog === "function" && student) {
+        addSystemLog("رصد امتحان 📝", `رصد درجة ${score}/${maxScore} للطالب ${student.name} في (${exam.name})`);
+    }
+};
+
+// 3. دالة حفظ درجة الواجب (الزر اليدوي أو Enter)
+window.saveHwGrade = function(studentCode) {
+    const hw = homeworks.find(h => String(h.id) === String(currentActiveHwId));
+    if (!hw) return showToast("لم يتم تحديد الواجب!", "error");
+
+    const inputEl = document.getElementById(`hw_grade_${studentCode}`) || document.getElementById(`grade_${studentCode}`);
+    if (!inputEl) return;
+
+    const rawVal = inputEl.value.trim();
+    if (!hw.grades) hw.grades = {};
+
+    const student = students.find(s => String(s.code) === String(studentCode));
+
+    if (rawVal === "") {
+        delete hw.grades[studentCode];
+        if (student && student.phone && student.phone !== "0") delete hw.grades[student.phone];
+        localStorage.setItem("homeworks", JSON.stringify(homeworks));
+        showToast(`تم مسح درجة واجب الطالب: ${student ? student.name : studentCode}`, "warning");
+        return;
+    }
+
+    const score = parseFloat(rawVal);
+    const maxScore = parseFloat(hw.maxScore);
+
+    if (isNaN(score) || score < 0 || score > maxScore) {
+        return showToast(`يرجى إدخال درجة صحيحة بين 0 و ${maxScore}!`, "error");
+    }
+
+    hw.grades[studentCode] = score;
+    localStorage.setItem("homeworks", JSON.stringify(homeworks));
+
+    inputEl.style.borderColor = "var(--success-color)";
+    inputEl.style.backgroundColor = "rgba(16, 185, 129, 0.1)";
+    setTimeout(() => { inputEl.style.borderColor = ""; inputEl.style.backgroundColor = ""; }, 800);
+
+    showToast(`تم حفظ واجب (${student ? student.name : studentCode}): ${score} / ${maxScore} 📚`, "success");
+    if (typeof addSystemLog === "function" && student) {
+        addSystemLog("تقييم واجب 📚", `رصد درجة ${score}/${maxScore} للطالب ${student.name} في (${hw.name})`);
+    }
+};
+
+// 4. تفعيل الرصد السريع بالباركود أو الاسم في الامتحانات والواجبات
+window.submitExamBarcodeGrade = function() {
+    const codeInput = document.getElementById("examBarcodeCode");
+    const gradeInput = document.getElementById("examBarcodeGrade");
+    if (!codeInput || !gradeInput) return;
+
+    const student = findStudentByCodeOrName(codeInput.value.trim());
+    if (!student) return showToast("الطالب غير موجود!", "error");
+
+    const rowInput = document.getElementById(`exam_grade_${student.code}`);
+    if (!rowInput) return showToast("الطالب ليس ضمن هذه المجموعة!", "error");
+
+    rowInput.value = gradeInput.value.trim();
+    saveExamGrade(student.code);
+
+    codeInput.value = "";
+    gradeInput.value = "";
+    codeInput.focus();
+};
+
+window.submitHwBarcodeGrade = function() {
+    const codeInput = document.getElementById("hwBarcodeCode");
+    const gradeInput = document.getElementById("hwBarcodeGrade");
+    if (!codeInput || !gradeInput) return;
+
+    const student = findStudentByCodeOrName(codeInput.value.trim());
+    if (!student) return showToast("الطالب غير موجود!", "error");
+
+    const rowInput = document.getElementById(`hw_grade_${student.code}`);
+    if (!rowInput) return showToast("الطالب ليس ضمن هذه المجموعة!", "error");
+
+    rowInput.value = gradeInput.value.trim();
+    saveHwGrade(student.code);
+
+    codeInput.value = "";
+    gradeInput.value = "";
+    codeInput.focus();
+};

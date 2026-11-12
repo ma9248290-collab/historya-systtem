@@ -1973,33 +1973,61 @@
         </div>
 
 
-        <!-- صفحة المساعد الذكي -->
+        <!-- صفحة المساعد الذكي المطورة (مع بنك المعرفة ورفع الملفات) -->
 <div id="bot-view" class="view-section admin-only" style="display: none;">
     <section class="students-section">
         <div class="admin-panel-card" style="border-top: 5px solid #8b5cf6;">
             <h2 style="color: #8b5cf6; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 24px;">🤖</span> إعدادات المساعد الذكي للواتساب
+                <span style="font-size: 24px;">🤖</span> إعدادات المساعد الذكي للواتساب (AI + بنك المذكرات)
             </h2>
             
-            <div style="background: var(--hover-bg); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px dashed #8b5cf6;">
-                <p style="font-weight: bold; margin-bottom: 15px; color: var(--text-main);">💡 تحكم في عقل المساعد الآلي الذي يرد على الطلاب وأولياء الأمور 24/7:</p>
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 16px; font-weight: bold; color: var(--success-color); background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: 8px; border: 1px solid var(--success-color);">
+            <div style="background: var(--hover-bg); padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px dashed #8b5cf6;">
+                <p style="font-weight: bold; margin-bottom: 12px; color: var(--text-main);">
+                    💡 المساعد الذكي يرد تلقائياً على الطلاب وأولياء الأمور (يعرف درجات الطالب، غيابه، مواعيد مجموعته، ويجيب عن أسئلة المنهج من الملفات المرفوعة):
+                </p>
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 16px; font-weight: bold; color: var(--success-color); background: rgba(16, 185, 129, 0.1); padding: 12px; border-radius: 8px; border: 1px solid var(--success-color);">
                     <input type="checkbox" id="settingBotEnabled" style="width: 20px; height: 20px; accent-color: var(--success-color);">
-                    تفعيل المساعد الذكي للرد التلقائي
+                    تفعيل المساعد الذكي للرد التلقائي عبر الواتساب 24/7 ✅
                 </label>
             </div>
 
-            <div class="input-group">
-                <label style="font-weight: bold;">اسم المساعد (مثال: شيفو، أوكتو، ميرا)</label>
-                <input type="text" id="settingBotName" class="custom-input" placeholder="اكتب اسم المساعد هنا...">
+            <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div class="input-group" style="margin: 0;">
+                    <label style="font-weight: bold;">اسم المساعد (مثال: أوكتو، مساعد هيستوريا)</label>
+                    <input type="text" id="settingBotName" class="custom-input" placeholder="أوكتو">
+                </div>
+                <div class="input-group" style="margin: 0;">
+                    <label style="font-weight: bold; color: #3b82f6;">🔑 مفتاح الذكاء الاصطناعي (Gemini API Key)</label>
+                    <input type="password" id="settingGeminiApiKey" class="custom-input" placeholder="AIzaSy... (احصل عليه مجاناً من Google AI Studio)" style="direction: ltr;">
+                </div>
             </div>
             
             <div class="input-group">
-                <label style="font-weight: bold;">تعليمات وشخصية المساعد (System Prompt)</label>
-                <textarea id="settingBotInstructions" class="custom-input" rows="5" placeholder="مثال: تحدث بأسلوب محفز جداً، استخدم إيموجي كثيرة، لا تقدم أي وعود مالية أو خصومات للطلاب..."></textarea>
+                <label style="font-weight: bold;">تعليمات وشخصية المساعد ومعلومات السنتر (System Prompt)</label>
+                <textarea id="settingBotInstructions" class="custom-input" rows="4" placeholder="مثال: أنت المساعد الذكي لمستر أسامة رفعت خبير التاريخ. سعر الحصة 50 ج.م، تحدث بأسلوب مشجع، وإذا سألك طالب سؤالاً في التاريخ اشرحه له ببساطة واختبره بسؤال اختياري..."></textarea>
+            </div>
+
+            <!-- 📚 قسم رفع المذكرات والملفات لتدريب المساعد -->
+            <div style="background: rgba(59, 130, 246, 0.04); padding: 20px; border-radius: 14px; border: 1px dashed #3b82f6; margin: 20px 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+                    <div>
+                        <h3 style="margin: 0; color: #3b82f6; font-size: 16px;">📚 بنك المذكرات والملفات (يقرأها المساعد ويرد منها على أسئلة الطلاب)</h3>
+                        <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--text-muted); font-weight: bold;">ارفع ملفات (PDF أو TXT أو انسخ ملخص الفصل/الأسئلة) لكي يذاكرها البوت ويسأل الطلاب فيها</p>
+                    </div>
+                    <label style="background: #3b82f6; color: white; padding: 8px 18px; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 13px;">
+                        📄 رفع ملف (PDF / TXT)
+                        <input type="file" id="botKnowledgeFileInput" accept=".pdf,.txt,.md,.json" style="display: none;" onchange="extractTextFromUploadedFile(event)">
+                    </label>
+                </div>
+
+                <textarea id="settingBotKnowledge" class="custom-input" rows="7" placeholder="سيظهر هنا محتوى الملفات التي ترفعها (أو يمكنك لصق ملخصات الفصول وأسئلة المراجعة والـ Q&A مباشرة هنا)..."></textarea>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-top: 5px; font-weight: bold;">
+                    <span id="botKnowledgeStats">حجم بنك المعرفة الحالي: 0 حرف</span>
+                    <button type="button" onclick="document.getElementById('settingBotKnowledge').value=''; updateKnowledgeStats();" style="background: none; border: none; color: var(--danger-color); cursor: pointer; font-weight: bold;">🗑️ تفريغ النص</button>
+                </div>
             </div>
             
-            <button class="save-btn" style="width: 100%; font-size: 18px; padding: 15px; background-color: #8b5cf6; box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);" onclick="saveBotSettings()">💾 حفظ تشغيل وإعدادات المساعد</button>
+            <button id="saveBotSettingsBtn" class="save-btn" style="width: 100%; font-size: 18px; padding: 15px; background-color: #8b5cf6; box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);" onclick="saveBotSettings()">💾 حفظ وتنشيط المساعد الذكي الآن</button>
         </div>
     </section>
 </div>
@@ -3210,6 +3238,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 
 <script src="assistant-enc.js?v=100"></script>
-<script src="script-enc.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
