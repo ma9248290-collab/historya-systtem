@@ -859,24 +859,44 @@ function mergeLocalAndCloudData(cloudData, isLocalPriority = false) {
         groups = Array.from(groupMap.values()).filter(g => !(del.groups || []).includes(String(g.name).trim()));
 
         // 3. الحصص
-        const sessionMap = new Map();
-        filterDeleted(cloudData.classSessions, "id", "sessions").forEach(cs => sessionMap.set(String(cs.id), cs));
-        (classSessions || []).forEach(ls => {
-            if (!ls || !ls.id) return;
-            const idStr = String(ls.id);
-            if (!sessionMap.has(idStr)) sessionMap.set(idStr, ls);
-            else {
-                const cs = sessionMap.get(idStr);
+        // 🛡️ دمج الحصص وسجل الحضور (يحترم إلغاء الحضور التام ولا يعيد الطالب المحذوف)
+        const cloudSessions = filterDeleted(cloudData.classSessions, "id", "sessions");
+    const sessionMap = new Map();
+    cloudSessions.forEach(cs => { 
+        if (cs && cs.id) sessionMap.set(String(cs.id).trim(), cs); 
+    });
+
+    (classSessions || []).forEach(ls => {
+        if (!ls || !ls.id) return;
+        const idStr = String(ls.id).trim();
+        if ((del.sessions || []).includes(idStr)) return;
+
+        if (!sessionMap.has(idStr)) {
+            sessionMap.set(idStr, ls);
+        } else {
+            const cs = sessionMap.get(idStr);
+            if (isLocalPriority) {
+                // 🔥 السحر هنا: لو التعديل محلي (مثل إلغاء حضور طالب)، نعتمد سجل الحضور المحلي (ls) فوراً ولا ندمج القديم من السحابة!
                 sessionMap.set(idStr, {
                     ...cs,
                     ...ls,
+                    attendance: { ...(ls.attendance || {}) },
+                    attendanceLog: { ...(ls.attendanceLog || {}) }
+                });
+            } else {
+                sessionMap.set(idStr, {
+                    ...cs,
                     attendance: { ...(cs.attendance || {}), ...(ls.attendance || {}) },
                     attendanceLog: { ...(cs.attendanceLog || {}), ...(ls.attendanceLog || {}) }
                 });
             }
-        });
-        classSessions = Array.from(sessionMap.values()).filter(s => !(del.sessions || []).includes(String(s.id).trim()));
+        }
+    });
 
+    if (sessionMap.size > 0 || isLocalPriority) {
+        classSessions = Array.from(sessionMap.values()).filter(s => !(del.sessions || []).includes(String(s.id).trim()));
+    }
+        
         // 4. باقي الجداول (الامتحانات، الواجبات، المصاريف، الكتب، الجدول)
         const mergeListWithDelete = (cloudArr, localArr, cat) => {
             const map = new Map();
@@ -12329,4 +12349,84 @@ window.submitHwBarcodeGrade = function() {
     codeInput.value = "";
     gradeInput.value = "";
     codeInput.focus();
+};
+
+
+
+// =========================================================
+// 🤖 حفظ وجلب إعدادات صديق المذاكرة الـ AI (للوحة المدرس)
+// =========================================================
+window.updateKnowledgeStats = function() {
+    const txt = document.getElementById('settingBotKnowledge')?.value || "";
+    const statsEl = document.getElementById('botKnowledgeStats');
+    if (statsEl) statsEl.innerText = `حجم بنك المعرفة الحالي: ${txt.length.toLocaleString()} حرف`;
+};
+
+window.extractTextFromUploadedFile = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const box = document.getElementById('settingBotKnowledge');
+        if (box) {
+            box.value += (box.value ? "\n\n---\n\n" : "") + e.target.result;
+            window.updateKnowledgeStats();
+            if (typeof showToast === "function") showToast("تمت إضافة محتوى الملف لبنك المذكرات بنجاح! 📄");
+        }
+    };
+    reader.readAsText(file);
+};
+
+window.saveBotSettings = async function() {
+    const btn = document.getElementById('saveBotSettingsBtn');
+    const origText = btn ? btn.innerHTML : "";
+    if (btn) { btn.innerHTML = "جاري الحفظ والتفعيل... ⏳"; btn.disabled = true; }
+
+    const botSettings = {
+        enabled: document.getElementById('settingBotEnabled')?.checked || false,
+        botName: (document.getElementById('settingBotName')?.value || "رفيق هيستوريا").trim(),
+        apiKey: (document.getElementById('settingGeminiApiKey')?.value || "").trim(),
+        instructions: (document.getElementById('settingBotInstructions')?.value || "").trim(),
+        knowledge: (document.getElementById('settingBotKnowledge')?.value || "").trim(),
+        updatedAt: new Date().toISOString()
+    };
+
+    try {
+        const uid = typeof getSafeUid === "function" ? getSafeUid() : "Historia_System_Master";
+        await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${uid}/bot_settings.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(botSettings)
+        });
+        localStorage.setItem('botEnabled', String(botSettings.enabled));
+        localStorage.setItem('botName', botSettings.botName);
+        localStorage.setItem('botInstructions', botSettings.instructions);
+        if (typeof showToast === "function") showToast("✅ تم حفظ وتنشيط صديق المذاكرة الـ AI على منصة الطلاب!");
+    } catch (e) {
+        if (typeof showToast === "function") showToast("❌ خطأ في الاتصال بالسيرفر!", "error");
+    } finally {
+        if (btn) { btn.innerHTML = origText; btn.disabled = false; }
+    }
+};
+
+// جلب الإعدادات تلقائياً عند فتح صفحة المساعد الذكي في لوحة المدرس
+const _origSwitchPageBot = window.switchPage;
+window.switchPage = function(pageId) {
+    if (_origSwitchPageBot) _origSwitchPageBot(pageId);
+    if (pageId === 'bot') {
+        const uid = typeof getSafeUid === "function" ? getSafeUid() : "Historia_System_Master";
+        fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${uid}/bot_settings.json`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data) return;
+                if (document.getElementById('settingBotEnabled')) document.getElementById('settingBotEnabled').checked = !!data.enabled;
+                if (document.getElementById('settingBotName')) document.getElementById('settingBotName').value = data.botName || "رفيق هيستوريا";
+                if (document.getElementById('settingGeminiApiKey')) document.getElementById('settingGeminiApiKey').value = data.apiKey || "";
+                if (document.getElementById('settingBotInstructions')) document.getElementById('settingBotInstructions').value = data.instructions || "";
+                if (document.getElementById('settingBotKnowledge')) {
+                    document.getElementById('settingBotKnowledge').value = data.knowledge || "";
+                    window.updateKnowledgeStats();
+                }
+            }).catch(() => {});
+    }
 };

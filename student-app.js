@@ -2752,3 +2752,214 @@ window.renderStudentLectures = function() {
         </div>`;
     });
 };
+
+
+
+// =========================================================
+// 🤖 محرك صديق المذاكرة الذكي (StudyBuddyAI Module - Pro V1)
+// =========================================================
+window.StudyBuddyAI = {
+    config: null,
+    mode: 'study', // study | feynman | quiz
+    history: [],
+    isSending: false,
+    DAILY_LIMIT: 30,
+
+    // 1. تهيئة المحرك وجلب إعدادات المدرس من Firebase
+    async init() {
+        try {
+            const res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/bot_settings.json`);
+            const data = await res.json();
+            if (data && data.enabled && data.apiKey) {
+                this.config = data;
+                const fab = document.getElementById('ai-buddy-fab');
+                if (fab) fab.style.display = 'flex';
+                const titleEl = document.getElementById('ai-buddy-title');
+                if (titleEl && data.botName) titleEl.innerText = data.botName;
+                this.updateQuotaUI();
+            }
+        } catch (e) {
+            console.warn("AI Buddy Init Skipped:", e);
+        }
+    },
+
+    // 2. إدارة الحد اليومي للرسائل لحماية الـ API Key
+    getQuotaKey() {
+        const today = new Date().toISOString().split('T')[0];
+        const code = currentStudent ? currentStudent.code : 'guest';
+        return `ai_buddy_quota_${code}_${today}`;
+    },
+    getUsedCount() {
+        return parseInt(localStorage.getItem(this.getQuotaKey()) || "0", 10);
+    },
+    incrementUsedCount() {
+        localStorage.setItem(this.getQuotaKey(), String(this.getUsedCount() + 1));
+        this.updateQuotaUI();
+    },
+    updateQuotaUI() {
+        const rem = Math.max(0, this.DAILY_LIMIT - this.getUsedCount());
+        const el = document.getElementById('ai-buddy-quota');
+        if (el) el.innerText = `● متصل • متبقي لك ${rem} رسالة اليوم`;
+    },
+
+    // 3. فتح وإغلاق وتغيير الأوضاع
+    open() {
+        if (!this.config) return;
+        document.getElementById('ai-buddy-modal').classList.add('open');
+        if (this.history.length === 0) this.renderWelcome();
+        setTimeout(() => document.getElementById('ai-buddy-input')?.focus(), 150);
+    },
+    close() {
+        document.getElementById('ai-buddy-modal').classList.remove('open');
+    },
+    setMode(newMode) {
+        if (this.isSending) return;
+        this.mode = newMode;
+        document.querySelectorAll('.ai-mode-pill').forEach(b => b.classList.remove('active'));
+        const activeBtn = document.getElementById(`mode-${newMode}`);
+        if (activeBtn) activeBtn.classList.add('active');
+        this.resetChat();
+    },
+    resetChat() {
+        this.history = [];
+        document.getElementById('ai-buddy-messages').innerHTML = '';
+        this.renderWelcome();
+    },
+
+    // 4. رسالة الترحيب المخصصة لكل وضع وباسم الطالب
+    renderWelcome() {
+        const stName = currentStudent ? currentStudent.name.split(' ')[0] : 'يا بطل';
+        const botName = this.config?.botName || 'صديقك في المذاكرة';
+        let msg = "";
+
+        if (this.mode === 'study') {
+            msg = `أهلاً يا **${stName}**! 👋 أنا **${botName}**.\nابعتلي أي سؤال واقف معاك في المنهج أو اسم درس عايز نراجعه سوا وهشرحهولك بأبسط طريقة.`;
+        } else if (this.mode === 'feynman') {
+            msg = `تحدي **"اشرحلي أنت"** بدأ يا **${stName}**! 🧠\nاختار أي درس أو فقرة واشرحهالي بأسلوبك كأني صاحبك اللي مش فاهم، وأنا هقييم شرحك من 10 وأقولك إيه اللي نسيته!`;
+        } else if (this.mode === 'quiz') {
+            msg = `جاهز للـ **اختبار السريع** يا **${stName}**؟ ⚡\nاكتبلي اسم الدرس أو الفصل اللي عايز نختبر فيه، وهسألك 5 أسئلة سريعة سؤال بسؤال ونشوف هتجيب كام من 5!`;
+        }
+        this.appendMessage('ai', msg);
+    },
+
+    // 5. بناء التعليمات الذكية (System Instruction)
+    buildSystemPrompt() {
+        const stName = currentStudent?.name || "الطالب";
+        const stLevel = currentStudent?.level || "الثانوية العامة";
+        const teacherNotes = (this.config?.knowledge || "").substring(0, 12000);
+        const customRules = this.config?.instructions || "";
+
+        let modePrompt = "";
+        if (this.mode === 'study') {
+            modePrompt = `أنت صديق مذاكرة ذكي ومرح باللهجة المصرية الودودة.
+عندما يرسل لك الطالب سؤالاً (خصوصاً أسئلة الاختيار من متعدد):
+1. لا تطِل في الترحيب والمقدمات، وادخل في الإجابة مباشرة في نفس الرسالة.
+2. ابدأ بـ: **✅ الإجابة الصحيحة:** (اكتب الحرف ونص الاختيار الصحيح).
+3. ثم اكتب: **💡 الشرح والتفسير:** (اشرح لماذا هذه الإجابة صحيحة مع ربطها بناتج التعلم، ووضح باختصار سبب استبعاد باقي الاختيارات).`;
+        } else if (this.mode === 'feynman') {
+            modePrompt = "الوضع الحالي هو (اشرحلي أنت): تصرف كصديق يريد أن يفهم الدرس من الطالب. استمع لشرحه، ثم قيّم شرحه من 10 بصدق ولطف، واذكر له النقاط الصحيحة التي قالها وأي نقطة مهمة نسيها.";
+        } else if (this.mode === 'quiz') {
+            modePrompt = "الوضع الحالي هو (اختبار سريع من 5 أسئلة): اسأل الطالب سؤالاً واحداً فقط في كل مرة (اختيار من متعدد أ/ب/ج/د). انتظر إجابته، ثم صححها له فوراً مع سبب الإجابة وانتقل للسؤال التالي. في النهاية اعرض نتيجته من 5 وشجعه.";
+        }
+
+        return `أنت "${this.config?.botName || 'صديق المذاكرة'}".
+بيانات الطالب: الاسم (${stName})، الصف (${stLevel}).
+${modePrompt}
+تعليمات المدرس الإضافية: ${customRules}
+مرجع ومذكرات المدرس (اعتمد عليها كأولوية):
+${teacherNotes}
+قواعد صارمة: أجب باللغة العربية الواضحة، اجعل ردودك كاملة ومنظمة، ولا تخرج عن إطار التعليم والمذاكرة.`;
+    },
+
+    // 6. إرسال الرسالة إلى Gemini API
+    async send() {
+        if (this.isSending || !this.config?.apiKey) return;
+        const inputEl = document.getElementById('ai-buddy-input');
+        const text = (inputEl?.value || "").trim();
+        if (!text) return;
+
+        if (this.getUsedCount() >= this.DAILY_LIMIT) {
+            this.appendMessage('ai', "⚠️ لقد استهلكت الحد اليومي المسموح للرسائل (30 رسالة). نكمل مذاكرة بكرة يا بطل! 💪");
+            return;
+        }
+
+        inputEl.value = "";
+        this.appendMessage('user', text);
+        this.history.push({ role: "user", parts: [{ text }] });
+
+        this.isSending = true;
+        const sendBtn = document.getElementById('ai-buddy-send');
+        if (sendBtn) sendBtn.disabled = true;
+        const loadingId = this.appendMessage('ai', "جاري التفكير... ⏳");
+
+        try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.config.apiKey}`;
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    system_instruction: { parts: [{ text: this.buildSystemPrompt() }] },
+                    contents: this.history.slice(-10), // الاحتفاظ بآخر 10 رسائل للذاكرة
+                    generationConfig: { 
+                        temperature: 0.5, 
+                        maxOutputTokens: 2500,
+                        thinkingConfig: { thinkingBudget: 0 }
+                    }
+                })
+            });
+
+            const data = await response.json();
+            const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+            if (!reply) throw new Error(data?.error?.message || "لم يتم استلام رد");
+
+            this.history.push({ role: "model", parts: [{ text: reply }] });
+            this.incrementUsedCount();
+            this.updateMessage(loadingId, reply);
+        } catch (err) {
+            console.error("AI Buddy Error:", err);
+            this.history.pop(); // إزالة الرسالة الفاشلة من الذاكرة
+            this.updateMessage(loadingId, "❌ عذراً، حدثت مشكلة مؤقتة في الاتصال. تأكد من الإنترنت وحاول مرة أخرى.");
+        } finally {
+            this.isSending = false;
+            if (sendBtn) sendBtn.disabled = false;
+            inputEl?.focus();
+        }
+    },
+
+    // 7. تنسيق الردود وعرضها بأمان (XSS Safe + Markdown Formatting)
+    formatText(raw) {
+        return raw
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+            .replace(/\n/g, "<br>");
+    },
+    appendMessage(sender, text) {
+        const box = document.getElementById('ai-buddy-messages');
+        const id = "msg_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+        const div = document.createElement('div');
+        div.id = id;
+        div.className = `buddy-msg ${sender}`;
+        div.innerHTML = this.formatText(text);
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+        return id;
+    },
+    updateMessage(id, text) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.innerHTML = this.formatText(text);
+            const box = document.getElementById('ai-buddy-messages');
+            if (box) box.scrollTop = box.scrollHeight;
+        }
+    }
+};
+
+// تفعيل صديق المذاكرة تلقائياً بمجرد دخول الطالب للمنصة
+const _origFetchStudentForBuddy = window.fetchStudentData;
+if (typeof _origFetchStudentForBuddy === 'function') {
+    window.fetchStudentData = async function(...args) {
+        await _origFetchStudentForBuddy.apply(this, args);
+        if (window.currentStudent) StudyBuddyAI.init();
+    };
+}
