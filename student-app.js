@@ -2754,9 +2754,8 @@ window.renderStudentLectures = function() {
 };
 
 
-
 // =========================================================
-// 🤖 محرك صديق المذاكرة الذكي (StudyBuddyAI Module - Pro V1)
+// 🤖 محرك صديق المذاكرة الذكي (StudyBuddyAI Module - Pro V2)
 // =========================================================
 window.StudyBuddyAI = {
     config: null,
@@ -2764,8 +2763,72 @@ window.StudyBuddyAI = {
     history: [],
     isSending: false,
     DAILY_LIMIT: 30,
+    MODELS_FALLBACK: [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash"
+    ],
 
-    // 1. تهيئة المحرك وجلب إعدادات المدرس من Firebase
+    // 1. استخراج الأسئلة التي أخطأ فيها الطالب من كل الامتحانات الإلكترونية
+    getStudentMistakesContext() {
+        try {
+            if (!currentStudent || !Array.isArray(allOnlineExams) || !window.studentSubmissions) {
+                return "لا توجد امتحانات مسجلة بعد.";
+            }
+            let mistakes = [];
+
+            allOnlineExams.forEach(exam => {
+                if (!exam || !exam.questions) return;
+                const examSubs = window.studentSubmissions[exam.id];
+                if (!examSubs) return;
+                const sub = examSubs[currentStudent.code] || (currentStudent.phone && currentStudent.phone !== "0" ? examSubs[currentStudent.phone] : null);
+                if (!sub || !sub.answers) return;
+
+                exam.questions.forEach(q => {
+                    const stAns = sub.answers[q.id];
+                    let isWrong = false;
+                    let stAnsText = "لم يُجب";
+                    let correctAnsText = "";
+
+                    if (q.type === 'mcq') {
+                        const sIdx = stAns !== undefined && stAns !== null ? parseInt(stAns) : -1;
+                        const cIdx = parseInt(q.correctAnswerIndex);
+                        if (sIdx !== cIdx) {
+                            isWrong = true;
+                            const optS = q.options?.[sIdx];
+                            const optC = q.options?.[cIdx];
+                            stAnsText = optS ? (typeof optS === 'object' ? optS.text : optS) : "لم يُجب";
+                            correctAnsText = optC ? (typeof optC === 'object' ? optC.text : optC) : "";
+                        }
+                    } else if (q.type === 'tf') {
+                        const cVal = String(q.correctAnswerTF !== undefined ? q.correctAnswerTF : q.correctAnswer);
+                        if (String(stAns) !== cVal) {
+                            isWrong = true;
+                            stAnsText = stAns === 'true' ? 'صح' : (stAns === 'false' ? 'خطأ' : 'لم يُجب');
+                            correctAnsText = cVal === 'true' ? 'صح' : 'خطأ';
+                        }
+                    } else if (q.type === 'blank') {
+                        if ((stAns || "").trim().toLowerCase() !== (q.correctAnswerText || "").trim().toLowerCase()) {
+                            isWrong = true;
+                            stAnsText = stAns || "لم يُجب";
+                            correctAnsText = q.correctAnswerText || "";
+                        }
+                    }
+
+                    if (isWrong) {
+                        mistakes.push(`- امتحان (${exam.title}): السؤال: "${q.text}" | إجابة الطالب الخاطئة: "${stAnsText}" | الإجابة الصحيحة: "${correctAnsText}"${q.explanation ? ` | التفسير: ${q.explanation}` : ""}`);
+                    }
+                });
+            });
+
+            if (mistakes.length === 0) return "الطالب لم يخطئ في أي سؤال في امتحاناته السابقة (ممتاز!).";
+            return mistakes.slice(-15).join("\n");
+        } catch (e) {
+            return "غير متوفر حالياً.";
+        }
+    },
+
+    // 2. تهيئة المحرك وجلب إعدادات المدرس من Firebase
     async init() {
         try {
             const res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/bot_settings.json`);
@@ -2783,7 +2846,7 @@ window.StudyBuddyAI = {
         }
     },
 
-    // 2. إدارة الحد اليومي للرسائل لحماية الـ API Key
+    // 3. إدارة الحد اليومي للرسائل
     getQuotaKey() {
         const today = new Date().toISOString().split('T')[0];
         const code = currentStudent ? currentStudent.code : 'guest';
@@ -2802,7 +2865,7 @@ window.StudyBuddyAI = {
         if (el) el.innerText = `● متصل • متبقي لك ${rem} رسالة اليوم`;
     },
 
-    // 3. فتح وإغلاق وتغيير الأوضاع
+    // 4. فتح وإغلاق وتغيير الأوضاع
     open() {
         if (!this.config) return;
         document.getElementById('ai-buddy-modal').classList.add('open');
@@ -2826,7 +2889,7 @@ window.StudyBuddyAI = {
         this.renderWelcome();
     },
 
-    // 4. رسالة الترحيب المخصصة لكل وضع وباسم الطالب
+    // 5. رسالة الترحيب المخصصة
     renderWelcome() {
         const stName = currentStudent ? currentStudent.name.split(' ')[0] : 'يا بطل';
         const botName = this.config?.botName || 'صديقك في المذاكرة';
@@ -2842,7 +2905,7 @@ window.StudyBuddyAI = {
         this.appendMessage('ai', msg);
     },
 
-    // 5. بناء التعليمات الذكية (System Instruction)
+    // 6. بناء التعليمات الذكية (System Instruction)
     buildSystemPrompt() {
         const stName = currentStudent?.name || "الطالب";
         const stLevel = currentStudent?.level || "الثانوية العامة";
@@ -2862,16 +2925,75 @@ window.StudyBuddyAI = {
             modePrompt = "الوضع الحالي هو (اختبار سريع من 5 أسئلة): اسأل الطالب سؤالاً واحداً فقط في كل مرة (اختيار من متعدد أ/ب/ج/د). انتظر إجابته، ثم صححها له فوراً مع سبب الإجابة وانتقل للسؤال التالي. في النهاية اعرض نتيجته من 5 وشجعه.";
         }
 
+        const studentMistakes = this.getStudentMistakesContext();
+
         return `أنت "${this.config?.botName || 'صديق المذاكرة'}".
 بيانات الطالب: الاسم (${stName})، الصف (${stLevel}).
 ${modePrompt}
+أخطاء الطالب السابقة في الامتحانات (استخدمها إذا سألك عن أخطائه أو طلب مراجعتها):
+${studentMistakes}
 تعليمات المدرس الإضافية: ${customRules}
 مرجع ومذكرات المدرس (اعتمد عليها كأولوية):
 ${teacherNotes}
 قواعد صارمة: أجب باللغة العربية الواضحة، اجعل ردودك كاملة ومنظمة، ولا تخرج عن إطار التعليم والمذاكرة.`;
     },
 
-    // 6. إرسال الرسالة إلى Gemini API
+    // 7. دالة الاتصال بالـ API مع التبديل التلقائي للموديلات وحماية Timeout
+    async callGeminiWithFallback(payload) {
+        let lastError = "UNKNOWN_ERROR";
+
+        for (const modelName of this.MODELS_FALLBACK) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 25000); // حد أقصى 25 ثانية
+
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${this.config.apiKey}`;
+                
+                // thinkingConfig مدعومة في سلسلة 2.5 فقط
+                const bodyPayload = JSON.parse(JSON.stringify(payload));
+                if (!modelName.includes("2.5")) {
+                    delete bodyPayload.generationConfig.thinkingConfig;
+                }
+
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(bodyPayload),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+                const data = await response.json();
+
+                if (response.ok) {
+                    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (reply) return reply;
+                    lastError = "EMPTY_REPLY";
+                    continue;
+                }
+
+                if (response.status === 429 || response.status === 503) {
+                    lastError = "RATE_LIMIT";
+                    continue; // جرب الموديل البديل تلقائياً
+                }
+
+                throw new Error(data?.error?.message || `HTTP ${response.status}`);
+            } catch (err) {
+                clearTimeout(timeoutId);
+                if (err.name === "AbortError") {
+                    lastError = "TIMEOUT";
+                    continue;
+                }
+                lastError = err.message;
+                if (!lastError.includes("RATE_LIMIT") && !lastError.includes("429")) {
+                    throw err;
+                }
+            }
+        }
+        throw new Error(lastError);
+    },
+
+    // 8. إرسال الرسالة
     async send() {
         if (this.isSending || !this.config?.apiKey) return;
         const inputEl = document.getElementById('ai-buddy-input');
@@ -2893,41 +3015,40 @@ ${teacherNotes}
         const loadingId = this.appendMessage('ai', "جاري التفكير... ⏳");
 
         try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.config.apiKey}`;
-            const response = await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    system_instruction: { parts: [{ text: this.buildSystemPrompt() }] },
-                    contents: this.history.slice(-10), // الاحتفاظ بآخر 10 رسائل للذاكرة
-                    generationConfig: { 
-                        temperature: 0.5, 
-                        maxOutputTokens: 2500,
-                        thinkingConfig: { thinkingBudget: 0 }
-                    }
-                })
-            });
+            const payload = {
+                system_instruction: { parts: [{ text: this.buildSystemPrompt() }] },
+                contents: this.history.slice(-10),
+                generationConfig: {
+                    temperature: 0.5,
+                    maxOutputTokens: 2500,
+                    thinkingConfig: { thinkingBudget: 0 }
+                }
+            };
 
-            const data = await response.json();
-            const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-            if (!reply) throw new Error(data?.error?.message || "لم يتم استلام رد");
+            const reply = await this.callGeminiWithFallback(payload);
 
             this.history.push({ role: "model", parts: [{ text: reply }] });
             this.incrementUsedCount();
             this.updateMessage(loadingId, reply);
         } catch (err) {
             console.error("AI Buddy Error:", err);
-            this.history.pop(); // إزالة الرسالة الفاشلة من الذاكرة
-            this.updateMessage(loadingId, "❌ عذراً، حدثت مشكلة مؤقتة في الاتصال. تأكد من الإنترنت وحاول مرة أخرى.");
+            this.history.pop();
+            if (err.message === "RATE_LIMIT") {
+                this.updateMessage(loadingId, "⏳ هناك ضغط لحظي على السيرفر، انتظر 10 ثوانٍ وأعد إرسال سؤالك يا بطل.");
+            } else if (err.message === "TIMEOUT") {
+                this.updateMessage(loadingId, "⏱️ استغرق الرد وقتاً أطول من المعتاد، تأكد من سرعة الإنترنت وحاول مجدداً.");
+            } else {
+                this.updateMessage(loadingId, `❌ حدث خطأ مؤقت (${err.message}). حاول مرة أخرى.`);
+            }
         } finally {
+            // 🔒 ضمان فك الزرار دائماً في كل الحالات
             this.isSending = false;
             if (sendBtn) sendBtn.disabled = false;
             inputEl?.focus();
         }
     },
 
-    // 7. تنسيق الردود وعرضها بأمان (XSS Safe + Markdown Formatting)
+    // 9. تنسيق الردود وعرضها بأمان
     formatText(raw) {
         return raw
             .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
