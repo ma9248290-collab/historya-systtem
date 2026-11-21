@@ -2755,7 +2755,7 @@ window.renderStudentLectures = function() {
 
 
 // =========================================================
-// 🤖 محرك صديق المذاكرة الذكي (StudyBuddyAI Module - Pro V2)
+// 🤖 محرك صديق المذاكرة الذكي (StudyBuddyAI Module - Pro V3: Vision + Voice)
 // =========================================================
 window.StudyBuddyAI = {
     config: null,
@@ -2769,14 +2769,22 @@ window.StudyBuddyAI = {
         "gemini-2.0-flash"
     ],
 
-    // 1. استخراج الأسئلة التي أخطأ فيها الطالب من كل الامتحانات الإلكترونية
+    // متغيرات الصورة والفويس (تُحفظ في الذاكرة المؤقتة فقط - صفر حمل على الفايربيز)
+    pendingImageBase64: null,
+    pendingImageMime: "image/jpeg",
+    mediaRecorder: null,
+    audioChunks: [],
+    recTimerInterval: null,
+    recSeconds: 0,
+    isRecordingCancelled: false,
+
+    // 1. استخراج أخطاء الطالب من الامتحانات
     getStudentMistakesContext() {
         try {
             if (!currentStudent || !Array.isArray(allOnlineExams) || !window.studentSubmissions) {
                 return "لا توجد امتحانات مسجلة بعد.";
             }
             let mistakes = [];
-
             allOnlineExams.forEach(exam => {
                 if (!exam || !exam.questions) return;
                 const examSubs = window.studentSubmissions[exam.id];
@@ -2786,17 +2794,14 @@ window.StudyBuddyAI = {
 
                 exam.questions.forEach(q => {
                     const stAns = sub.answers[q.id];
-                    let isWrong = false;
-                    let stAnsText = "لم يُجب";
-                    let correctAnsText = "";
+                    let isWrong = false, stAnsText = "لم يُجب", correctAnsText = "";
 
                     if (q.type === 'mcq') {
                         const sIdx = stAns !== undefined && stAns !== null ? parseInt(stAns) : -1;
                         const cIdx = parseInt(q.correctAnswerIndex);
                         if (sIdx !== cIdx) {
                             isWrong = true;
-                            const optS = q.options?.[sIdx];
-                            const optC = q.options?.[cIdx];
+                            const optS = q.options?.[sIdx], optC = q.options?.[cIdx];
                             stAnsText = optS ? (typeof optS === 'object' ? optS.text : optS) : "لم يُجب";
                             correctAnsText = optC ? (typeof optC === 'object' ? optC.text : optC) : "";
                         }
@@ -2820,7 +2825,6 @@ window.StudyBuddyAI = {
                     }
                 });
             });
-
             if (mistakes.length === 0) return "الطالب لم يخطئ في أي سؤال في امتحاناته السابقة (ممتاز!).";
             return mistakes.slice(-15).join("\n");
         } catch (e) {
@@ -2828,7 +2832,7 @@ window.StudyBuddyAI = {
         }
     },
 
-    // 2. تهيئة المحرك وجلب إعدادات المدرس من Firebase
+    // 2. التهيئة
     async init() {
         try {
             const res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${globalTeacherId}/bot_settings.json`);
@@ -2846,15 +2850,12 @@ window.StudyBuddyAI = {
         }
     },
 
-    // 3. إدارة الحد اليومي للرسائل
+    // 3. الحد اليومي
     getQuotaKey() {
         const today = new Date().toISOString().split('T')[0];
-        const code = currentStudent ? currentStudent.code : 'guest';
-        return `ai_buddy_quota_${code}_${today}`;
+        return `ai_buddy_quota_${currentStudent ? currentStudent.code : 'guest'}_${today}`;
     },
-    getUsedCount() {
-        return parseInt(localStorage.getItem(this.getQuotaKey()) || "0", 10);
-    },
+    getUsedCount() { return parseInt(localStorage.getItem(this.getQuotaKey()) || "0", 10); },
     incrementUsedCount() {
         localStorage.setItem(this.getQuotaKey(), String(this.getUsedCount() + 1));
         this.updateQuotaUI();
@@ -2865,7 +2866,7 @@ window.StudyBuddyAI = {
         if (el) el.innerText = `● متصل • متبقي لك ${rem} رسالة اليوم`;
     },
 
-    // 4. فتح وإغلاق وتغيير الأوضاع
+    // 4. التحكم بالنافذة والأوضاع
     open() {
         if (!this.config) return;
         document.getElementById('ai-buddy-modal').classList.add('open');
@@ -2873,59 +2874,199 @@ window.StudyBuddyAI = {
         setTimeout(() => document.getElementById('ai-buddy-input')?.focus(), 150);
     },
     close() {
+        this.cancelVoiceRecording();
         document.getElementById('ai-buddy-modal').classList.remove('open');
     },
     setMode(newMode) {
         if (this.isSending) return;
         this.mode = newMode;
         document.querySelectorAll('.ai-mode-pill').forEach(b => b.classList.remove('active'));
-        const activeBtn = document.getElementById(`mode-${newMode}`);
-        if (activeBtn) activeBtn.classList.add('active');
+        document.getElementById(`mode-${newMode}`)?.classList.add('active');
         this.resetChat();
     },
     resetChat() {
         this.history = [];
+        this.clearPendingImage();
         document.getElementById('ai-buddy-messages').innerHTML = '';
         this.renderWelcome();
     },
+    sendQuickChip(promptText) {
+        if (this.isSending) return;
+        const inputEl = document.getElementById('ai-buddy-input');
+        if (inputEl) inputEl.value = promptText;
+        this.send();
+    },
 
-    // 5. رسالة الترحيب المخصصة
     renderWelcome() {
         const stName = currentStudent ? currentStudent.name.split(' ')[0] : 'يا بطل';
         const botName = this.config?.botName || 'صديقك في المذاكرة';
         let msg = "";
-
         if (this.mode === 'study') {
-            msg = `أهلاً يا **${stName}**! 👋 أنا **${botName}**.\nابعتلي أي سؤال واقف معاك في المنهج أو اسم درس عايز نراجعه سوا وهشرحهولك بأبسط طريقة.`;
+            msg = `أهلاً يا **${stName}**! 👋 أنا **${botName}**.\nاكتبلي سؤالك، أو اضغط 📸 **صوّر السؤال** من كتابك، أو اضغط 🎙️ **واسألني فويس** وهجاوبك وأشرحلك فوراً!`;
         } else if (this.mode === 'feynman') {
-            msg = `تحدي **"اشرحلي أنت"** بدأ يا **${stName}**! 🧠\nاختار أي درس أو فقرة واشرحهالي بأسلوبك كأني صاحبك اللي مش فاهم، وأنا هقييم شرحك من 10 وأقولك إيه اللي نسيته!`;
+            msg = `تحدي **"اشرحلي أنت"** بدأ يا **${stName}**! 🧠\nاضغط على المايك 🎙️ واشرحلي الدرس بصوتك كأني صاحبك اللي مش فاهم، وهقييم شرحك من 10 وأقولك إيه اللي نسيته!`;
         } else if (this.mode === 'quiz') {
-            msg = `جاهز للـ **اختبار السريع** يا **${stName}**؟ ⚡\nاكتبلي اسم الدرس أو الفصل اللي عايز نختبر فيه، وهسألك 5 أسئلة سريعة سؤال بسؤال ونشوف هتجيب كام من 5!`;
+            msg = `جاهز للـ **اختبار السريع** يا **${stName}**؟ ⚡\nاكتبلي اسم الدرس أو الفصل اللي عايز نختبر فيه، وهسألك 5 أسئلة سريعة سؤال بسؤال!`;
         }
         this.appendMessage('ai', msg);
     },
 
-    // 6. بناء التعليمات الذكية (System Instruction)
+    // =========================================================
+    // 📸 5. معالجة وضغط الصور محلياً (Zero Server Load)
+    // =========================================================
+    handleImageSelect(event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX = 1024; // دقة ممتازة لقراءة النصوص الصغيرة مع حجم خفيف جداً
+                let w = img.width, h = img.height;
+                if (w > h && w > MAX) { h *= MAX / w; w = MAX; }
+                else if (h > MAX) { w *= MAX / h; h = MAX; }
+                canvas.width = w;
+                canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.72);
+                this.pendingImageBase64 = dataUrl.split(',')[1];
+                this.pendingImageMime = "image/jpeg";
+
+                document.getElementById('ai-preview-img').src = dataUrl;
+                document.getElementById('ai-image-preview-bar').style.display = 'flex';
+                document.getElementById('ai-buddy-input')?.focus();
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+        event.target.value = "";
+    },
+    clearPendingImage() {
+        this.pendingImageBase64 = null;
+        const bar = document.getElementById('ai-image-preview-bar');
+        if (bar) bar.style.display = 'none';
+    },
+
+    // =========================================================
+    // 🎙️ 6. تسجيل الفويس الاحترافي (يعمل على Android و iOS والكمبيوتر)
+    // =========================================================
+    async toggleVoiceRecording() {
+        if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
+            this.stopAndSendVoice();
+            return;
+        }
+        if (this.isSending) return;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            return alert("⚠️ متصفحك لا يدعم تسجيل الصوت، يرجى استخدام Chrome أو Safari.");
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                ? 'audio/webm;codecs=opus'
+                : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4');
+
+            // 🎚️ كاشف الصوت لمنع إرسال تسجيلات صامتة للـ API
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioCtx.createMediaStreamSource(stream);
+            const analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 256;
+            source.connect(analyser);
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            let peakVolume = 0;
+
+            const volumeCheckInterval = setInterval(() => {
+                analyser.getByteFrequencyData(dataArray);
+                const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+                if (avg > peakVolume) peakVolume = avg;
+            }, 100);
+
+            this.audioChunks = [];
+            this.isRecordingCancelled = false;
+            this.mediaRecorder = new MediaRecorder(stream, { mimeType });
+
+            this.mediaRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) this.audioChunks.push(e.data);
+            };
+
+            this.mediaRecorder.onstop = () => {
+                clearInterval(volumeCheckInterval);
+                audioCtx.close().catch(() => {});
+                stream.getTracks().forEach(t => t.stop());
+                clearInterval(this.recTimerInterval);
+                document.getElementById('ai-voice-recording-bar').style.display = 'none';
+                document.getElementById('ai-mic-btn')?.classList.remove('recording');
+
+                if (this.isRecordingCancelled || this.audioChunks.length === 0) return;
+
+                // 🚫 لو التسجيل صامت أو مفيش صوت واضح، وقّف الإرسال فوراً بدون استهلاك API
+                if (peakVolume < 4) {
+                    this.appendMessage('ai', "🎙️ التسجيل كان فاضي أو الصوت واطي جداً يا بطل! اتأكد إن المايك شغال واتكلم بوضوح وجرب تاني.");
+                    return;
+                }
+
+                const cleanMime = mimeType.split(';')[0];
+                const audioBlob = new Blob(this.audioChunks, { type: cleanMime });
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64Audio = reader.result.split(',')[1];
+                    this.send({ audioBase64: base64Audio, audioMime: cleanMime, durationSec: this.recSeconds });
+                };
+                reader.readAsDataURL(audioBlob);
+            };
+
+            this.mediaRecorder.start();
+            this.recSeconds = 0;
+            document.getElementById('ai-rec-timer').innerText = "00:00";
+            document.getElementById('ai-voice-recording-bar').style.display = 'flex';
+            document.getElementById('ai-mic-btn')?.classList.add('recording');
+
+            this.recTimerInterval = setInterval(() => {
+                this.recSeconds++;
+                const m = String(Math.floor(this.recSeconds / 60)).padStart(2, '0');
+                const s = String(this.recSeconds % 60).padStart(2, '0');
+                document.getElementById('ai-rec-timer').innerText = `${m}:${s}`;
+                if (this.recSeconds >= 60) this.stopAndSendVoice();
+            }, 1000);
+
+        } catch (err) {
+            alert("🎙️ يرجى السماح بصلاحية الميكروفون من المتصفح لتسجيل الفويس.");
+        }
+    },
+    stopAndSendVoice() {
+        if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
+            this.isRecordingCancelled = false;
+            this.mediaRecorder.stop();
+        }
+    },
+    cancelVoiceRecording() {
+        if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
+            this.isRecordingCancelled = true;
+            this.mediaRecorder.stop();
+        }
+    },
+
+    // 7. بناء التعليمات الذكية
     buildSystemPrompt() {
         const stName = currentStudent?.name || "الطالب";
         const stLevel = currentStudent?.level || "الثانوية العامة";
         const teacherNotes = (this.config?.knowledge || "").substring(0, 12000);
         const customRules = this.config?.instructions || "";
+        const studentMistakes = this.getStudentMistakesContext();
 
         let modePrompt = "";
         if (this.mode === 'study') {
             modePrompt = `أنت صديق مذاكرة ذكي ومرح باللهجة المصرية الودودة.
-عندما يرسل لك الطالب سؤالاً (خصوصاً أسئلة الاختيار من متعدد):
+عندما يرسل لك الطالب سؤالاً (سواء نصاً أو صورة أو تسجيلاً صوتياً):
 1. لا تطِل في الترحيب والمقدمات، وادخل في الإجابة مباشرة في نفس الرسالة.
-2. ابدأ بـ: **✅ الإجابة الصحيحة:** (اكتب الحرف ونص الاختيار الصحيح).
+2. إذا كان سؤال اختيار من متعدد، ابدأ بـ: **✅ الإجابة الصحيحة:** (اكتب الحرف ونص الاختيار الصحيح).
 3. ثم اكتب: **💡 الشرح والتفسير:** (اشرح لماذا هذه الإجابة صحيحة مع ربطها بناتج التعلم، ووضح باختصار سبب استبعاد باقي الاختيارات).`;
         } else if (this.mode === 'feynman') {
-            modePrompt = "الوضع الحالي هو (اشرحلي أنت): تصرف كصديق يريد أن يفهم الدرس من الطالب. استمع لشرحه، ثم قيّم شرحه من 10 بصدق ولطف، واذكر له النقاط الصحيحة التي قالها وأي نقطة مهمة نسيها.";
+            modePrompt = "الوضع الحالي هو (اشرحلي أنت): استمع لشرح الطالب (سواء نصاً أو تسجيلاً صوتياً) كصديق يريد أن يفهم منه الدرس، ثم قيّم شرحه من 10 بصدق ولطف، واذكر له النقاط الصحيحة التي قالها وأي نقطة مهمة نسيها أو أخطأ فيها.";
         } else if (this.mode === 'quiz') {
             modePrompt = "الوضع الحالي هو (اختبار سريع من 5 أسئلة): اسأل الطالب سؤالاً واحداً فقط في كل مرة (اختيار من متعدد أ/ب/ج/د). انتظر إجابته، ثم صححها له فوراً مع سبب الإجابة وانتقل للسؤال التالي. في النهاية اعرض نتيجته من 5 وشجعه.";
         }
-
-        const studentMistakes = this.getStudentMistakesContext();
 
         return `أنت "${this.config?.botName || 'صديق المذاكرة'}".
 بيانات الطالب: الاسم (${stName})، الصف (${stLevel}).
@@ -2938,22 +3079,16 @@ ${teacherNotes}
 قواعد صارمة: أجب باللغة العربية الواضحة، اجعل ردودك كاملة ومنظمة، ولا تخرج عن إطار التعليم والمذاكرة.`;
     },
 
-    // 7. دالة الاتصال بالـ API مع التبديل التلقائي للموديلات وحماية Timeout
+    // 8. الاتصال بالـ API مع التبديل التلقائي وحماية Timeout
     async callGeminiWithFallback(payload) {
         let lastError = "UNKNOWN_ERROR";
-
         for (const modelName of this.MODELS_FALLBACK) {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 25000); // حد أقصى 25 ثانية
-
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
             try {
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${this.config.apiKey}`;
-                
-                // thinkingConfig مدعومة في سلسلة 2.5 فقط
                 const bodyPayload = JSON.parse(JSON.stringify(payload));
-                if (!modelName.includes("2.5")) {
-                    delete bodyPayload.generationConfig.thinkingConfig;
-                }
+                if (!modelName.includes("2.5")) delete bodyPayload.generationConfig.thinkingConfig;
 
                 const response = await fetch(url, {
                     method: "POST",
@@ -2961,7 +3096,6 @@ ${teacherNotes}
                     body: JSON.stringify(bodyPayload),
                     signal: controller.signal
                 });
-
                 clearTimeout(timeoutId);
                 const data = await response.json();
 
@@ -2971,53 +3105,79 @@ ${teacherNotes}
                     lastError = "EMPTY_REPLY";
                     continue;
                 }
-
                 if (response.status === 429 || response.status === 503) {
                     lastError = "RATE_LIMIT";
-                    continue; // جرب الموديل البديل تلقائياً
+                    continue;
                 }
-
                 throw new Error(data?.error?.message || `HTTP ${response.status}`);
             } catch (err) {
                 clearTimeout(timeoutId);
-                if (err.name === "AbortError") {
-                    lastError = "TIMEOUT";
-                    continue;
-                }
+                if (err.name === "AbortError") { lastError = "TIMEOUT"; continue; }
                 lastError = err.message;
-                if (!lastError.includes("RATE_LIMIT") && !lastError.includes("429")) {
-                    throw err;
-                }
+                if (!lastError.includes("RATE_LIMIT") && !lastError.includes("429")) throw err;
             }
         }
         throw new Error(lastError);
     },
 
-    // 8. إرسال الرسالة
-    async send() {
+    // 9. إرسال الرسالة (نص + صورة + فويس)
+    async send(voicePayload = null) {
         if (this.isSending || !this.config?.apiKey) return;
         const inputEl = document.getElementById('ai-buddy-input');
         const text = (inputEl?.value || "").trim();
-        if (!text) return;
+        const hasImage = !!this.pendingImageBase64;
+        const hasVoice = !!(voicePayload && voicePayload.audioBase64);
+
+        if (!text && !hasImage && !hasVoice) return;
 
         if (this.getUsedCount() >= this.DAILY_LIMIT) {
             this.appendMessage('ai', "⚠️ لقد استهلكت الحد اليومي المسموح للرسائل (30 رسالة). نكمل مذاكرة بكرة يا بطل! 💪");
             return;
         }
 
-        inputEl.value = "";
-        this.appendMessage('user', text);
-        this.history.push({ role: "user", parts: [{ text }] });
+        // تجهيز محتوى الرسالة للعرض وللـ API
+        const parts = [];
+        let uiHtmlPrefix = "";
+        let historyTextFallback = text;
+
+        if (hasImage) {
+            const imgDataUrl = document.getElementById('ai-preview-img')?.src || "";
+            uiHtmlPrefix += `<img src="${imgDataUrl}" class="msg-thumb" alt="سؤال">`;
+            parts.push({ inline_data: { mime_type: this.pendingImageMime, data: this.pendingImageBase64 } });
+            if (!text) parts.push({ text: "اقرأ السؤال الموجود في هذه الصورة، واختر الإجابة الصحيحة واشرحها بالتفصيل." });
+            historyTextFallback = text || "[أرسل الطالب صورة سؤال]";
+            this.clearPendingImage();
+        }
+
+        if (hasVoice) {
+            uiHtmlPrefix += `🎙️ <strong>رسالة صوتية (${voicePayload.durationSec || 1} ثانية)</strong>`;
+            parts.push({ inline_data: { mime_type: voicePayload.audioMime, data: voicePayload.audioBase64 } });
+            parts.push({
+    text: "استمع جيداً للتسجيل الصوتي المرفق. قاعدة صارمة: إذا كان التسجيل صامتاً أو يحتوي على ضوضاء فقط أو لم تسمع كلاماً مفهوماً من الطالب، فلا تؤلف أي شرح أو تقييم ولا تستخدم قوالب مثل [مثال]، بل قل فوراً: (🎙️ لم أسمع كلاماً واضحاً في التسجيل، يرجى المحاولة مرة أخرى). أما إذا سمعت كلاماً واضحاً، فاذكر باختصار ما سمعته من الطالب ثم رد عليه بناءً على الوضع الحالي."
+});
+            historyTextFallback = "[أرسل الطالب رسالة صوتية]";
+        }
+
+        if (text) {
+            parts.push({ text });
+        }
+
+        if (inputEl) inputEl.value = "";
+        this.appendMessage('user', text, uiHtmlPrefix);
+
+        // نرسل الطلب بالـ inline_data للرسالة الحالية فقط، ونحفظ نصاً خفيفاً في الذاكرة بعد الرد
+        const currentTurnContent = { role: "user", parts };
+        const contentsToSend = [...this.history.slice(-8), currentTurnContent];
 
         this.isSending = true;
         const sendBtn = document.getElementById('ai-buddy-send');
         if (sendBtn) sendBtn.disabled = true;
-        const loadingId = this.appendMessage('ai', "جاري التفكير... ⏳");
+        const loadingId = this.appendMessage('ai', hasVoice ? "جاري الاستماع لفويسك... 🎧" : (hasImage ? "جاري قراءة الصورة وحل السؤال... 🔍" : "جاري التفكير... ⏳"));
 
         try {
             const payload = {
                 system_instruction: { parts: [{ text: this.buildSystemPrompt() }] },
-                contents: this.history.slice(-10),
+                contents: contentsToSend,
                 generationConfig: {
                     temperature: 0.5,
                     maxOutputTokens: 2500,
@@ -3027,12 +3187,14 @@ ${teacherNotes}
 
             const reply = await this.callGeminiWithFallback(payload);
 
+            // 🧹 حفظ نسخة نصية خفيفة في الذاكرة (بدون Base64 الصور/الصوت) لسرعة فائقة
+            this.history.push({ role: "user", parts: [{ text: historyTextFallback }] });
             this.history.push({ role: "model", parts: [{ text: reply }] });
+
             this.incrementUsedCount();
             this.updateMessage(loadingId, reply);
         } catch (err) {
             console.error("AI Buddy Error:", err);
-            this.history.pop();
             if (err.message === "RATE_LIMIT") {
                 this.updateMessage(loadingId, "⏳ هناك ضغط لحظي على السيرفر، انتظر 10 ثوانٍ وأعد إرسال سؤالك يا بطل.");
             } else if (err.message === "TIMEOUT") {
@@ -3041,27 +3203,26 @@ ${teacherNotes}
                 this.updateMessage(loadingId, `❌ حدث خطأ مؤقت (${err.message}). حاول مرة أخرى.`);
             }
         } finally {
-            // 🔒 ضمان فك الزرار دائماً في كل الحالات
             this.isSending = false;
             if (sendBtn) sendBtn.disabled = false;
             inputEl?.focus();
         }
     },
 
-    // 9. تنسيق الردود وعرضها بأمان
+    // 10. تنسيق وعرض الرسائل
     formatText(raw) {
-        return raw
+        return (raw || "")
             .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
             .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
             .replace(/\n/g, "<br>");
     },
-    appendMessage(sender, text) {
+    appendMessage(sender, text, rawHtmlPrefix = "") {
         const box = document.getElementById('ai-buddy-messages');
         const id = "msg_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
         const div = document.createElement('div');
         div.id = id;
         div.className = `buddy-msg ${sender}`;
-        div.innerHTML = this.formatText(text);
+        div.innerHTML = rawHtmlPrefix + (rawHtmlPrefix && text ? "<br>" : "") + this.formatText(text);
         box.appendChild(div);
         box.scrollTop = box.scrollHeight;
         return id;
