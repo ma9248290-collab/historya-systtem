@@ -1906,6 +1906,64 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- ✨ مولد الأسئلة بالذكاء الاصطناعي (AI Exam Generator) -->
+<div style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(59, 130, 246, 0.06)); padding: 18px; border-radius: 14px; border: 1.5px dashed #8b5cf6; margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; cursor: pointer;" onclick="let b = document.getElementById('aiExamGenBody'); b.style.display = b.style.display === 'none' ? 'block' : 'none';">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 22px;">✨</span>
+            <div>
+                <h4 style="margin: 0; color: #7c3aed; font-size: 16px; font-weight: 900;">مولد الأسئلة الذكي بالذكاء الاصطناعي (من PDF أو نص)</h4>
+                <span style="font-size: 12px; color: var(--text-muted); font-weight: bold;">ارفع مذكرة PDF أو الصق شرح الدرس وسيقوم الـ AI بتوليد الأسئلة وتفسيرها فوراً</span>
+            </div>
+        </div>
+        <span style="background: #8b5cf6; color: #fff; padding: 5px 14px; border-radius: 50px; font-size: 12px; font-weight: 900;">فتح / إغلاق 🔽</span>
+    </div>
+
+    <div id="aiExamGenBody" style="display: none; margin-top: 16px; padding-top: 15px; border-top: 1px solid rgba(139, 92, 246, 0.2);">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px;">
+            <div>
+                <label style="font-size: 12px; font-weight: bold; color: var(--text-main);">عدد الأسئلة:</label>
+                <input type="number" id="aiGenCount" class="custom-input" value="5" min="1" max="30" style="margin: 4px 0 0 0;">
+            </div>
+            <div>
+                <label style="font-size: 12px; font-weight: bold; color: var(--text-main);">نوع الأسئلة:</label>
+                <select id="aiGenType" class="custom-input" style="margin: 4px 0 0 0;">
+                    <option value="mcq">اختيار من متعدد فقط (MCQ)</option>
+                    <option value="tf">صح وخطأ فقط</option>
+                    <option value="mixed">متنوع (اختياري + صح وخطأ)</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size: 12px; font-weight: bold; color: var(--text-main);">مستوى الصعوبة:</label>
+                <select id="aiGenDifficulty" class="custom-input" style="margin: 4px 0 0 0;">
+                    <option value="نظام حديث (فهم واستنتاج ونواتج تعلم)">نظام حديث (نواتج تعلم 🎯)</option>
+                    <option value="متوسط ومباشر">متوسط ومباشر</option>
+                    <option value="صعب جداً للمتفوقين (أسئلة مهارات عليا)">مستويات عليا للمتفوقين 🔥</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size: 12px; font-weight: bold; color: var(--text-main);">درجة كل سؤال:</label>
+                <input type="number" id="aiGenPoints" class="custom-input" value="1" min="1" max="10" style="margin: 4px 0 0 0;">
+            </div>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <label style="font-size: 12px; font-weight: bold; color: #7c3aed; display: block; margin-bottom: 5px;">📄 ارفع ملف المذكرة (PDF أو صورة أو TXT) — اختياري:</label>
+            <input type="file" id="aiGenFileInput" class="custom-input" accept=".pdf,.txt,.md,image/*" style="margin: 0; background: #fff;">
+        </div>
+
+        <div style="margin-bottom: 14px;">
+            <label style="font-size: 12px; font-weight: bold; color: var(--text-main); display: block; margin-bottom: 5px;">✍️ أو الصق نص الدرس / ملاحظاتك هنا:</label>
+            <textarea id="aiGenSourceText" class="custom-input" rows="3" placeholder="مثال: الصق فقرة من الدرس أو اكتب: اعمل 5 أسئلة عن الحملة الفرنسية على مصر ومقاومة أهالي الإسكندرية..." style="margin: 0;"></textarea>
+        </div>
+
+        <button type="button" id="aiGenRunBtn" onclick="AIExamGenerator.generate()" class="save-btn" style="width: 100%; margin: 0; background: linear-gradient(135deg, #8b5cf6, #6d28d9); font-size: 15px; padding: 12px;">
+            ✨ توليد وإضافة الأسئلة للامتحان الآن
+        </button>
+    </div>
+</div>
+
                 <div id="examQuestionsContainer"></div>
                 <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; background: var(--bg-color); padding: 15px; border-radius: 12px; border: 1px dashed var(--primary-color);">
                     <p style="width: 100%; margin-bottom: 10px; font-weight: bold; color: var(--text-muted);">➕ أضف سؤالاً جديداً:</p>

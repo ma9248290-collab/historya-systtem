@@ -3245,3 +3245,300 @@ if (typeof _origFetchStudentForBuddy === 'function') {
         if (window.currentStudent) StudyBuddyAI.init();
     };
 }
+
+// =========================================================
+// 🛡️ إخفاء وحظر صديق المذاكرة تلقائياً أثناء الامتحان النشط
+// =========================================================
+(function protectExamFromAIBuddy() {
+    const syncBuddyExamLock = () => {
+        const examScreen = document.getElementById('active-exam-screen');
+        const fab = document.getElementById('ai-buddy-fab');
+        const isExamActive = examScreen && examScreen.style.display === 'block';
+
+        if (isExamActive) {
+            if (fab) fab.style.display = 'none';
+            if (window.StudyBuddyAI) StudyBuddyAI.close();
+        } else {
+            // إرجاع الزرار بعد انتهاء الامتحان لو البوت مفعل والطالب مسجل دخول
+            if (fab && window.StudyBuddyAI?.config && window.currentStudent) {
+                fab.style.display = 'flex';
+            }
+        }
+    };
+
+    // 1. مراقبة فورية لشاشة الامتحان عند الفتح أو التسليم أو انتهاء الوقت
+    const examScreenEl = document.getElementById('active-exam-screen');
+    if (examScreenEl) {
+        new MutationObserver(syncBuddyExamLock).observe(examScreenEl, {
+            attributes: true,
+            attributeFilter: ['style']
+        });
+    }
+
+    // 2. قفل دالة الفتح نفسها أثناء الامتحان كحماية إضافية
+    if (window.StudyBuddyAI && typeof StudyBuddyAI.open === 'function') {
+        const _origOpen = StudyBuddyAI.open.bind(StudyBuddyAI);
+        StudyBuddyAI.open = function() {
+            const examScreen = document.getElementById('active-exam-screen');
+            if (examScreen && examScreen.style.display === 'block') return;
+            _origOpen();
+        };
+    }
+})();
+
+
+// =========================================================
+// 📸 مولد كارت ستوري التفوق (Viral Flex Story Card - Pro V1)
+// =========================================================
+window.FlexStoryCard = {
+    // 1. حقن زر التحميل تلقائياً داخل شاشة مراجعة الامتحان
+    injectButton() {
+        const renderBox = document.getElementById("review-questions-render");
+        if (!renderBox || document.getElementById("flex-story-banner")) return;
+
+        const banner = document.createElement("div");
+        banner.id = "flex-story-banner";
+        banner.style.cssText = `
+            background: linear-gradient(135deg, #0f172a, #3b0000);
+            border: 1.5px solid rgba(251, 191, 36, 0.45);
+            border-radius: 20px;
+            padding: 18px 22px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 14px;
+            color: #fff;
+            box-shadow: 0 12px 28px rgba(152, 0, 0, 0.2);
+        `;
+        banner.innerHTML = `
+            <div>
+                <h4 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 900; color: #fbbf24;">🏆 شارك تفوقك مع أصحابك!</h4>
+                <span style="font-size: 13px; color: #cbd5e1; font-weight: 700;">نزّل كارت نتيجتك بمقاس ستوري إنستجرام وواتساب بضغطة واحدة</span>
+            </div>
+            <button id="downloadFlexStoryBtn" onclick="FlexStoryCard.generateAndShare()" style="
+                background: linear-gradient(135deg, #f59e0b, #d97706);
+                color: #0f172a;
+                border: none;
+                padding: 11px 22px;
+                border-radius: 50px;
+                font-weight: 900;
+                font-size: 14px;
+                cursor: pointer;
+                box-shadow: 0 6px 18px rgba(245, 158, 11, 0.35);
+                transition: transform 0.2s;
+            " onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">
+                📸 تحميل كارت الستوري
+            </button>
+        `;
+        renderBox.parentNode.insertBefore(banner, renderBox);
+    },
+
+    // 2. رسم مستطيل بحواف دائرية على الـ Canvas
+    roundRect(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+    },
+
+    // 3. تقسيم النص الطويل لسطرين داخل الكارت
+    drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
+        const words = String(text || "").split(" ");
+        let line = "";
+        let curY = y;
+        for (let i = 0; i < words.length; i++) {
+            const testLine = line + words[i] + " ";
+            if (ctx.measureText(testLine).width > maxWidth && i > 0) {
+                ctx.fillText(line.trim(), x, curY);
+                line = words[i] + " ";
+                curY += lineHeight;
+            } else {
+                line = testLine;
+            }
+        }
+        ctx.fillText(line.trim(), x, curY);
+        return curY;
+    },
+
+    // 4. توليد ومشاركة / تحميل صورة الستوري (1080 × 1920)
+    async generateAndShare() {
+        const btn = document.getElementById("downloadFlexStoryBtn");
+        const origText = btn ? btn.innerHTML : "";
+        if (btn) { btn.innerHTML = "⏳ جاري تصميم الكارت..."; btn.disabled = true; }
+
+        try {
+            const studentName = currentStudent?.name || "بطل المنصة";
+            const studentLevel = currentStudent?.level || "";
+            const examTitle = document.getElementById("review-exam-title")?.innerText || "امتحان إلكتروني";
+            const score = parseFloat(document.getElementById("review-exam-score")?.innerText || "0");
+            const total = parseFloat(document.getElementById("review-exam-total")?.innerText || "1");
+            const percent = total > 0 ? Math.round((score / total) * 100) : 0;
+            const teacherName = document.getElementById("hero-teacher-name")?.innerText || "مستر أسامة رفعت";
+            const brandName = (document.getElementById("nav-brand-name")?.innerText || "هيستوريا").split(":")[0].trim();
+
+            let rankTitle = "💪 محاولة قوية — القادم أقوى";
+            let accentColor = "#38bdf8";
+            if (percent === 100) { rankTitle = "👑 العلامة الكاملة — أسطورة الدفعة"; accentColor = "#fbbf24"; }
+            else if (percent >= 90) { rankTitle = "🔥 امتياز — من كتيبة الأوائل"; accentColor = "#34d399"; }
+            else if (percent >= 75) { rankTitle = "⭐ جيد جداً — بطل مستمر"; accentColor = "#a78bfa"; }
+
+            const canvas = document.createElement("canvas");
+            canvas.width = 1080;
+            canvas.height = 1920;
+            const ctx = canvas.getContext("2d");
+
+            // أ. الخلفية الملكية المتدرجة
+            const bgGrad = ctx.createLinearGradient(0, 0, 1080, 1920);
+            bgGrad.addColorStop(0, "#090d16");
+            bgGrad.addColorStop(0.5, "#2b0505");
+            bgGrad.addColorStop(1, "#0f172a");
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, 1080, 1920);
+
+            // ب. توهجات خلفية ناعمة
+            const glow1 = ctx.createRadialGradient(900, 300, 40, 900, 300, 520);
+            glow1.addColorStop(0, "rgba(152, 0, 0, 0.45)");
+            glow1.addColorStop(1, "transparent");
+            ctx.fillStyle = glow1;
+            ctx.fillRect(0, 0, 1080, 1920);
+
+            const glow2 = ctx.createRadialGradient(180, 1600, 40, 180, 1600, 500);
+            glow2.addColorStop(0, "rgba(245, 158, 11, 0.25)");
+            glow2.addColorStop(1, "transparent");
+            ctx.fillStyle = glow2;
+            ctx.fillRect(0, 0, 1080, 1920);
+
+            // ج. الإطار الخارجي الذهبي
+            ctx.strokeStyle = "rgba(251, 191, 36, 0.35)";
+            ctx.lineWidth = 4;
+            this.roundRect(ctx, 55, 55, 970, 1810, 55);
+            ctx.stroke();
+
+            ctx.textAlign = "center";
+            ctx.direction = "rtl";
+
+            // د. الشارة العلوية واسم المنصة
+            ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+            this.roundRect(ctx, 290, 130, 500, 76, 38);
+            ctx.fill();
+            ctx.fillStyle = "#fbbf24";
+            ctx.font = "900 32px 'Cairo', sans-serif";
+            ctx.fillText(`👑 منصة ${brandName} التعليمية`, 540, 180);
+
+            ctx.fillStyle = "#cbd5e1";
+            ctx.font = "700 30px 'Cairo', sans-serif";
+            ctx.fillText(teacherName, 540, 260);
+
+            // هـ. الكارت الزجاجي الرئيسي في المنتصف
+            ctx.fillStyle = "rgba(255, 255, 255, 0.06)";
+            this.roundRect(ctx, 105, 340, 870, 1160, 48);
+            ctx.fill();
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // و. شارة اللقب
+            ctx.fillStyle = accentColor;
+            ctx.font = "900 40px 'Cairo', sans-serif";
+            ctx.fillText(rankTitle, 540, 445);
+
+            // ز. اسم الطالب والصف
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "900 62px 'Cairo', sans-serif";
+            this.drawWrappedText(ctx, studentName, 540, 555, 760, 78);
+
+            if (studentLevel) {
+                ctx.fillStyle = "#94a3b8";
+                ctx.font = "700 32px 'Cairo', sans-serif";
+                ctx.fillText(studentLevel, 540, 650);
+            }
+
+            // ح. دائرة الدرجة المتوهجة
+            ctx.beginPath();
+            ctx.arc(540, 910, 195, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+            ctx.fill();
+            ctx.lineWidth = 18;
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+            ctx.stroke();
+
+            // قوس النسبة المئوية
+            const startAngle = -Math.PI / 2;
+            const endAngle = startAngle + (Math.PI * 2 * (percent / 100));
+            ctx.beginPath();
+            ctx.arc(540, 910, 195, startAngle, endAngle);
+            ctx.strokeStyle = accentColor;
+            ctx.lineCap = "round";
+            ctx.stroke();
+
+            // الدرجة داخل الدائرة
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "900 84px 'Cairo', sans-serif";
+            ctx.fillText(`${score} / ${total}`, 540, 925);
+
+            ctx.fillStyle = accentColor;
+            ctx.font = "900 44px 'Cairo', sans-serif";
+            ctx.fillText(`${percent}%`, 540, 995);
+
+            // ط. اسم الامتحان والتاريخ
+            ctx.fillStyle = "#e2e8f0";
+            ctx.font = "800 38px 'Cairo', sans-serif";
+            this.drawWrappedText(ctx, `📝 ${examTitle}`, 540, 1215, 760, 52);
+
+            const dateStr = new Date().toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
+            ctx.fillStyle = "#94a3b8";
+            ctx.font = "700 28px 'Cairo', sans-serif";
+            ctx.fillText(`📅 ${dateStr}`, 540, 1345);
+
+            // ي. الفوتر ورابط المنصة للتسويق المجاني
+            ctx.fillStyle = "#fbbf24";
+            ctx.font = "900 34px 'Cairo', sans-serif";
+            ctx.fillText("انضم لكتيبة الأوائل الآن 🚀", 540, 1650);
+
+            const siteHost = location.hostname || "historya.online";
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "800 36px monospace";
+            ctx.fillText(siteHost, 540, 1720);
+
+            // ك. التحويل لصورة ومشاركتها أو تحميلها
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png", 1.0));
+            const fileName = `تفوق_${studentName.replace(/\s+/g, "_")}.png`;
+            const file = new File([blob], fileName, { type: "image/png" });
+
+            // مشاركة مباشرة على الموبايل إن كانت مدعومة
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    title: `نتيجتي في ${examTitle}`,
+                    text: `حصلت على ${score}/${total} (${percent}%) في ${examTitle} على منصة ${brandName}! 🔥`,
+                    files: [file]
+                });
+            } else {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = fileName;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        } catch (err) {
+            console.error("Flex Card Error:", err);
+            alert("حدث خطأ أثناء تجهيز الكارت، يرجى المحاولة مرة أخرى.");
+        } finally {
+            if (btn) { btn.innerHTML = origText; btn.disabled = false; }
+        }
+    }
+};
+
+// ربط الكارت تلقائياً عند فتح شاشة مراجعة أي امتحان
+const _origReviewExamForFlex = window.reviewExam;
+if (typeof _origReviewExamForFlex === "function") {
+    window.reviewExam = function(...args) {
+        _origReviewExamForFlex.apply(this, args);
+        FlexStoryCard.injectButton();
+    };
+}

@@ -1234,7 +1234,7 @@ window.processStudentSaving = async function(keepOpen) {
     if(typeof addSystemLog === "function") addSystemLog("إضافة طالب 🎓", `تسجيل الطالب: ${name} (كود: ${code}) في ${group}`);
 
     // إرسال الواتساب
-    const portalLink = `https://ma9248290-collab.github.io/historya-systtem/parent.html`;
+    const portalLink = `https://historya.online/.html`;
     const teacherName = localStorage.getItem("teacherName") || "Sami Samir";
     const centerName = localStorage.getItem("centerName") || "هيستوريا";
 
@@ -3761,7 +3761,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function updateParentLinkUI() {
     const linkInput = document.getElementById("parentPortalLink");
     if (linkInput) {
-        linkInput.value = "https://ma9248290-collab.github.io/historya-systtem/parent";
+        linkInput.value = "https://historya.online/";
     }
 }
 
@@ -8353,7 +8353,7 @@ window.confirmApproveRequest = async function() {
                     }
                 }
 
-                let portalLink = `https://ma9248290-collab.github.io/historya-systtem/parent.html`;
+                let portalLink = `https://historya.online/.html`;
                 let waMsg = `🎉 *تمت الموافقة على طلب الانضمام*\nأهلاً بك في نظام ${localStorage.getItem("teacherName") || "السنتر"}.\n\n👤 *اسم الطالب:* ${newStudent.name}\n📚 *المجموعة:* ${newStudent.group}\n🔑 *كود الدخول الخاص بك:* ${newCode}\n\n🔗 *رابط منصة الطالب:* ${portalLink}`;
                 
                 if (typeof sendAutoWhatsApp === "function") {
@@ -12428,5 +12428,206 @@ window.switchPage = function(pageId) {
                     window.updateKnowledgeStats();
                 }
             }).catch(() => {});
+    }
+};
+
+
+// =========================================================
+// ✨ محرك مولد الامتحانات الذكي (AIExamGenerator Module)
+// =========================================================
+window.AIExamGenerator = {
+    isGenerating: false,
+    MODELS_FALLBACK: [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash"
+    ],
+
+    // جلب مفتاح الـ API من إعدادات البوت في Firebase
+    async getApiKey() {
+        const localInput = document.getElementById('settingGeminiApiKey')?.value?.trim();
+        if (localInput) return localInput;
+
+        const uid = typeof getSafeUid === "function" ? getSafeUid() : "Historia_System_Master";
+        const res = await fetch(`https://historya-el3alamy-default-rtdb.europe-west1.firebasedatabase.app/${uid}/bot_settings/apiKey.json`);
+        return (await res.json()) || "";
+    },
+
+    // قراءة الملف المرفوع (PDF / صورة / نص)
+    readUploadedFile(file) {
+        return new Promise((resolve, reject) => {
+            if (file.type === "text/plain" || file.name.endsWith(".txt") || file.name.endsWith(".md")) {
+                const r = new FileReader();
+                r.onload = e => resolve({ kind: "text", data: e.target.result });
+                r.onerror = reject;
+                r.readAsText(file);
+            } else {
+                // PDF أو صورة -> إرسال كـ inline_data مباشرة لـ Gemini
+                if (file.size > 15 * 1024 * 1024) {
+                    return reject(new Error("حجم الملف أكبر من 15 ميجابايت، يرجى تقسيمه أو ضغطه."));
+                }
+                const r = new FileReader();
+                r.onload = e => resolve({
+                    kind: "inline",
+                    mimeType: file.type || "application/pdf",
+                    data: e.target.result.split(",")[1]
+                });
+                r.onerror = reject;
+                r.readAsDataURL(file);
+            }
+        });
+    },
+
+    async generate() {
+        if (this.isGenerating) return;
+
+        const count = Math.min(30, Math.max(1, parseInt(document.getElementById("aiGenCount")?.value || "5", 10)));
+        const qType = document.getElementById("aiGenType")?.value || "mcq";
+        const difficulty = document.getElementById("aiGenDifficulty")?.value || "نظام حديث";
+        const points = Math.max(1, parseFloat(document.getElementById("aiGenPoints")?.value || "1"));
+        const sourceText = (document.getElementById("aiGenSourceText")?.value || "").trim();
+        const fileInput = document.getElementById("aiGenFileInput");
+        const file = fileInput?.files?.[0] || null;
+
+        if (!sourceText && !file) {
+            return showToast("⚠️ يرجى رفع ملف (PDF/صورة) أو كتابة نص/موضوع الدرس أولاً!", "error");
+        }
+
+        const btn = document.getElementById("aiGenRunBtn");
+        const origText = btn.innerHTML;
+        this.isGenerating = true;
+        btn.disabled = true;
+        btn.innerHTML = "⏳ جاري قراءة المحتوى وتوليد الأسئلة وتفسيرها...";
+
+        try {
+            const apiKey = await this.getApiKey();
+            if (!apiKey) {
+                throw new Error("يرجى إدخال Gemini API Key أولاً من صفحة (المساعد الذكي 🤖).");
+            }
+
+            const parts = [];
+            if (file) {
+                const filePayload = await this.readUploadedFile(file);
+                if (filePayload.kind === "inline") {
+                    parts.push({ inline_data: { mime_type: filePayload.mimeType, data: filePayload.data } });
+                } else {
+                    parts.push({ text: `محتوى الملف المرفق:\n${filePayload.data.substring(0, 25000)}` });
+                }
+            }
+
+            const typeRule = qType === "mcq"
+                ? `جميع الأسئلة يجب أن تكون من نوع "mcq" فقط، ولكل سؤال 4 اختيارات دقيقة في مصفوفة options.`
+                : (qType === "tf"
+                    ? `جميع الأسئلة يجب أن تكون من نوع "tf" (صح وخطأ) فقط.`
+                    : `نوّع الأسئلة بين "mcq" (اختيار من متعدد بـ 4 اختيارات) و "tf" (صح وخطأ).`);
+
+            const prompt = `أنت خبير وضع امتحانات ثانوية عامة في مصر.
+المطلوب: توليد ${count} أسئلة احترافية باللغة العربية بناءً على المحتوى المرفق/المكتوب.
+مستوى الصعوبة: ${difficulty}.
+${typeRule}
+${sourceText ? `تعليمات أو نص الدرس من المدرس:\n${sourceText}` : ""}
+
+أرجع النتيجة بصيغة JSON Array فقط بدون أي كلام خارجي، بحيث يكون كل عنصر مطابقاً تماماً لهذا الهيكل:
+[
+  {
+    "type": "mcq" أو "tf",
+    "text": "نص السؤال واضحاً ودقيقاً",
+    "options": ["الاختيار الأول", "الاختيار الثاني", "الاختيار الثالث", "الاختيار الرابع"],
+    "correctAnswerIndex": 0,
+    "correctAnswerTF": "true",
+    "explanation": "تفسير مختصر وواضح لسبب الإجابة الصحيحة وناتج التعلم"
+  }
+]
+ملاحظة: في حالة "tf" اجعل options مصفوفة فارغة [] وضع الإجابة الصحيحة في correctAnswerTF بقيمة "true" أو "false". وفي حالة "mcq" ضع رقم الاختيار الصحيح (من 0 إلى 3) في correctAnswerIndex.`;
+
+            parts.push({ text: prompt });
+
+            let generatedJsonText = null;
+            let lastErr = "فشل الاتصال بالذكاء الاصطناعي";
+
+            for (const modelName of this.MODELS_FALLBACK) {
+                try {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+                    const genConfig = {
+                        temperature: 0.4,
+                        maxOutputTokens: 4096,
+                        responseMimeType: "application/json"
+                    };
+                    if (modelName.includes("2.5")) genConfig.thinkingConfig = { thinkingBudget: 0 };
+
+                    const res = await fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            contents: [{ role: "user", parts }],
+                            generationConfig: genConfig
+                        })
+                    });
+
+                    const data = await res.json();
+                    if (res.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+                        generatedJsonText = data.candidates[0].content.parts[0].text;
+                        break;
+                    }
+                    if (res.status === 429 || res.status === 503) {
+                        lastErr = "ضغط مؤقت على السيرفر، حاول بعد ثوانٍ";
+                        continue;
+                    }
+                    throw new Error(data?.error?.message || `HTTP ${res.status}`);
+                } catch (e) {
+                    lastErr = e.message;
+                }
+            }
+
+            if (!generatedJsonText) throw new Error(lastErr);
+
+            // تنظيف وتحويل الـ JSON
+            const cleanJson = generatedJsonText.replace(/```json|```/g, "").trim();
+            const parsedQuestions = JSON.parse(cleanJson);
+            if (!Array.isArray(parsedQuestions) || parsedQuestions.length === 0) {
+                throw new Error("لم يتمكن الذكاء الاصطناعي من استخراج أسئلة صالحة.");
+            }
+
+            // إزالة أول سؤال فاضي افتراضي لو المدرس لسه فاتح المودال ومكتبش فيه حاجة
+            if (currentQuestions.length === 1 && !currentQuestions[0].text.trim()) {
+                currentQuestions = [];
+            }
+
+            // إضافة الأسئلة المولدة مباشرة إلى صانع الامتحانات
+            parsedQuestions.forEach((q, idx) => {
+                const isTf = q.type === "tf";
+                currentQuestions.push({
+                    id: "q_" + Date.now() + "_" + idx + "_" + Math.floor(Math.random() * 1000),
+                    type: isTf ? "tf" : "mcq",
+                    text: q.text || "",
+                    imageUrl: "",
+                    explanation: q.explanation || "",
+                    points: points,
+                    options: isTf ? ["", "", "", ""] : (Array.isArray(q.options) && q.options.length >= 2 ? q.options.slice(0, 4) : ["", "", "", ""]),
+                    correctAnswerIndex: isTf ? 0 : Math.min(3, Math.max(0, parseInt(q.correctAnswerIndex, 10) || 0)),
+                    correctAnswerText: "",
+                    correctAnswerTF: String(q.correctAnswerTF) === "false" ? "false" : "true"
+                });
+            });
+
+            renderQuestionBlocks();
+            document.getElementById("aiExamGenBody").style.display = "none";
+            if (fileInput) fileInput.value = "";
+            document.getElementById("aiGenSourceText").value = "";
+
+            showToast(`🎉 تم توليد وإضافة ${parsedQuestions.length} أسئلة بنواتج التعلم بنجاح!`, "success");
+            setTimeout(() => {
+                const sa = document.getElementById("examBuilderScrollArea");
+                if (sa) sa.scrollTop = sa.scrollHeight;
+            }, 150);
+
+        } catch (err) {
+            console.error("AI Exam Gen Error:", err);
+            showToast(`❌ ${err.message}`, "error");
+        } finally {
+            this.isGenerating = false;
+            btn.disabled = false;
+            btn.innerHTML = origText;
+        }
     }
 };
